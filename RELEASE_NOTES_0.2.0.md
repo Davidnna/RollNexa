@@ -1,4 +1,4 @@
-# AttendIQ 0.2.0 — User Management and Role-Based Access Control
+# RollNexa 0.2.0 — User Management and Role-Based Access Control
 
 ## Included
 - Adds a `UserProfile` model linked one-to-one to Django's existing user model.

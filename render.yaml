@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: attendiq
+    name: rollnexa
     runtime: python
     plan: free
     region: frankfurt

@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}Access restricted — AttendIQ{% endblock %}
+{% block title %}Access restricted — RollNexa{% endblock %}
 {% block content %}
 <section class="simple-state">
   <span class="eyebrow">ACCESS RESTRICTED</span>
   <h1>You do not have permission to view this page.</h1>
-  <p>Your account does not have the required role or permission for this area of AttendIQ.</p>
+  <p>Your account does not have the required role or permission for this area of RollNexa.</p>
   {% if user.is_authenticated %}
     <a class="button button-primary" href="{% url 'dashboard' %}">Return to your dashboard</a>
   {% else %}

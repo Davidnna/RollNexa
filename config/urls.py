@@ -1,8 +1,8 @@
 from django.contrib import admin
 from django.urls import include, path
 
-admin.site.site_header = "AttendIQ Administration"
-admin.site.site_title = "AttendIQ Admin"
+admin.site.site_header = "RollNexa Administration"
+admin.site.site_title = "RollNexa Admin"
 admin.site.index_title = "Platform management"
 
 urlpatterns = [

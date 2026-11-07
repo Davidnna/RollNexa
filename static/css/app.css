@@ -1,15 +1,15 @@
 :root {
-  --navy: #101A33;
-  --navy-soft: #1B2948;
-  --teal: #19B89F;
-  --teal-dark: #118F7D;
-  --mist: #F5F7FA;
+  --navy: #111B35;
+  --navy-soft: #203154;
+  --teal: #19C8B6;
+  --teal-dark: #0D968B;
+  --mist: #F3F7FB;
   --white: #FFFFFF;
-  --slate: #53627A;
-  --slate-light: #7B8799;
-  --line: #E5EAF0;
-  --amber: #F2B85B;
-  --red: #C94C4C;
+  --slate: #52637C;
+  --slate-light: #7C8BA0;
+  --line: #E3EAF1;
+  --amber: #F4B860;
+  --red: #D95B64;
   --shadow: 0 24px 70px rgba(16, 26, 51, .12);
   --radius: 22px;
 }
@@ -34,10 +34,10 @@ button, input { font: inherit; }
 }
 .nav-shell { min-height: 82px; display: flex; align-items: center; justify-content: space-between; }
 .brand img { display: block; width: 174px; height: auto; }
-.main-nav { display: flex; align-items: center; gap: 32px; color: #53627A; font-size: 13px; font-weight: 600; }
+.main-nav { display: flex; align-items: center; gap: 32px; color: #52637C; font-size: 13px; font-weight: 600; }
 .main-nav > a:not(.button):hover, .nav-link-button:hover { color: var(--teal-dark); }
 .nav-form { margin: 0; }
-.nav-link-button { border: 0; padding: 0; background: none; color: #53627A; cursor: pointer; font-weight: 600; }
+.nav-link-button { border: 0; padding: 0; background: none; color: #52637C; cursor: pointer; font-weight: 600; }
 .nav-toggle { display: none; border: 0; background: transparent; padding: 8px; }
 .nav-toggle span { display: block; width: 22px; height: 2px; margin: 4px; background: var(--navy); }
 .button {
@@ -47,7 +47,7 @@ button, input { font: inherit; }
 }
 .button:hover { transform: translateY(-2px); }
 .button-primary { color: var(--navy); background: var(--teal); box-shadow: 0 10px 24px rgba(25,184,159,.18); }
-.button-primary:hover { background: #25C9AE; }
+.button-primary:hover { background: #35D7C5; }
 .button-secondary { color: var(--navy); background: var(--white); border-color: var(--line); }
 .button-secondary:hover { border-color: #B9C7D4; }
 .button-small { min-height: 40px; padding-inline: 17px; }
@@ -99,7 +99,7 @@ button, input { font: inherit; }
 .trust-strip { border-block: 1px solid var(--line); background: white; }
 .trust-inner { min-height: 83px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
 .trust-inner > span { color: #8290A3; font-size: 9px; font-weight: 800; letter-spacing: .13em; }
-.trust-inner div { color: #53627A; font-size: 11px; font-weight: 600; }
+.trust-inner div { color: #52637C; font-size: 11px; font-weight: 600; }
 .trust-inner b { margin-right: 8px; color: var(--teal-dark); font-size: 10px; }
 .section { padding-block: 100px; }
 .section-light { background: var(--mist); }
@@ -210,7 +210,7 @@ button, input { font: inherit; }
 }
 
 
-/* AttendIQ 0.2.0 — account management */
+/* RollNexa 0.2.0 — account management */
 .admin-actions { display:flex; flex-wrap:wrap; gap:10px; margin:0 0 22px; }
 .stats-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin:22px 0; }
 .stat-card { padding:22px; border:1px solid var(--line); border-radius:14px; background:#fff; }
@@ -224,7 +224,7 @@ button, input { font: inherit; }
 .table-wrap { width:100%; overflow-x:auto; }
 .data-table { width:100%; border-collapse:collapse; text-align:left; }
 .data-table th { padding:12px 13px; border-bottom:1px solid var(--line); color:#8997A9; font-size:9px; font-weight:800; letter-spacing:.1em; white-space:nowrap; }
-.data-table td { padding:15px 13px; border-bottom:1px solid #EEF1F5; color:#53627A; font-size:11px; vertical-align:middle; }
+.data-table td { padding:15px 13px; border-bottom:1px solid #EEF1F5; color:#52637C; font-size:11px; vertical-align:middle; }
 .data-table tr:last-child td { border-bottom:0; }
 .data-table td strong, .table-subtext { display:block; }
 .data-table td strong { color:var(--navy); font-size:11px; }
@@ -269,3 +269,15 @@ button, input { font: inherit; }
   .filter-bar .button { width:100%; }
   .pagination { align-items:flex-start; flex-direction:column; }
 }
+
+
+/* RollNexa brand accents */
+:root {
+  --aqua: #7CE6DC;
+  --teal: #19C8B6;
+  --teal-dark: #0D968B;
+  --navy: #111B35;
+  --navy-soft: #203154;
+  --mist: #F3F7FB;
+}
+::selection { color: #111B35; background: #B9F2EA; }

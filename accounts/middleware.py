@@ -4,7 +4,7 @@ from django.shortcuts import redirect
 class ForcePasswordChangeMiddleware:
     """
     Require administrator-created accounts to change their temporary password
-    before using the rest of AttendIQ.
+    before using the rest of RollNexa.
     """
 
     allowed_url_names = {"password_change", "logout"}
@@ -19,10 +19,10 @@ class ForcePasswordChangeMiddleware:
         match = getattr(request, "resolver_match", None)
         # Clear a pending one-time password if the administrator navigates
         # away from its confirmation page.
-        if request.session.get("attendiq_new_user_credentials") and (
+        if request.session.get("rollnexa_new_user_credentials") and (
             not match or match.url_name != "user_created"
         ):
-            request.session.pop("attendiq_new_user_credentials", None)
+            request.session.pop("rollnexa_new_user_credentials", None)
 
         user = getattr(request, "user", None)
         if not user or not user.is_authenticated or user.is_superuser:

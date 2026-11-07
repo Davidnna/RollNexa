@@ -7,7 +7,7 @@ from .models import UserProfile
 User = get_user_model()
 
 
-class AttendIQAccountTests(TestCase):
+class RollNexaAccountTests(TestCase):
     def setUp(self):
         self.admin = User.objects.create_superuser(
             username="systemadmin",

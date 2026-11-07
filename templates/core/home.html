@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 {% load static %}
-{% block title %}AttendIQ — Presence, verified.{% endblock %}
+{% block title %}RollNexa — Attendance, connected.{% endblock %}
 {% block content %}
 <section class="hero-section">
   <div class="container hero-grid">
     <div class="hero-copy">
-      <div class="eyebrow"><span class="eyebrow-dot"></span> SMART ATTENDANCE MANAGEMENT</div>
+      <div class="eyebrow"><span class="eyebrow-dot"></span> SMART ACADEMIC ATTENDANCE</div>
       <h1>Attendance you can <span>verify.</span></h1>
-      <p class="hero-lead">A smarter way to manage classroom attendance, bringing QR-code session access and identity verification into one clear workflow.</p>
+      <p class="hero-lead">A connected academic attendance platform bringing session access, identity verification and attendance records into one clear workflow.</p>
       <div class="hero-actions">
         {% if user.is_authenticated %}
           <a class="button button-primary" href="{% url 'dashboard' %}">Open dashboard <span aria-hidden="true">→</span></a>
@@ -18,14 +18,14 @@
       </div>
       <div class="hero-assurance">
         <span class="assurance-icon">✓</span>
-        <span>Designed for clarity, accountability and reliable records.</span>
+        <span>Connected workflows. Clear records. Accountable attendance.</span>
       </div>
     </div>
     <div class="hero-visual" aria-label="Illustration of an attendance verification interface">
       <div class="visual-glow"></div>
       <div class="verification-card">
         <div class="card-topline">
-          <div class="mini-brand"><img src="{% static 'images/attendiq-mark.svg' %}" alt="" width="25" height="25"><span>AttendIQ</span></div>
+          <div class="mini-brand"><img src="{% static 'images/rollnexa-mark.svg' %}" alt="" width="25" height="25"><span>RollNexa</span></div>
           <span class="live-pill"><i></i> SESSION PREVIEW</span>
         </div>
         <div class="scan-frame">
@@ -61,7 +61,7 @@
 <section class="section section-light" id="how-it-works">
   <div class="container">
     <div class="section-heading">
-      <span class="eyebrow">THE ATTENDIQ APPROACH</span>
+      <span class="eyebrow">THE ROLLNEXA APPROACH</span>
       <h2>Built around better attendance records.</h2>
       <p>The platform is being developed in focused stages, with each capability tested before it becomes part of the live workflow.</p>
     </div>
@@ -91,12 +91,12 @@
 <section class="closing-section">
   <div class="container closing-inner">
     <div>
-      <span class="eyebrow eyebrow-light">ATTENDIQ</span>
+      <span class="eyebrow eyebrow-light">ROLLNEXA</span>
       <h2>Make every attendance record count.</h2>
-      <p>AttendIQ accounts are created by authorised system administrators. Contact your administrator if you need access.</p>
+      <p>RollNexa accounts are created by authorised system administrators. Contact your administrator if you need access.</p>
     </div>
     <a class="button button-light" href="{% if user.is_authenticated %}{% url 'dashboard' %}{% else %}{% url 'login' %}{% endif %}">
-      {% if user.is_authenticated %}Go to dashboard{% else %}Sign in to AttendIQ{% endif %} <span aria-hidden="true">→</span>
+      {% if user.is_authenticated %}Go to dashboard{% else %}Sign in to RollNexa{% endif %} <span aria-hidden="true">→</span>
     </a>
   </div>
 </section>

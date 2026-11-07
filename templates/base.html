@@ -4,9 +4,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#101A33">
-  <meta name="description" content="AttendIQ — intelligent attendance management. Presence, verified.">
-  <title>{% block title %}AttendIQ — Presence, verified.{% endblock %}</title>
+  <meta name="theme-color" content="#111B35">
+  <meta property="og:site_name" content="RollNexa">
+  <meta property="og:type" content="website">
+  <meta name="description" content="RollNexa — smart academic attendance management. Attendance, connected.">
+  <title>{% block title %}RollNexa — Attendance, connected.{% endblock %}</title>
   <link rel="icon" type="image/svg+xml" href="{% static 'images/favicon.svg' %}">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,8 +19,8 @@
 <body>
   <header class="site-header">
     <div class="container nav-shell">
-      <a class="brand" href="{% url 'home' %}" aria-label="AttendIQ home">
-        <img src="{% static 'images/attendiq-logo.svg' %}" alt="AttendIQ">
+      <a class="brand" href="{% url 'home' %}" aria-label="RollNexa home">
+        <img src="{% static 'images/rollnexa-logo.svg' %}" alt="RollNexa">
       </a>
       <button class="nav-toggle" type="button" aria-label="Toggle navigation" aria-expanded="false" data-nav-toggle>
         <span></span><span></span><span></span>
@@ -56,12 +58,12 @@
   <footer class="site-footer">
     <div class="container footer-inner">
       <a class="footer-brand" href="{% url 'home' %}">
-        <img src="{% static 'images/attendiq-mark.svg' %}" alt="" width="28" height="28">
-        <span>AttendIQ</span>
+        <img src="{% static 'images/rollnexa-mark.svg' %}" alt="" width="28" height="28">
+        <span>RollNexa</span>
       </a>
-      <p>Presence, verified.</p>
+      <p>Attendance, connected.</p>
       <p class="footer-note">An academic software prototype. Features are being developed in stages.</p>
-      <span class="copyright">© {% now "Y" %} AttendIQ</span>
+      <span class="copyright">© {% now "Y" %} RollNexa</span>
     </div>
   </footer>
 </body>

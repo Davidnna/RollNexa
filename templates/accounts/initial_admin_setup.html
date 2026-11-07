@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Initial administrator setup — AttendIQ{% endblock %}
+{% block title %}Initial administrator setup — RollNexa{% endblock %}
 {% block content %}
 <section class="auth-section">
   <div class="auth-card auth-card-wide">
     <span class="eyebrow">ONE-TIME SYSTEM SETUP</span>
     <h1>Create the first administrator</h1>
-    <p class="auth-intro">This protected setup page is available only while no AttendIQ system administrator exists. Enter the one-time token configured in Render.</p>
+    <p class="auth-intro">This protected setup page is available only while no RollNexa system administrator exists. Enter the one-time token configured in Render.</p>
     {% if form.non_field_errors %}<div class="form-error-summary">{{ form.non_field_errors }}</div>{% endif %}
     <form method="post" class="auth-form">
       {% csrf_token %}

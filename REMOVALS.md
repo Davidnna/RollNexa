@@ -1,10 +1,17 @@
-# Files to delete from the GitHub repository for AttendIQ 0.2.0
+# Obsolete files to remove from GitHub during the RollNexa rebrand
 
-The 0.2.0 package removes public self-registration. After uploading the new files, delete these two obsolete templates in GitHub:
+After uploading the new source package, delete these old files from the GitHub repository if they are still present:
 
-1. `templates/registration/signup.html`
-2. `templates/core/dashboard.html`
+- `static/images/attendiq-logo.svg`
+- `static/images/attendiq-mark.svg`
+- `templates/registration/signup.html`
+- `templates/core/dashboard.html`
 
-They are no longer routed or used. Deleting them keeps the public repository aligned with the administrator-created account policy.
+The new RollNexa logo and mark are stored at:
 
-Do not delete the existing database or any Neon data.
+- `static/images/rollnexa-logo.svg`
+- `static/images/rollnexa-mark.svg`
+
+The new `static/images/favicon.svg` replaces the previous favicon.
+
+These are source/static-template cleanups only. Do not delete database tables or user records.

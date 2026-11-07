@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 64" role="img" aria-label="AttendIQ">
-<rect x="0" y="0" width="64" height="64" rx="17" fill="#19B89F"/>
-<path d="M15 26V15h11M38 15h11v11M49 38v11H38M26 49H15V38" fill="none" stroke="#101A33" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M21 21h8v8h-8zM35 21h8v8h-8zM21 35h8v8h-8z" fill="#101A33"/>
-<path d="m33 38 5 5 10-12" fill="none" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="78" y="43" fill="#101A33" font-family="Manrope, Inter, Arial, sans-serif" font-size="31" font-weight="800" letter-spacing="-1.4">AttendIQ</text>
-</svg>

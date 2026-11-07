@@ -142,7 +142,7 @@ def user_create(request):
         # Keep the one-time credential briefly in the server-side Django session,
         # then redirect (POST/Redirect/GET) to avoid duplicate account creation
         # if the administrator refreshes the confirmation page.
-        request.session["attendiq_new_user_credentials"] = {
+        request.session["rollnexa_new_user_credentials"] = {
             "user_id": user.pk,
             "temporary_password": temporary_password,
             "created_at": timezone.now().timestamp(),
@@ -154,7 +154,7 @@ def user_create(request):
 
 @system_admin_required
 def user_created(request):
-    credentials = request.session.pop("attendiq_new_user_credentials", None)
+    credentials = request.session.pop("rollnexa_new_user_credentials", None)
     if not credentials:
         return redirect("user_list")
 
@@ -192,7 +192,7 @@ def toggle_account_status(request, user_id):
     return redirect("user_list")
 
 
-class AttendIQPasswordChangeView(PasswordChangeView):
+class RollNexaPasswordChangeView(PasswordChangeView):
     template_name = "registration/password_change_form.html"
     success_url = "/accounts/password-change/done/"
 
@@ -238,7 +238,7 @@ def initial_admin_setup(request):
                 profile.save(update_fields=["role", "must_change_password", "updated_at"])
 
             login(request, administrator)
-            messages.success(request, "Your AttendIQ system administrator account is ready.")
+            messages.success(request, "Your RollNexa system administrator account is ready.")
             return redirect("admin_dashboard")
 
     response = render(request, "accounts/initial_admin_setup.html", {"form": form})

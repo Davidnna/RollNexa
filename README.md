@@ -1,87 +1,71 @@
-# AttendIQ
+# RollNexa
 
-**Presence, verified.**
+**Attendance, connected.**
 
-AttendIQ is a web-based student attendance management system prototype. Its planned attendance workflow combines time-limited QR-code session access with facial identity verification.
+RollNexa is a web-based Smart Academic Attendance Platform prototype. Its planned workflow connects academic users, attendance sessions, identity verification and institutional attendance records.
 
-## Current release: 0.2.0
+## Current release: 0.2.1 — Brand refresh
 
-This release introduces user profiles, role-based dashboards and administrator-created accounts.
+This release rebrands AttendIQ as RollNexa and updates the logo, favicon, colour palette, interface copy, metadata and deployment naming. It preserves the existing 0.2.0 user-management functionality.
 
-### Roles
-- **System administrator:** platform-wide account and system management.
-- **Lecturer:** lecturer workspace; course and attendance features will be added in later releases.
-- **Student:** student workspace; attendance and course features will be added in later releases.
+### Current functionality
+- Django authentication and session management
+- Administrator, lecturer and student roles
+- Administrator-created student and lecturer accounts
+- Temporary passwords with mandatory change at first sign-in
+- Account activation and deactivation
+- Role-specific dashboards
+- Neon PostgreSQL persistence
+- Render deployment with automatic deploys from GitHub
 
-### Account policy
-Public self-registration is disabled. Only a system administrator can create student and lecturer accounts. AttendIQ generates a temporary password and requires the user to change it at first sign-in. The temporary password is shown once on a no-cache confirmation page after account creation; it is not automatically emailed.
+### Planned modules
+- Faculties, departments, programmes and course management
+- Lecturer-course assignment
+- QR-code attendance sessions and verification
+- Facial enrollment and identity verification
+- Attendance records, analytics and exports
 
-The initial system administrator is created through a one-time, token-protected browser setup route.
+Do not describe planned modules as already implemented.
 
 ## Hosting architecture
-- **GitHub:** source repository
+- **GitHub:** source repository (`Davidnna/RollNexa` after repository rename)
 - **Render:** Django web application
 - **Neon:** managed PostgreSQL database
 
-The application is configured to use Neon through `DATABASE_URL` (pooled connection) and `DIRECT_DATABASE_URL` (direct connection for migrations). Never commit these values.
+The application uses `DATABASE_URL` (Neon pooled connection) and `DIRECT_DATABASE_URL` (Neon direct connection for migrations). Never commit these credentials.
 
-## Upgrade from 0.1.1
+## Rebranding an existing deployment
+This is an in-place branding release. Do not create a new Render service or a new Neon database.
 
-1. Download and extract the 0.2.0 package.
-2. Upload the extracted project contents to the root of `https://github.com/Davidnna/AttendIQ`, replacing existing files when prompted.
-3. Commit with: `Add AttendIQ user management and role-based access control`
-4. Delete the two obsolete templates listed in `REMOVALS.md`.
-5. In Render → AttendIQ → Environment, add `BOOTSTRAP_ADMIN_TOKEN` with a long, randomly generated secret value. Generate it with a password manager; do not put it in GitHub or send it in chat.
-6. Save the environment variable and allow Render to deploy the new commit.
-7. Open `https://YOUR-RENDER-SERVICE-URL/setup/initial-admin/`.
-8. Enter the same one-time token and create the first system administrator.
-9. After successful creation, remove `BOOTSTRAP_ADMIN_TOKEN` from Render and save. The setup route will then return 404.
-10. Sign in as the new administrator and create student and lecturer accounts.
+1. In Render, open the existing AttendIQ web service and rename that same service to `rollnexa` in its Settings. Confirm the target `rollnexa.onrender.com` is available. Do not click **New Web Service**.
+2. If the Render Blueprint sync preview proposes creating a second web service rather than updating the existing one, cancel the sync and resolve the service-name mapping before continuing.
+3. Upload the extracted RollNexa package contents to the existing GitHub repository `https://github.com/Davidnna/AttendIQ`, replacing files at the repository root.
+4. Commit with: `Rebrand AttendIQ as RollNexa 0.2.1`.
+5. Allow the existing Render service to deploy. The updated `render.yaml` uses the service name `rollnexa` to match the renamed service.
+6. Verify the new brand at the service URL, `/healthz`, login and role dashboards.
+7. After successful deployment, rename the GitHub repository from `AttendIQ` to `RollNexa` using **Repository → Settings → General → Repository name**. GitHub redirects most web and Git operations from the previous repository URL, but update future references to `https://github.com/Davidnna/RollNexa`.
 
-## Existing database and user preservation
+If `rollnexa.onrender.com` is unavailable, stop before changing the service name and choose another brand-consistent Render service slug. Do not create a duplicate service.
 
-The migration adds the `accounts_userprofile` table and creates a profile for every existing Django user. It does not delete or recreate the existing `auth_user` rows. Existing ordinary users receive the Student role. Existing superusers receive the System administrator role.
+## Database and migration safety
+This release makes **no database schema changes and runs no new migrations**. It does not change the Neon database, database credentials, existing accounts, passwords, roles or user records. Do not reset or recreate the database.
 
-Do not reset, delete or recreate the Neon database during this upgrade.
+Keep the following existing Render environment variables unchanged:
+- `DATABASE_URL`
+- `DIRECT_DATABASE_URL`
+- `SECRET_KEY`
+- `DEBUG`
+- `PYTHON_VERSION`
+- `WEB_CONCURRENCY`
+- `BOOTSTRAP_ADMIN_TOKEN` (if it is still present for initial setup; normally remove it after the first administrator has been created)
 
-## Environment variables
+## Files and branding
+- `BRAND_GUIDELINES.md` contains the RollNexa visual and verbal identity.
+- `static/images/rollnexa-logo.svg` is the horizontal logo.
+- `static/images/rollnexa-mark.svg` is the standalone mark.
+- `static/images/favicon.svg` is the browser icon.
 
-Existing variables remain:
-- `DATABASE_URL`: Neon pooled connection string
-- `DIRECT_DATABASE_URL`: Neon direct connection string
-- `SECRET_KEY`: generated by Render
-- `DEBUG`: `false`
-- `PYTHON_VERSION`: `3.12.10`
-- `WEB_CONCURRENCY`: `1`
-
-Add temporarily:
-- `BOOTSTRAP_ADMIN_TOKEN`: a long random secret used only to create the first system administrator. Remove it after setup.
-
-## Included in this release
-- AttendIQ branded landing page and navigation
-- Student and lecturer dashboards
-- System administrator dashboard
-- User profile model and roles
-- Data migration preserving existing user accounts
-- Administrator-only account creation
-- Temporary passwords and mandatory first-login password change
-- Account activation and deactivation
-- One-time initial administrator setup
-- Django administration profile listing
-- Access-denied page
-- Basic automated account/access tests
-
-## Not yet implemented
-- Faculties, departments, programmes and course management
-- Lecturer-course assignment
-- QR-code generation and scanning
-- Facial enrollment and recognition
-- Attendance sessions and records
-- Reports and exports
-- Email verification, transactional email and password-reset email
-
-## Security notes
-- Never commit `.env`, database URLs, passwords, API keys or biometric information.
-- Do not use real student or biometric data until privacy, security, retention and backup arrangements are completed.
-- The first administrator setup token must be removed from Render immediately after successful setup.
-- The temporary password must be delivered to the account holder through a secure channel.
+## Security
+- Never commit `.env`, database URLs, passwords, API keys, bootstrap tokens or biometric information.
+- Do not use real student or biometric data until privacy, security, retention, access and backup arrangements have been established.
+- The temporary administrator bootstrap token must be removed from Render after the first administrator is created.

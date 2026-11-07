@@ -16,7 +16,7 @@ SECRET_KEY = os.environ.get("SECRET_KEY")
 if not SECRET_KEY:
     if not DEBUG:
         raise ImproperlyConfigured("The SECRET_KEY environment variable must be configured.")
-    SECRET_KEY = "django-insecure-attendiq-development-only-not-for-production"
+    SECRET_KEY = "django-insecure-rollnexa-development-only-not-for-production"
 
 ALLOWED_HOSTS = ["localhost", "127.0.0.1", "testserver"]
 configured_hosts = os.environ.get("ALLOWED_HOSTS", "")
