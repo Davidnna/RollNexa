@@ -10,3 +10,20 @@
     menu.classList.toggle("is-open", !isOpen);
   });
 })();
+
+
+document.querySelectorAll("[data-copy-target]").forEach((button) => {
+  button.addEventListener("click", async () => {
+    const target = document.getElementById(button.dataset.copyTarget);
+    if (!target) return;
+    const value = target.textContent.trim();
+    try {
+      await navigator.clipboard.writeText(value);
+      const original = button.textContent;
+      button.textContent = "Copied";
+      window.setTimeout(() => { button.textContent = original; }, 1800);
+    } catch (_) {
+      button.textContent = "Select and copy";
+    }
+  });
+});

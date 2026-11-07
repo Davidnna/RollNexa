@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Account created — AttendIQ{% endblock %}
+{% block content %}
+<section class="auth-section">
+  <div class="auth-card auth-card-wide">
+    <span class="eyebrow">ACCOUNT CREATED</span>
+    <h1>{{ created_user.get_full_name|default:created_user.username }}</h1>
+    <p class="auth-intro">The {{ created_user.profile.get_role_display|lower }} account has been created. Copy the temporary password now and provide it to the account holder through a secure channel.</p>
+    <div class="credential-panel">
+      <span class="credential-label">USERNAME</span>
+      <strong>{{ created_user.username }}</strong>
+      <span class="credential-label">TEMPORARY PASSWORD</span>
+      <div class="credential-value"><code id="temporary-password">{{ temporary_password }}</code><button type="button" class="copy-button" data-copy-target="temporary-password">Copy</button></div>
+    </div>
+    <div class="form-notice"><strong>Important:</strong> This temporary password is shown only in this response. The user will be required to change it at first sign-in. It is not emailed automatically.</div>
+    <div class="hero-actions">
+      <a class="button button-primary" href="{% url 'user_list' %}">Return to user management</a>
+      <a class="button button-secondary" href="{% url 'user_create' %}">Create another account</a>
+    </div>
+  </div>
+</section>
+{% endblock %}

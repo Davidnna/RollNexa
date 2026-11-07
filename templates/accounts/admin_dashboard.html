@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Administration — AttendIQ{% endblock %}
+{% block content %}
+<section class="dashboard-section">
+  <div class="container dashboard-container">
+    <div class="dashboard-heading">
+      <div>
+        <span class="eyebrow">SYSTEM ADMINISTRATION</span>
+        <h1>Platform overview</h1>
+        <p>Manage AttendIQ accounts and monitor the platform's user base.</p>
+      </div>
+      <span class="account-status"><i></i> Administrator access</span>
+    </div>
+    <div class="admin-actions">
+      <a class="button button-primary" href="{% url 'user_create' %}">Create an account <span aria-hidden="true">+</span></a>
+      <a class="button button-secondary" href="{% url 'user_list' %}">Manage users <span aria-hidden="true">→</span></a>
+      <a class="button button-secondary" href="/admin/">Django administration</a>
+    </div>
+    <div class="stats-grid">
+      <article class="stat-card"><span class="stat-label">STUDENTS</span><strong>{{ student_count }}</strong><span class="stat-caption">Student accounts</span></article>
+      <article class="stat-card"><span class="stat-label">LECTURERS</span><strong>{{ lecturer_count }}</strong><span class="stat-caption">Lecturer accounts</span></article>
+      <article class="stat-card"><span class="stat-label">ACTIVE ACCOUNTS</span><strong>{{ active_count }}</strong><span class="stat-caption">Can sign in to AttendIQ</span></article>
+      <article class="stat-card"><span class="stat-label">INACTIVE ACCOUNTS</span><strong>{{ inactive_count }}</strong><span class="stat-caption">Access currently disabled</span></article>
+    </div>
+    <div class="panel-card">
+      <div class="panel-heading"><div><span class="eyebrow">RECENT ACTIVITY</span><h2>Recently created accounts</h2></div><a href="{% url 'user_list' %}">View all →</a></div>
+      {% if recent_users %}
+        <div class="table-wrap"><table class="data-table"><thead><tr><th>USER</th><th>ROLE</th><th>STATUS</th><th>DATE CREATED</th></tr></thead><tbody>
+        {% for item in recent_users %}
+          <tr><td><strong>{{ item.get_full_name|default:item.username }}</strong><span class="table-subtext">{{ item.email }}</span></td><td>{{ item.profile.get_role_display }}</td><td><span class="status-tag {% if item.is_active %}status-active{% else %}status-inactive{% endif %}">{% if item.is_active %}Active{% else %}Inactive{% endif %}</span></td><td>{{ item.date_joined|date:"d M Y" }}</td></tr>
+        {% endfor %}
+        </tbody></table></div>
+      {% else %}
+        <div class="empty-state"><strong>No accounts have been created yet.</strong><p>Create the first student or lecturer account to get started.</p></div>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endblock %}

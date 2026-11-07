@@ -12,8 +12,8 @@
         {% if user.is_authenticated %}
           <a class="button button-primary" href="{% url 'dashboard' %}">Open dashboard <span aria-hidden="true">→</span></a>
         {% else %}
-          <a class="button button-primary" href="{% url 'signup' %}">Get started <span aria-hidden="true">→</span></a>
-          <a class="button button-secondary" href="{% url 'login' %}">Sign in</a>
+          <a class="button button-primary" href="{% url 'login' %}">Sign in <span aria-hidden="true">→</span></a>
+          <a class="button button-secondary" href="#how-it-works">Explore the platform</a>
         {% endif %}
       </div>
       <div class="hero-assurance">
@@ -93,10 +93,10 @@
     <div>
       <span class="eyebrow eyebrow-light">ATTENDIQ</span>
       <h2>Make every attendance record count.</h2>
-      <p>A clear foundation for more accountable academic attendance management.</p>
+      <p>AttendIQ accounts are created by authorised system administrators. Contact your administrator if you need access.</p>
     </div>
-    <a class="button button-light" href="{% if user.is_authenticated %}{% url 'dashboard' %}{% else %}{% url 'signup' %}{% endif %}">
-      {% if user.is_authenticated %}Go to dashboard{% else %}Create your account{% endif %} <span aria-hidden="true">→</span>
+    <a class="button button-light" href="{% if user.is_authenticated %}{% url 'dashboard' %}{% else %}{% url 'login' %}{% endif %}">
+      {% if user.is_authenticated %}Go to dashboard{% else %}Sign in to AttendIQ{% endif %} <span aria-hidden="true">→</span>
     </a>
   </div>
 </section>

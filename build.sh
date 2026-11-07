@@ -3,6 +3,7 @@ set -o errexit
 
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
+python manage.py check
 python manage.py collectstatic --noinput
 
 # Use Neon's direct (non-pooled) connection for schema migrations.

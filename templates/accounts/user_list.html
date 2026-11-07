@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}User management — AttendIQ{% endblock %}
+{% block content %}
+<section class="dashboard-section">
+  <div class="container dashboard-container">
+    <div class="dashboard-heading">
+      <div><span class="eyebrow">SYSTEM ADMINISTRATION</span><h1>User management</h1><p>Create and manage student and lecturer accounts.</p></div>
+      <a class="button button-primary" href="{% url 'user_create' %}">Create account <span aria-hidden="true">+</span></a>
+    </div>
+    <div class="panel-card">
+      <form method="get" class="filter-bar">
+        <input type="search" name="q" value="{{ search }}" placeholder="Search name, username, email or ID" aria-label="Search users">
+        <select name="role" aria-label="Filter by role">
+          <option value="">All roles</option>
+          <option value="student" {% if selected_role == "student" %}selected{% endif %}>Students</option>
+          <option value="lecturer" {% if selected_role == "lecturer" %}selected{% endif %}>Lecturers</option>
+        </select>
+        <select name="status" aria-label="Filter by status">
+          <option value="">All statuses</option>
+          <option value="active" {% if selected_status == "active" %}selected{% endif %}>Active</option>
+          <option value="inactive" {% if selected_status == "inactive" %}selected{% endif %}>Inactive</option>
+        </select>
+        <button class="button button-primary button-small" type="submit">Apply filters</button>
+        <a class="filter-reset" href="{% url 'user_list' %}">Reset</a>
+      </form>
+      {% if page_obj.object_list %}
+        <div class="table-wrap"><table class="data-table"><thead><tr><th>USER</th><th>ROLE</th><th>INSTITUTIONAL ID</th><th>STATUS</th><th>ACCOUNT ACTION</th></tr></thead><tbody>
+        {% for item in page_obj.object_list %}
+          <tr>
+            <td><strong>{{ item.get_full_name|default:item.username }}</strong><span class="table-subtext">{{ item.username }} · {{ item.email }}</span></td>
+            <td>{{ item.profile.get_role_display }}</td>
+            <td>{{ item.profile.institutional_id|default:"—" }}</td>
+            <td><span class="status-tag {% if item.is_active %}status-active{% else %}status-inactive{% endif %}">{% if item.is_active %}Active{% else %}Inactive{% endif %}</span></td>
+            <td><form method="post" action="{% url 'toggle_account_status' item.pk %}" class="inline-action">{% csrf_token %}<button class="text-action {% if item.is_active %}text-danger{% endif %}" type="submit">{% if item.is_active %}Deactivate{% else %}Activate{% endif %}</button></form></td>
+          </tr>
+        {% endfor %}
+        </tbody></table></div>
+        <div class="pagination">
+          <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+          <div>
+            {% if page_obj.has_previous %}<a href="?q={{ search|urlencode }}&role={{ selected_role }}&status={{ selected_status }}&page={{ page_obj.previous_page_number }}">Previous</a>{% endif %}
+            {% if page_obj.has_next %}<a href="?q={{ search|urlencode }}&role={{ selected_role }}&status={{ selected_status }}&page={{ page_obj.next_page_number }}">Next</a>{% endif %}
+          </div>
+        </div>
+      {% else %}
+        <div class="empty-state"><strong>No matching accounts.</strong><p>Try changing the filters or create a new account.</p></div>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endblock %}

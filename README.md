@@ -1,105 +1,87 @@
 # AttendIQ
 
-**Tagline:** Presence, verified.
+**Presence, verified.**
 
 AttendIQ is a web-based student attendance management system prototype. Its planned attendance workflow combines time-limited QR-code session access with facial identity verification.
 
-This repository contains the first deployable foundation:
-- AttendIQ branded landing page
-- Student account registration and login
-- Authenticated starter dashboard
-- Django administration
-- PostgreSQL configuration through Neon
-- Render deployment Blueprint
-- Health-check endpoint
-- Production static-file serving with WhiteNoise
+## Current release: 0.2.0
 
-**Not yet implemented in this first draft:** course management, lecturer workflows, QR-code generation/scanning, facial enrollment/verification, attendance records and reporting. These will be added in later, separately tested releases.
+This release introduces user profiles, role-based dashboards and administrator-created accounts.
 
-## Cloud-first workflow
+### Roles
+- **System administrator:** platform-wide account and system management.
+- **Lecturer:** lecturer workspace; course and attendance features will be added in later releases.
+- **Student:** student workspace; attendance and course features will be added in later releases.
 
-The project is maintained through GitHub's website and deployed from GitHub to Render. No local Python installation is required for the agreed workflow.
+### Account policy
+Public self-registration is disabled. Only a system administrator can create student and lecturer accounts. AttendIQ generates a temporary password and requires the user to change it at first sign-in. The temporary password is shown once on a no-cache confirmation page after account creation; it is not automatically emailed.
+
+The initial system administrator is created through a one-time, token-protected browser setup route.
 
 ## Hosting architecture
-
 - **GitHub:** source repository
 - **Render:** Django web application
 - **Neon:** managed PostgreSQL database
 
-The Render service is configured for Frankfurt. Create the Neon project in **AWS Europe Central 1 (Frankfurt / `aws-eu-central-1`)** to keep the application and database in the same region and reduce network latency.
+The application is configured to use Neon through `DATABASE_URL` (pooled connection) and `DIRECT_DATABASE_URL` (direct connection for migrations). Never commit these values.
 
-## Deployment
+## Upgrade from 0.1.1
 
-1. Upload the contents of this package to the root of `https://github.com/Davidnna/AttendIQ`.
-2. Commit with: `Create AttendIQ branded Django foundation with Neon PostgreSQL`
-3. In Neon, create a PostgreSQL project in Frankfurt.
-4. In Neon, obtain two connection strings for the same database and role:
-   - **Pooled connection string** (hostname includes `-pooler`): used by the running Django web service.
-   - **Direct connection string** (hostname does not include `-pooler`): used by the deployment build to run Django migrations.
-5. Keep `sslmode=require` and `channel_binding=require` if Neon includes them in the connection strings.
-6. In Render, choose **New → Blueprint** and connect `Davidnna/AttendIQ`.
-7. Review the Blueprint. It creates only the web service; it does not create a Render database.
-8. During initial Blueprint creation, provide:
-   - `DATABASE_URL` = Neon pooled connection string
-   - `DIRECT_DATABASE_URL` = Neon direct connection string
-9. Render generates `SECRET_KEY`, builds the app, collects static files, runs migrations using the direct database connection and starts Gunicorn.
-10. After deployment, visit the service URL shown in Render. The requested subdomain is `attendiq.onrender.com`; Render will confirm whether it is available.
+1. Download and extract the 0.2.0 package.
+2. Upload the extracted project contents to the root of `https://github.com/Davidnna/AttendIQ`, replacing existing files when prompted.
+3. Commit with: `Add AttendIQ user management and role-based access control`
+4. Delete the two obsolete templates listed in `REMOVALS.md`.
+5. In Render → AttendIQ → Environment, add `BOOTSTRAP_ADMIN_TOKEN` with a long, randomly generated secret value. Generate it with a password manager; do not put it in GitHub or send it in chat.
+6. Save the environment variable and allow Render to deploy the new commit.
+7. Open `https://YOUR-RENDER-SERVICE-URL/setup/initial-admin/`.
+8. Enter the same one-time token and create the first system administrator.
+9. After successful creation, remove `BOOTSTRAP_ADMIN_TOKEN` from Render and save. The setup route will then return 404.
+10. Sign in as the new administrator and create student and lecturer accounts.
 
-If the Blueprint has already been created and the initial prompt has passed, add or update these values manually under the Render service's **Environment** settings. Do not put either connection string in GitHub.
+## Existing database and user preservation
 
-## Neon connection strings
+The migration adds the `accounts_userprofile` table and creates a profile for every existing Django user. It does not delete or recreate the existing `auth_user` rows. Existing ordinary users receive the Student role. Existing superusers receive the System administrator role.
 
-Neon supports standard PostgreSQL connection strings. Use the pooled endpoint for normal web traffic and the direct endpoint for schema migrations. The pooled endpoint hostname includes `-pooler`.
+Do not reset, delete or recreate the Neon database during this upgrade.
 
-Example shape only (not a real credential):
+## Environment variables
 
-```text
-postgresql://ROLE:PASSWORD@ep-example-pooler.eu-central-1.aws.neon.tech/DATABASE?sslmode=require&channel_binding=require
-```
+Existing variables remain:
+- `DATABASE_URL`: Neon pooled connection string
+- `DIRECT_DATABASE_URL`: Neon direct connection string
+- `SECRET_KEY`: generated by Render
+- `DEBUG`: `false`
+- `PYTHON_VERSION`: `3.12.10`
+- `WEB_CONCURRENCY`: `1`
 
-Never share or commit the actual connection string. It contains database credentials.
+Add temporarily:
+- `BOOTSTRAP_ADMIN_TOKEN`: a long random secret used only to create the first system administrator. Remove it after setup.
 
-## Render configuration
+## Included in this release
+- AttendIQ branded landing page and navigation
+- Student and lecturer dashboards
+- System administrator dashboard
+- User profile model and roles
+- Data migration preserving existing user accounts
+- Administrator-only account creation
+- Temporary passwords and mandatory first-login password change
+- Account activation and deactivation
+- One-time initial administrator setup
+- Django administration profile listing
+- Access-denied page
+- Basic automated account/access tests
 
-The `render.yaml` Blueprint configures:
-- Python 3.12
-- Django 5.2
-- Neon PostgreSQL via environment variables
-- Generated `SECRET_KEY`
-- `DEBUG=False`
-- Frankfurt region
-- automatic deployment on commits to the linked branch
-- `/healthz` health check
-
-`DATABASE_URL` and `DIRECT_DATABASE_URL` are declared with `sync: false`, so Render asks for their values during initial Blueprint creation. If you add a new secret variable after the service already exists, add it manually in the Render Dashboard.
+## Not yet implemented
+- Faculties, departments, programmes and course management
+- Lecturer-course assignment
+- QR-code generation and scanning
+- Facial enrollment and recognition
+- Attendance sessions and records
+- Reports and exports
+- Email verification, transactional email and password-reset email
 
 ## Security notes
-
-- Never commit `.env`, passwords, API keys, database URLs or other secrets.
-- Never commit student records, facial images or biometric templates.
-- Production `SECRET_KEY` is generated by Render through the Blueprint.
-- `DEBUG` is disabled in production.
-- HTTPS is terminated by Render; Django is configured to recognize the forwarded HTTPS scheme.
-- The first draft's registration flow creates ordinary Django user accounts only. It does not yet enroll or process facial data.
-
-## Project structure
-
-```text
-attendiq/
-├── accounts/
-├── config/
-├── core/
-├── brand/
-├── static/
-├── templates/
-├── .env.example
-├── .gitignore
-├── build.sh
-├── manage.py
-├── render.yaml
-└── requirements.txt
-```
-
-## Product status
-
-AttendIQ is the product name for this academic software project. The product name and Render subdomain are separate: if `attendiq.onrender.com` is unavailable, use a suitable alternative subdomain without changing the product brand.
+- Never commit `.env`, database URLs, passwords, API keys or biometric information.
+- Do not use real student or biometric data until privacy, security, retention and backup arrangements are completed.
+- The first administrator setup token must be removed from Render immediately after successful setup.
+- The temporary password must be delivered to the account holder through a secure channel.
