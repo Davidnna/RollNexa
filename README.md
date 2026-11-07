@@ -9,7 +9,7 @@ This repository contains the first deployable foundation:
 - Student account registration and login
 - Authenticated starter dashboard
 - Django administration
-- PostgreSQL configuration through `DATABASE_URL`
+- PostgreSQL configuration through Neon
 - Render deployment Blueprint
 - Health-check endpoint
 - Production static-file serving with WhiteNoise
@@ -18,31 +18,60 @@ This repository contains the first deployable foundation:
 
 ## Cloud-first workflow
 
-The project is intended to be maintained through GitHub's website and deployed from GitHub to Render. No local Python installation is required for the agreed workflow.
+The project is maintained through GitHub's website and deployed from GitHub to Render. No local Python installation is required for the agreed workflow.
+
+## Hosting architecture
+
+- **GitHub:** source repository
+- **Render:** Django web application
+- **Neon:** managed PostgreSQL database
+
+The Render service is configured for Frankfurt. Create the Neon project in **AWS Europe Central 1 (Frankfurt / `aws-eu-central-1`)** to keep the application and database in the same region and reduce network latency.
 
 ## Deployment
 
 1. Upload the contents of this package to the root of `https://github.com/Davidnna/AttendIQ`.
-2. Commit with: `Create AttendIQ branded Django foundation`
-3. In Render, choose **New → Blueprint** and connect `Davidnna/AttendIQ`.
-4. Review the resources and costs before selecting **Apply**.
-5. The Blueprint requests a web service named `attendiq` and a PostgreSQL database named `attendiq-db`, both in Frankfurt.
-6. Render builds the app, collects static files, applies Django migrations and starts Gunicorn.
-7. After deployment, visit the service URL shown in Render. The requested subdomain is `attendiq.onrender.com`; Render will confirm whether it is available.
+2. Commit with: `Create AttendIQ branded Django foundation with Neon PostgreSQL`
+3. In Neon, create a PostgreSQL project in Frankfurt.
+4. In Neon, obtain two connection strings for the same database and role:
+   - **Pooled connection string** (hostname includes `-pooler`): used by the running Django web service.
+   - **Direct connection string** (hostname does not include `-pooler`): used by the deployment build to run Django migrations.
+5. Keep `sslmode=require` and `channel_binding=require` if Neon includes them in the connection strings.
+6. In Render, choose **New → Blueprint** and connect `Davidnna/AttendIQ`.
+7. Review the Blueprint. It creates only the web service; it does not create a Render database.
+8. During initial Blueprint creation, provide:
+   - `DATABASE_URL` = Neon pooled connection string
+   - `DIRECT_DATABASE_URL` = Neon direct connection string
+9. Render generates `SECRET_KEY`, builds the app, collects static files, runs migrations using the direct database connection and starts Gunicorn.
+10. After deployment, visit the service URL shown in Render. The requested subdomain is `attendiq.onrender.com`; Render will confirm whether it is available.
 
-The included Blueprint currently selects Render's Free plans for the initial prototype. **A free Render PostgreSQL database expires after 30 days. Do not enter real student records or biometric data into this temporary database.** Upgrade to a durable database plan or choose another durable PostgreSQL host before real data is used.
+If the Blueprint has already been created and the initial prompt has passed, add or update these values manually under the Render service's **Environment** settings. Do not put either connection string in GitHub.
+
+## Neon connection strings
+
+Neon supports standard PostgreSQL connection strings. Use the pooled endpoint for normal web traffic and the direct endpoint for schema migrations. The pooled endpoint hostname includes `-pooler`.
+
+Example shape only (not a real credential):
+
+```text
+postgresql://ROLE:PASSWORD@ep-example-pooler.eu-central-1.aws.neon.tech/DATABASE?sslmode=require&channel_binding=require
+```
+
+Never share or commit the actual connection string. It contains database credentials.
 
 ## Render configuration
 
 The `render.yaml` Blueprint configures:
 - Python 3.12
 - Django 5.2
-- PostgreSQL using the internal `DATABASE_URL`
+- Neon PostgreSQL via environment variables
 - Generated `SECRET_KEY`
 - `DEBUG=False`
 - Frankfurt region
 - automatic deployment on commits to the linked branch
 - `/healthz` health check
+
+`DATABASE_URL` and `DIRECT_DATABASE_URL` are declared with `sync: false`, so Render asks for their values during initial Blueprint creation. If you add a new secret variable after the service already exists, add it manually in the Render Dashboard.
 
 ## Security notes
 

@@ -78,23 +78,17 @@ WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
 database_url = os.environ.get("DATABASE_URL")
-if database_url:
-    DATABASES = {
-        "default": dj_database_url.parse(
-            database_url,
-            conn_max_age=600,
-            conn_health_checks=True,
-            ssl_require=not DEBUG,
-        )
-    }
-else:
-    # Development fallback only. Render receives DATABASE_URL from render.yaml.
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": BASE_DIR / "db.sqlite3",
-        }
-    }
+if not database_url:
+    raise ImproperlyConfigured("The DATABASE_URL environment variable must be configured.")
+
+DATABASES = {
+    "default": dj_database_url.parse(
+        database_url,
+        conn_max_age=60,
+        conn_health_checks=True,
+        ssl_require=True,
+    )
+}
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
