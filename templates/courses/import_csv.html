@@ -38,7 +38,7 @@
           <div><strong>offering_active, registration_open, max_students</strong><small>Imported offerings remain closed for registration. Open registration manually after review.</small></div>
           <div><strong>description, source_url, source_note</strong><small>Optional reference fields. Source notes remain in the CSV and are not treated as course descriptions.</small></div>
         </div>
-        <div class="academic-help-note"><strong>Before upload:</strong> Ensure the faculty, course-owning departments, target programme, current academic session and its First/Second semester records already exist and are active.</div>
+        <div class="academic-help-note"><strong>Before upload:</strong> Ensure the faculty, course-owning departments, target programme, current academic session and its First/Second semester records already exist and are active. If no current session exists, <a href="{% url 'academic_session_csv_import' %}">import academic sessions and semesters first</a>, then set the verified session as current.</div>
         <div class="academic-help-note"><strong>Safe import:</strong> The importer previews records first, runs the final import in one transaction and does not delete or overwrite existing courses. Re-uploading the same file is idempotent. New offerings have registration closed.</div>
       </article>
     </div>

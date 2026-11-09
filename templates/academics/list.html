@@ -5,7 +5,7 @@
   <div class="container dashboard-container">
     <div class="dashboard-heading">
       <div><span class="eyebrow">ACADEMIC ADMINISTRATION</span><h1>{{ title }}</h1><p>Manage {{ title|lower }} and their relationships within RollNexa.</p></div>
-      <a class="button button-primary" href="{% url 'academic_create' kind=kind %}">Create {{ singular|lower }} <span aria-hidden="true">+</span></a>
+      {% if kind == "sessions" or kind == "semesters" %}<div class="admin-actions"><a class="button button-secondary" href="{% url 'academic_session_csv_import' %}">Import sessions CSV</a><a class="button button-primary" href="{% url 'academic_create' kind=kind %}">Create {{ singular|lower }} <span aria-hidden="true">+</span></a></div>{% else %}<a class="button button-primary" href="{% url 'academic_create' kind=kind %}">Create {{ singular|lower }} <span aria-hidden="true">+</span></a>{% endif %}
     </div>
     <div class="academic-breadcrumb"><a href="{% url 'academic_overview' %}">Academic structure</a><span> / </span>{{ title }}</div>
     <div class="panel-card">

@@ -421,3 +421,119 @@ class CourseCSVImportTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertContains(response, "registration_open must be false", status_code=400)
         self.assertEqual(Course.objects.count(), 0)
+
+
+class AcademicSessionCSVImportTests(TestCase):
+    CSV_CONTENT = (
+        "academic_session,session_start_date,session_end_date,semester,"
+        "semester_start_date,semester_end_date,source_url,source_note\n"
+        "2026/2027,,,FIRST,,,https://ebsu.edu.ng/2026-2027-post-utme-application-screening/,Candidate session reference; dates not confirmed.\n"
+        "2026/2027,,,SECOND,,,https://ebsu.edu.ng/2026-2027-post-utme-application-screening/,Candidate session reference; dates not confirmed.\n"
+    )
+
+    def setUp(self):
+        self.admin = User.objects.create_superuser(
+            username="sessioncsvadmin",
+            email="sessioncsvadmin@example.test",
+            password="StrongTestPassword!2026",
+        )
+        self.student = User.objects.create_user(
+            username="sessioncsvstudent",
+            email="sessioncsvstudent@example.test",
+            password="StrongTestPassword!2026",
+        )
+
+    def upload(self, content=None):
+        return SimpleUploadedFile(
+            "academic_sessions.csv",
+            (content or self.CSV_CONTENT).encode("utf-8"),
+            content_type="text/csv",
+        )
+
+    def test_non_admin_cannot_access_session_import(self):
+        self.client.force_login(self.student)
+        response = self.client.get(reverse("academic_session_csv_import"))
+        self.assertEqual(response.status_code, 403)
+
+    def test_preview_does_not_write_records(self):
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse("academic_session_csv_import"),
+            {"action": "preview", "csv_file": self.upload()},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Import preview")
+        self.assertEqual(AcademicSession.objects.count(), 0)
+        self.assertEqual(Semester.objects.count(), 0)
+
+    def test_import_creates_session_and_first_two_semesters(self):
+        self.client.force_login(self.admin)
+        content = (
+            "academic_session,session_start_date,session_end_date,semester,semester_start_date,semester_end_date\n"
+            "2026/2027,,,FIRST,,\n"
+            "2026/2027,,,SECOND,,\n"
+        )
+        self.client.post(
+            reverse("academic_session_csv_import"),
+            {"action": "preview", "csv_file": self.upload(content)},
+        )
+        response = self.client.post(
+            reverse("academic_session_csv_import"), {"action": "import"}
+        )
+        self.assertRedirects(response, reverse("academic_list", kwargs={"kind": "sessions"}))
+        self.assertEqual(AcademicSession.objects.count(), 1)
+        self.assertEqual(Semester.objects.count(), 2)
+        self.assertFalse(AcademicSession.objects.get().is_current)
+        self.assertFalse(Semester.objects.filter(is_current=True).exists())
+
+    def test_reimport_is_idempotent(self):
+        self.client.force_login(self.admin)
+        content = (
+            "academic_session,session_start_date,session_end_date,semester,semester_start_date,semester_end_date\n"
+            "2026/2027,,,FIRST,,\n"
+            "2026/2027,,,SECOND,,\n"
+        )
+        for _ in range(2):
+            self.client.post(
+                reverse("academic_session_csv_import"),
+                {"action": "preview", "csv_file": self.upload(content)},
+            )
+            self.client.post(
+                reverse("academic_session_csv_import"), {"action": "import"}
+            )
+        self.assertEqual(AcademicSession.objects.count(), 1)
+        self.assertEqual(Semester.objects.count(), 2)
+
+    def test_invalid_session_year_range_is_rejected(self):
+        self.client.force_login(self.admin)
+        content = (
+            "academic_session,session_start_date,session_end_date,semester,semester_start_date,semester_end_date\n"
+            "2026/2028,,,FIRST,,\n"
+        )
+        response = self.client.post(
+            reverse("academic_session_csv_import"),
+            {"action": "preview", "csv_file": self.upload(content)},
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(response, "ending year must be one year after", status_code=400)
+        self.assertEqual(AcademicSession.objects.count(), 0)
+
+    def test_conflicting_existing_dates_are_not_overwritten(self):
+        self.client.force_login(self.admin)
+        session = AcademicSession.objects.create(
+            name="2026/2027",
+            start_date=date(2026, 9, 1),
+            end_date=date(2027, 7, 31),
+        )
+        content = (
+            "academic_session,session_start_date,session_end_date,semester,semester_start_date,semester_end_date\n"
+            "2026/2027,2026-10-01,2027-07-31,FIRST,,\n"
+        )
+        response = self.client.post(
+            reverse("academic_session_csv_import"),
+            {"action": "preview", "csv_file": self.upload(content)},
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(response, "conflicts with the existing record", status_code=400)
+        session.refresh_from_db()
+        self.assertEqual(session.start_date, date(2026, 9, 1))

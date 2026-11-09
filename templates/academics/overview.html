@@ -32,12 +32,12 @@
         <div class="panel-heading"><div><span class="eyebrow">ACADEMIC CALENDAR</span><h2>Current academic period</h2></div></div>
         <div class="current-period-block">
           <span class="stat-label">CURRENT SESSION</span>
-          {% if current_session %}<strong>{{ current_session.name }}</strong><small>{% if current_session.start_date %}{{ current_session.start_date|date:"d M Y" }}{% else %}Start date not specified{% endif %} – {% if current_session.end_date %}{{ current_session.end_date|date:"d M Y" }}{% else %}End date not specified{% endif %}</small>{% else %}<strong>Not configured</strong><small>Set an academic session as current.</small>{% endif %}
+          {% if current_session %}<strong>{{ current_session.name }}</strong><small>{% if current_session.start_date %}{{ current_session.start_date|date:"d M Y" }}{% else %}Start date not specified{% endif %} – {% if current_session.end_date %}{{ current_session.end_date|date:"d M Y" }}{% else %}End date not specified{% endif %}</small>{% else %}<strong>Not configured</strong><small>Import sessions if needed, then set the institutionally confirmed session as current.</small>{% endif %}
           <div class="period-divider"></div>
           <span class="stat-label">CURRENT SEMESTER</span>
           {% if current_semester %}<strong>{{ current_semester.get_name_display }}</strong><small>{{ current_semester.session.name }}</small>{% else %}<strong>Not configured</strong><small>Set a semester as current after selecting the current session.</small>{% endif %}
         </div>
-        <div class="academic-calendar-actions"><a class="button button-secondary button-small" href="{% url 'academic_list' kind='sessions' %}">Manage sessions</a><a class="button button-secondary button-small" href="{% url 'academic_list' kind='semesters' %}">Manage semesters</a></div>
+        <div class="academic-calendar-actions"><a class="button button-secondary button-small" href="{% url 'academic_list' kind='sessions' %}">Manage sessions</a><a class="button button-secondary button-small" href="{% url 'academic_list' kind='semesters' %}">Manage semesters</a><a class="button button-primary button-small" href="{% url 'academic_session_csv_import' %}">Import sessions CSV</a></div>
       </article>
     </div>
     <div class="academic-help-note"><strong>Data integrity:</strong> Academic records are deactivated rather than deleted. This protects the historical relationships that future student enrolment, course registration and attendance records will depend on.</div>

@@ -100,3 +100,8 @@ See `COURSE_MANAGEMENT_GUIDE.md` and `RELEASE_NOTES_0.4.0.md` for deployment and
 Administrators can bulk-import course catalogue records and programme-specific offerings at `/management/courses/import/`. The importer validates and previews the file before any database changes, uses an atomic transaction, preserves existing records and keeps registration closed.
 
 Download the EBSU Computer Science starter CSV from the import page. See `EBSU_COMPUTER_SCIENCE_COURSE_DATA_NOTES.md` for source limitations, department mappings and setup prerequisites.
+
+
+## Release 0.4.2 — Academic session and semester CSV import
+
+Administrators can import academic sessions and their First, Second or Summer semesters at `/management/academic/sessions/import/`. The importer validates and previews records, applies them atomically and never automatically marks a session or semester current. See `ACADEMIC_SESSION_CSV_IMPORT_GUIDE.md` and the EBSU session data notes.

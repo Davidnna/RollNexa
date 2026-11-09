@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}{{ title }} — RollNexa{% endblock %}
+{% block content %}
+<section class="dashboard-section">
+  <div class="container dashboard-container">
+    <div class="dashboard-heading">
+      <div><span class="eyebrow">ACADEMIC CALENDAR</span><h1>{{ title }}</h1><p>Import academic sessions and their semesters before importing course offerings.</p></div>
+      <a class="button button-secondary" href="{% url 'academic_overview' %}">Back to academic management</a>
+    </div>
+    <div class="academic-breadcrumb"><a href="{% url 'academic_overview' %}">Academic structure</a> / Academic sessions CSV</div>
+
+    <div class="academic-layout-grid csv-import-layout">
+      <article class="panel-card academic-panel">
+        <div class="panel-heading"><div><span class="eyebrow">STEP 1</span><h2>Upload session records</h2></div></div>
+        <p class="muted-copy">Use UTF-8 CSV. Maximum file size: 1 MB and 500 data rows. Each row links one academic session to one semester. Repeat the session name for its First and Second semester rows.</p>
+        <div class="csv-download-links csv-download-stack">
+          <a href="{% static 'downloads/ebsu_academic_sessions_starter.csv' %}">Download EBSU academic sessions starter CSV</a>
+          <a href="{% static 'downloads/rollnexa_academic_sessions_template.csv' %}">Download blank session CSV template</a>
+          <a href="{% url 'academic_session_csv_template' %}">Download template from RollNexa</a>
+          <a href="{% static 'downloads/ebsu_academic_sessions_data_notes.txt' %}">Read session data notes</a>
+        </div>
+        <form method="post" enctype="multipart/form-data" class="auth-form csv-upload-form">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="preview">
+          <div class="field-group"><label for="csv_file">Academic sessions CSV</label><input class="form-control" type="file" id="csv_file" name="csv_file" accept=".csv,text/csv" required><span class="field-help">Required: academic_session, session_start_date, session_end_date, semester, semester_start_date and semester_end_date. Dates may be blank if the approved calendar has not been confirmed.</span></div>
+          <button class="button button-primary button-full" type="submit">Validate and preview</button>
+        </form>
+      </article>
+
+      <article class="panel-card academic-panel">
+        <div class="panel-heading"><div><span class="eyebrow">IMPORT RULES</span><h2>How session records are handled</h2></div></div>
+        <div class="csv-column-list">
+          <div><strong>academic_session</strong><small>Use YYYY/YYYY, for example 2026/2027. The ending year must be exactly one year later.</small></div>
+          <div><strong>semester</strong><small>Use FIRST, SECOND or SUMMER. Each session may have one row per semester.</small></div>
+          <div><strong>Session and semester dates</strong><small>Use YYYY-MM-DD. Leave dates blank if the official dates have not been confirmed.</small></div>
+          <div><strong>source_url, source_note</strong><small>Optional provenance columns retained in the CSV for review.</small></div>
+        </div>
+        <div class="academic-help-note"><strong>Important:</strong> Imported sessions and semesters are created as active, but none is automatically marked current. This prevents RollNexa from selecting an academic session without administrator confirmation.</div>
+        <div class="academic-help-note"><strong>Safe import:</strong> The importer previews records, runs the final import in one transaction, does not delete records and does not overwrite existing dates. Re-uploading matching records is safe.</div>
+      </article>
+    </div>
+
+    {% if errors %}
+      <article class="panel-card csv-error-panel">
+        <div class="panel-heading"><div><span class="eyebrow">VALIDATION</span><h2>Resolve these issues before importing</h2></div></div>
+        <ul class="csv-error-list">{% for error in errors %}<li>{{ error }}</li>{% endfor %}</ul>
+      </article>
+    {% endif %}
+
+    {% if preview %}
+      <article class="panel-card csv-preview-panel">
+        <div class="panel-heading"><div><span class="eyebrow">STEP 2</span><h2>Import preview</h2><p class="muted-copy">No database records have changed. Review the sessions and semesters before confirming.</p></div><span class="status-tag status-active">Validation passed</span></div>
+        <div class="stats-grid csv-preview-stats">
+          <div class="stat-card"><span class="stat-label">ACADEMIC SESSIONS</span><strong>{{ preview.sessions_total }}</strong><span class="stat-caption">{{ preview.sessions_create }} new · {{ preview.sessions_unchanged }} existing</span></div>
+          <div class="stat-card"><span class="stat-label">SEMESTERS</span><strong>{{ preview.semesters_total }}</strong><span class="stat-caption">{{ preview.semesters_create }} new · {{ preview.semesters_unchanged }} existing</span></div>
+        </div>
+        {% if sample_rows %}
+          <div class="table-wrap"><table class="data-table"><thead><tr><th>ACADEMIC SESSION</th><th>SEMESTER</th><th>START</th><th>END</th><th>ACTION</th></tr></thead><tbody>
+            {% for row in sample_rows %}<tr><td><strong>{{ row.session }}</strong></td><td>{{ row.semester }}</td><td>{{ row.start }}</td><td>{{ row.end }}</td><td>{{ row.action }}</td></tr>{% endfor %}
+          </tbody></table></div>
+          {% if rows_truncated %}<p class="field-help">Showing the first 20 semester records.</p>{% endif %}
+        {% endif %}
+        <div class="academic-help-note"><strong>Next step:</strong> After import, open Academic Management → Academic Sessions and use Set current on the session confirmed by your department. Then open Semesters and set the current semester if required. Course CSV offerings can then resolve the CURRENT session.</div>
+        <form method="post" class="csv-confirm-form">
+          {% csrf_token %}
+          <button class="button button-primary" type="submit" name="action" value="import">Confirm and import sessions</button>
+          <button class="button button-secondary" type="submit" name="action" value="cancel" formnovalidate>Cancel preview</button>
+        </form>
+      </article>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}
