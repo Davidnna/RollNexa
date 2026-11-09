@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}{{ title }} — RollNexa{% endblock %}
+{% block content %}
+<section class="dashboard-section">
+  <div class="container dashboard-container">
+    <div class="dashboard-heading">
+      <div><span class="eyebrow">COURSE ADMINISTRATION</span><h1>{{ title }}</h1><p>Bulk-import course catalogue records and programme-specific course offerings.</p></div>
+      <a class="button button-secondary" href="{% url 'course_management' %}">Back to course management</a>
+    </div>
+    <div class="academic-breadcrumb"><a href="{% url 'course_management' %}">Course management</a> / CSV import</div>
+
+    <div class="academic-layout-grid csv-import-layout">
+      <article class="panel-card academic-panel">
+        <div class="panel-heading"><div><span class="eyebrow">STEP 1</span><h2>Upload a course CSV</h2></div></div>
+        <p class="muted-copy">UTF-8 CSV only. Maximum file size: 2 MB and 1,500 data rows. One row represents a course offering. A course repeated across semesters is stored once in the catalogue and linked to each offering.</p>
+        <div class="csv-download-links csv-download-stack">
+          <a href="{% static 'downloads/ebsu_computer_science_courses.csv' %}">Download EBSU Computer Science starter dataset</a>
+          <a href="{% static 'downloads/rollnexa_course_catalogue_template.csv' %}">Download course CSV template</a>
+          <a href="{% url 'course_csv_template' %}">Download template with example row</a>
+          <a href="{% static 'downloads/ebsu_computer_science_course_data_notes.txt' %}">EBSU dataset source notes (see release package)</a>
+        </div>
+        <form method="post" enctype="multipart/form-data" class="auth-form csv-upload-form">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="preview">
+          <div class="field-group"><label for="csv_file">Course catalogue CSV</label><input class="form-control" type="file" id="csv_file" name="csv_file" accept=".csv,text/csv" required><span class="field-help">Required: faculty_code, department_code, course_code, course_title, credit_units, stress_code, programme_code, academic_session, semester and level.</span></div>
+          <button class="button button-primary button-full" type="submit">Validate and preview</button>
+        </form>
+      </article>
+
+      <article class="panel-card academic-panel">
+        <div class="panel-heading"><div><span class="eyebrow">CSV FORMAT</span><h2>How the columns work</h2></div></div>
+        <div class="csv-column-list">
+          <div><strong>faculty_code, department_code</strong><small>Identify the department that owns the master course record.</small></div>
+          <div><strong>course_code, course_title, credit_units</strong><small>Master catalogue fields. Credit units accept 1–30 to preserve the published 18-unit SIWES entry.</small></div>
+          <div><strong>stress_code</strong><small>Optional curriculum classification: C, R, E, G or AR, preserved as published.</small></div>
+          <div><strong>programme_code, academic_session, semester, level</strong><small>Identify the programme-specific offering. Use CURRENT for the session marked current in RollNexa.</small></div>
+          <div><strong>offering_active, registration_open, max_students</strong><small>Imported offerings remain closed for registration. Open registration manually after review.</small></div>
+          <div><strong>description, source_url, source_note</strong><small>Optional reference fields. Source notes remain in the CSV and are not treated as course descriptions.</small></div>
+        </div>
+        <div class="academic-help-note"><strong>Before upload:</strong> Ensure the faculty, course-owning departments, target programme, current academic session and its First/Second semester records already exist and are active.</div>
+        <div class="academic-help-note"><strong>Safe import:</strong> The importer previews records first, runs the final import in one transaction and does not delete or overwrite existing courses. Re-uploading the same file is idempotent. New offerings have registration closed.</div>
+      </article>
+    </div>
+
+    {% if errors %}
+      <article class="panel-card csv-error-panel">
+        <div class="panel-heading"><div><span class="eyebrow">VALIDATION</span><h2>Resolve these issues before importing</h2></div></div>
+        <ul class="csv-error-list">{% for error in errors %}<li>{{ error }}</li>{% endfor %}</ul>
+      </article>
+    {% endif %}
+
+    {% if preview %}
+      <article class="panel-card csv-preview-panel">
+        <div class="panel-heading"><div><span class="eyebrow">STEP 2</span><h2>Import preview</h2><p class="muted-copy">No database records have been changed. Review the course and offering counts before confirming.</p></div><span class="status-tag status-active">Validation passed</span></div>
+        <div class="stats-grid csv-preview-stats">
+          <div class="stat-card"><span class="stat-label">COURSE RECORDS</span><strong>{{ preview.course_total }}</strong><span class="stat-caption">Distinct catalogue courses</span></div>
+          <div class="stat-card"><span class="stat-label">COURSE OFFERINGS</span><strong>{{ preview.offering_total }}</strong><span class="stat-caption">Programme / semester / level links</span></div>
+        </div>
+        <div class="table-wrap"><table class="data-table"><thead><tr><th>RECORD TYPE</th><th>NEW</th><th>UNCHANGED</th></tr></thead><tbody>
+          <tr><td>Courses</td><td>{{ preview.course_create }}</td><td>{{ preview.course_unchanged }}</td></tr>
+          <tr><td>Offerings</td><td>{{ preview.offering_create }}</td><td>{{ preview.offering_unchanged }}</td></tr>
+        </tbody></table></div>
+        {% if sample_rows %}
+          <h3 class="csv-sample-heading">Course catalogue sample</h3>
+          <div class="table-wrap"><table class="data-table"><thead><tr><th>CODE</th><th>COURSE TITLE</th><th>OWNER DEPARTMENT</th><th>ACTION</th></tr></thead><tbody>
+            {% for row in sample_rows %}<tr><td><strong>{{ row.code }}</strong></td><td>{{ row.title }}</td><td>{{ row.department }}</td><td>{{ row.course_action }}</td></tr>{% endfor %}
+          </tbody></table></div>
+          {% if courses_truncated %}<p class="field-help">Showing the first 15 course records.</p>{% endif %}
+        {% endif %}
+        {% if sample_offerings %}
+          <h3 class="csv-sample-heading">Course offering sample</h3>
+          <div class="table-wrap"><table class="data-table"><thead><tr><th>COURSE</th><th>PROGRAMME</th><th>SESSION / SEMESTER</th><th>LEVEL</th><th>ACTION</th></tr></thead><tbody>
+            {% for row in sample_offerings %}<tr><td>{{ row.code }}</td><td>{{ row.programme }}</td><td>{{ row.session }} · {{ row.semester }}</td><td>{{ row.level }}</td><td>{{ row.action }}</td></tr>{% endfor %}
+          </tbody></table></div>
+          {% if offerings_truncated %}<p class="field-help">Showing the first 15 offering records.</p>{% endif %}
+        {% endif %}
+        <div class="academic-help-note"><strong>Final check:</strong> Confirm that course ownership, programme, academic session, semester, level and credit units are correct. Imported offerings remain closed to student registration. The entire import rolls back if any record fails.</div>
+        <form method="post" class="csv-confirm-form">
+          {% csrf_token %}
+          <button class="button button-primary" type="submit" name="action" value="import">Confirm and import courses</button>
+          <button class="button button-secondary" type="submit" name="action" value="cancel" formnovalidate>Cancel preview</button>
+        </form>
+      </article>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

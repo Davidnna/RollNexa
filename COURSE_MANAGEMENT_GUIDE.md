@@ -59,3 +59,16 @@ Lecturers can view only their assigned active offerings and the students registe
 
 ## Important
 RollNexa 0.4.0 introduces course registration only. It does not yet record attendance. QR attendance will be implemented in a later release.
+
+
+## Bulk course import (0.4.1)
+1. Set an active current academic session.
+2. Create active First and Second semester records under that session.
+3. Confirm the target programme and all course-owning departments are active.
+4. Open `/management/courses/import/`.
+5. Download the EBSU starter CSV or blank template.
+6. Upload the CSV and review the preview.
+7. Confirm the import only after all validation checks pass.
+8. Assign lecturers and open registration manually.
+
+The EBSU starter dataset uses `CURRENT` for the session so it follows the current session configured in RollNexa. It imports offerings with registration closed. See `EBSU_COMPUTER_SCIENCE_COURSE_DATA_NOTES.md` for data provenance and exclusions.

@@ -1,8 +1,11 @@
 from django.urls import path
 from . import course_views as views
+from . import course_import_views as import_views
 
 urlpatterns = [
     path("management/courses/", views.course_management, name="course_management"),
+    path("management/courses/import/", import_views.course_csv_import, name="course_csv_import"),
+    path("management/courses/import/template/", import_views.course_csv_template, name="course_csv_template"),
     path("management/courses/catalogue/", views.course_catalogue, name="course_catalogue"),
     path("management/courses/catalogue/create/", views.course_create, name="course_create"),
     path("management/courses/catalogue/<int:pk>/edit/", views.course_edit, name="course_edit"),

@@ -93,3 +93,10 @@ Student route: `/student/courses/`
 Lecturer route: `/lecturer/courses/`
 
 See `COURSE_MANAGEMENT_GUIDE.md` and `RELEASE_NOTES_0.4.0.md` for deployment and verification instructions. Course registration is not attendance marking; QR attendance is a later release.
+
+
+## Release 0.4.1 — Course CSV import
+
+Administrators can bulk-import course catalogue records and programme-specific offerings at `/management/courses/import/`. The importer validates and previews the file before any database changes, uses an atomic transaction, preserves existing records and keeps registration closed.
+
+Download the EBSU Computer Science starter CSV from the import page. See `EBSU_COMPUTER_SCIENCE_COURSE_DATA_NOTES.md` for source limitations, department mappings and setup prerequisites.

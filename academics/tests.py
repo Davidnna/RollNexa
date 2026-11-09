@@ -305,3 +305,119 @@ class CourseManagementTests(TestCase):
         )
         with self.assertRaises(Exception):
             assignment.full_clean()
+
+
+class CourseCSVImportTests(TestCase):
+    CSV_CONTENT = (
+        "faculty_code,department_code,course_code,course_title,credit_units,stress_code,"
+        "programme_code,academic_session,semester,level,offering_active,registration_open,max_students\n"
+        "FSC,FSC-CS,CSC 101,Introduction to Computer Science,2,C,"
+        "FSC-CS-P01,CURRENT,FIRST,100,true,false,\n"
+        "FSC,FSC-CS,CSC 112,Problem Solving and Programming,3,C,"
+        "FSC-CS-P01,CURRENT,SECOND,100,true,false,\n"
+    )
+
+    def setUp(self):
+        self.admin = User.objects.create_superuser(
+            username="coursecsvadmin", email="coursecsvadmin@example.test",
+            password="StrongTestPassword!2026",
+        )
+        self.student = User.objects.create_user(
+            username="coursecsvstudent", email="coursecsvstudent@example.test",
+            password="StrongTestPassword!2026",
+        )
+        self.faculty = Faculty.objects.create(code="FSC", name="Faculty of Science")
+        self.department = Department.objects.create(
+            faculty=self.faculty, code="FSC-CS", name="Computer Science"
+        )
+        self.programme = Programme.objects.create(
+            department=self.department, code="FSC-CS-P01", name="Computer Science"
+        )
+        self.session = AcademicSession.objects.create(name="2026/2027", is_current=True)
+        Semester.objects.create(session=self.session, name=Semester.FIRST)
+        Semester.objects.create(session=self.session, name=Semester.SECOND)
+
+    def upload(self, content=None):
+        return SimpleUploadedFile(
+            "courses.csv",
+            (content or self.CSV_CONTENT).encode("utf-8"),
+            content_type="text/csv",
+        )
+
+    def test_non_admin_cannot_access_course_csv_import(self):
+        self.client.force_login(self.student)
+        response = self.client.get(reverse("course_csv_import"))
+        self.assertEqual(response.status_code, 403)
+
+    def test_preview_does_not_write_until_confirmed(self):
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse("course_csv_import"),
+            {"action": "preview", "csv_file": self.upload()},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Import preview")
+        self.assertEqual(Course.objects.count(), 0)
+        self.assertEqual(CourseOffering.objects.count(), 0)
+
+    def test_confirm_creates_courses_and_offerings(self):
+        self.client.force_login(self.admin)
+        self.client.post(
+            reverse("course_csv_import"),
+            {"action": "preview", "csv_file": self.upload()},
+        )
+        response = self.client.post(reverse("course_csv_import"), {"action": "import"})
+        self.assertRedirects(response, reverse("course_management"))
+        self.assertEqual(Course.objects.count(), 2)
+        self.assertEqual(CourseOffering.objects.count(), 2)
+        self.assertFalse(CourseOffering.objects.filter(registration_open=True).exists())
+
+    def test_reimport_is_idempotent(self):
+        self.client.force_login(self.admin)
+        for _ in range(2):
+            self.client.post(
+                reverse("course_csv_import"),
+                {"action": "preview", "csv_file": self.upload()},
+            )
+            self.client.post(reverse("course_csv_import"), {"action": "import"})
+        self.assertEqual(Course.objects.count(), 2)
+        self.assertEqual(CourseOffering.objects.count(), 2)
+
+    def test_course_units_above_six_are_supported_for_siwes(self):
+        self.client.force_login(self.admin)
+        content = (
+            "faculty_code,department_code,course_code,course_title,credit_units,stress_code,"
+            "programme_code,academic_session,semester,level,offering_active,registration_open,max_students\n"
+            "FSC,FSC-CS,CSC 398,Students Industrial Work Experience Scheme,18,AR,"
+            "FSC-CS-P01,CURRENT,SECOND,300,true,false,\n"
+        )
+        response = self.client.post(
+            reverse("course_csv_import"),
+            {"action": "preview", "csv_file": self.upload(content)},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.client.post(reverse("course_csv_import"), {"action": "import"})
+        self.assertEqual(Course.objects.get(code="CSC 398").credit_units, 18)
+
+    def test_missing_current_session_is_reported(self):
+        self.session.is_current = False
+        self.session.save()
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse("course_csv_import"),
+            {"action": "preview", "csv_file": self.upload()},
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(response, "no active current academic session", status_code=400)
+        self.assertEqual(Course.objects.count(), 0)
+
+    def test_registration_open_true_is_rejected_from_csv(self):
+        self.client.force_login(self.admin)
+        content = self.CSV_CONTENT.replace("true,false,", "true,true,")
+        response = self.client.post(
+            reverse("course_csv_import"),
+            {"action": "preview", "csv_file": self.upload(content)},
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(response, "registration_open must be false", status_code=400)
+        self.assertEqual(Course.objects.count(), 0)

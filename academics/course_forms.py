@@ -11,7 +11,7 @@ from .models import (
 class CourseForm(forms.ModelForm):
     class Meta:
         model = Course
-        fields = ["department", "code", "title", "credit_units", "description"]
+        fields = ["department", "code", "title", "credit_units", "stress_code", "description"]
         widgets = {"description": forms.Textarea(attrs={"rows": 3})}
 
     def __init__(self, *args, **kwargs):

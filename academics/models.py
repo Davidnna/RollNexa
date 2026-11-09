@@ -196,18 +196,29 @@ class Course(AcademicRecord):
     code = models.CharField(max_length=20, validators=[course_code_validator])
     title = models.CharField(max_length=180)
     credit_units = models.PositiveSmallIntegerField(
-        validators=[MinValueValidator(1), MaxValueValidator(6)],
-        help_text="Enter the approved course unit value (1–6).",
+        validators=[MinValueValidator(1), MaxValueValidator(30)],
+        help_text="Enter the approved course unit value (1–30).",
     )
     description = models.TextField(blank=True)
+    STRESS_CODE_CHOICES = [
+        ("C", "Core (C)"),
+        ("R", "Required (R)"),
+        ("E", "Elective (E)"),
+        ("G", "General (G)"),
+        ("AR", "As published: AR"),
+    ]
+    stress_code = models.CharField(
+        max_length=2, choices=STRESS_CODE_CHOICES, blank=True,
+        help_text="Optional curriculum classification, retained as published by the institution.",
+    )
 
     class Meta:
         ordering = ["department__name", "code"]
         constraints = [
             models.UniqueConstraint(fields=["department", "code"], name="uniq_course_code_per_department"),
             models.CheckConstraint(
-                condition=Q(credit_units__gte=1) & Q(credit_units__lte=6),
-                name="course_credit_units_between_1_6",
+                condition=Q(credit_units__gte=1) & Q(credit_units__lte=30),
+                name="course_credit_units_between_1_30",
             ),
         ]
         indexes = [
