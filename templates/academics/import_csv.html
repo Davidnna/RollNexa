@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}{{ title }} — RollNexa{% endblock %}
+{% block content %}
+<section class="dashboard-section">
+  <div class="container dashboard-container">
+    <div class="dashboard-heading">
+      <div><span class="eyebrow">ACADEMIC ADMINISTRATION</span><h1>{{ title }}</h1><p>Import faculties, departments and programmes from one structured CSV file.</p></div>
+      <a class="button button-secondary" href="{% url 'academic_overview' %}">Back to academic management</a>
+    </div>
+    <div class="academic-breadcrumb"><a href="{% url 'academic_overview' %}">Academic structure</a><span> / </span>CSV import</div>
+
+    <div class="academic-layout-grid csv-import-layout">
+      <article class="panel-card academic-panel">
+        <div class="panel-heading"><div><span class="eyebrow">STEP 1</span><h2>Choose a CSV file</h2></div></div>
+        <p class="muted-copy">Use UTF-8 CSV format. Maximum file size: 1 MB and 2,000 data rows. The importer accepts a single hierarchy file with repeated faculty and department values.</p>
+        <div class="csv-download-links csv-download-stack">
+          <a href="{% static 'downloads/ebsu_academic_structure.csv' %}">Download EBSU starter catalogue</a>
+          <a href="{% static 'downloads/ebsu_academic_data_sources.txt' %}">Read EBSU data sources and limitations</a>
+          <a href="{% url 'academic_csv_template' %}">Download blank CSV template</a>
+        </div>
+        <form method="post" enctype="multipart/form-data" class="auth-form csv-upload-form">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="preview">
+          <div class="field-group"><label for="csv_file">Academic structure CSV</label><input class="form-control" type="file" id="csv_file" name="csv_file" accept=".csv,text/csv" required><span class="field-help">Required columns: faculty_code and faculty_name. Department and programme columns may be blank when not applicable.</span></div>
+          <button class="button button-primary button-full" type="submit">Validate and preview file</button>
+        </form>
+      </article>
+
+      <article class="panel-card academic-panel">
+        <div class="panel-heading"><div><span class="eyebrow">CSV FORMAT</span><h2>Supported columns</h2></div></div>
+        <div class="csv-column-list">
+          <div><strong>faculty_code, faculty_name</strong><small>Required on every populated row.</small></div>
+          <div><strong>department_code, department_name</strong><small>Provide both values together, or leave both blank.</small></div>
+          <div><strong>programme_code, programme_name</strong><small>Provide both values together. A programme must have a department.</small></div>
+          <div><strong>award, duration_years, mode</strong><small>Optional. Unknown awards and durations should remain blank.</small></div>
+          <div><strong>source_url, source_session, verification_status, notes</strong><small>Optional provenance columns. These are retained in the CSV for reference but are not stored as academic records.</small></div>
+        </div>
+        <div class="academic-help-note"><strong>Import behaviour:</strong> The importer creates missing records and updates matching records using their codes. It never deletes records, never deactivates existing records and never clears an existing award or duration when the CSV leaves those optional fields blank.</div>
+      </article>
+    </div>
+
+    {% if errors %}
+      <article class="panel-card csv-error-panel">
+        <div class="panel-heading"><div><span class="eyebrow">VALIDATION</span><h2>Fix these issues before importing</h2></div></div>
+        <ul class="csv-error-list">{% for error in errors %}<li>{{ error }}</li>{% endfor %}</ul>
+      </article>
+    {% endif %}
+
+    {% if preview %}
+      <article class="panel-card csv-preview-panel">
+        <div class="panel-heading"><div><span class="eyebrow">STEP 2</span><h2>Import preview</h2><p class="muted-copy">No database records have been changed yet. Review the counts before confirming.</p></div><span class="status-tag status-active">Validation passed</span></div>
+        <div class="stats-grid csv-preview-stats">
+          <div class="stat-card"><span class="stat-label">FACULTIES</span><strong>{{ record_totals.faculties }}</strong><span class="stat-caption">Records in file</span></div>
+          <div class="stat-card"><span class="stat-label">DEPARTMENTS</span><strong>{{ record_totals.departments }}</strong><span class="stat-caption">Records in file</span></div>
+          <div class="stat-card"><span class="stat-label">PROGRAMMES</span><strong>{{ record_totals.programmes }}</strong><span class="stat-caption">Records in file</span></div>
+        </div>
+        <div class="table-wrap"><table class="data-table"><thead><tr><th>RECORD TYPE</th><th>NEW</th><th>UPDATE</th><th>UNCHANGED</th></tr></thead><tbody>
+          <tr><td>Faculties</td><td>{{ preview.faculties_create }}</td><td>{{ preview.faculties_update }}</td><td>{{ preview.faculties_unchanged }}</td></tr>
+          <tr><td>Departments</td><td>{{ preview.departments_create }}</td><td>{{ preview.departments_update }}</td><td>{{ preview.departments_unchanged }}</td></tr>
+          <tr><td>Programmes</td><td>{{ preview.programmes_create }}</td><td>{{ preview.programmes_update }}</td><td>{{ preview.programmes_unchanged }}</td></tr>
+        </tbody></table></div>
+        {% if sample_rows %}
+          <h3 class="csv-sample-heading">Sample records</h3>
+          <div class="table-wrap"><table class="data-table"><thead><tr><th>FACULTY</th><th>DEPARTMENT</th><th>PROGRAMME</th><th>AWARD</th></tr></thead><tbody>
+            {% for row in sample_rows %}<tr><td>{{ row.faculty }}</td><td>{{ row.department }}</td><td>{{ row.programme }}</td><td>{{ row.award }}</td></tr>{% endfor %}
+          </tbody></table></div>
+          {% if sample_rows_truncated %}<p class="field-help">Showing the first {{ sample_rows|length }} programme records. The full file will be processed after confirmation.</p>{% endif %}
+        {% endif %}
+        <div class="academic-help-note"><strong>Safe import:</strong> The import runs in one database transaction. If any record fails, the complete import is rolled back. Existing students, lecturers, passwords, academic assignments and attendance data are not altered.</div>
+        <form method="post" class="csv-confirm-form">
+          {% csrf_token %}
+          <button class="button button-primary" type="submit" name="action" value="import">Confirm and import records</button>
+          <button class="button button-secondary" type="submit" name="action" value="cancel" formnovalidate>Cancel preview</button>
+        </form>
+      </article>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

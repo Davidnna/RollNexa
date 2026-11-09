@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}Academic management — RollNexa{% endblock %}
 {% block content %}
 <section class="dashboard-section">
@@ -12,6 +13,11 @@
       <a class="stat-card" href="{% url 'academic_list' kind='departments' %}"><span class="stat-label">DEPARTMENTS</span><strong>{{ department_count }}</strong><span class="stat-caption">Active departments</span></a>
       <a class="stat-card" href="{% url 'academic_list' kind='programmes' %}"><span class="stat-label">PROGRAMMES</span><strong>{{ programme_count }}</strong><span class="stat-caption">Active programmes</span></a>
       <a class="stat-card" href="{% url 'academic_list' kind='sessions' %}"><span class="stat-label">SESSIONS</span><strong>{{ session_count }}</strong><span class="stat-caption">Active academic sessions</span></a>
+    </div>
+    <div class="panel-card academic-panel csv-import-card">
+      <div class="panel-heading"><div><span class="eyebrow">BULK DATA SETUP</span><h2>Import academic records</h2></div><a class="button button-primary button-small" href="{% url 'academic_csv_import' %}">Open CSV importer</a></div>
+      <p class="muted-copy">Upload a UTF-8 CSV containing faculties, departments and programmes. RollNexa validates the complete file and shows a preview before any records are saved.</p>
+      <div class="csv-download-links"><a href="{% static 'downloads/ebsu_academic_structure.csv' %}">Download EBSU starter catalogue</a><a href="{% static 'downloads/ebsu_academic_data_sources.txt' %}">Read data sources and limitations</a><a href="{% url 'academic_csv_template' %}">Download blank CSV template</a></div>
     </div>
     <div class="academic-layout-grid">
       <article class="panel-card academic-panel">

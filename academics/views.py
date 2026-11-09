@@ -1,17 +1,21 @@
+import csv
+import time
 from functools import wraps
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db import IntegrityError, transaction
 from django.db.models import Q
-from django.http import Http404
+from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST, require_http_methods
 from django.utils import timezone
 
 from .forms import AcademicSessionForm, DepartmentForm, FacultyForm, ProgrammeForm, SemesterForm
 from .models import AcademicSession, Department, Faculty, Programme, Semester
+from .csv_import import ACADEMIC_COLUMNS, apply_import_plan, build_import_plan, parse_academic_csv
 
 
 ACADEMIC_CONFIG = {
@@ -82,7 +86,7 @@ def _rows(kind, objects):
         elif kind == "departments":
             cells = [obj.code, obj.name, obj.faculty.name, obj.programmes.filter(is_active=True).count(), "Active" if obj.is_active else "Inactive"]
         elif kind == "programmes":
-            cells = [obj.code, obj.name, obj.department.name, obj.award, "Active" if obj.is_active else "Inactive"]
+            cells = [obj.code, obj.name, obj.department.name, obj.award or "Not specified", "Active" if obj.is_active else "Inactive"]
         elif kind == "sessions":
             cells = [obj.name, obj.start_date or "—", obj.end_date or "—", "Current" if obj.is_current else "—", "Active" if obj.is_active else "Inactive"]
         else:
@@ -208,6 +212,127 @@ def academic_toggle(request, kind, pk):
             Programme.objects.filter(department=obj, is_active=True).update(is_active=False, updated_at=timezone.now())
     messages.success(request, f"{config['singular']} {'activated' if obj.is_active else 'deactivated'}.")
     return redirect("academic_list", kind=kind)
+
+
+CSV_PREVIEW_SESSION_KEY = "rollnexa_academic_csv_preview"
+CSV_PREVIEW_MAX_AGE_SECONDS = 15 * 60
+
+
+def _csv_preview_rows(plan, limit=12):
+    faculty_names = {item["code"]: item["name"] for item in plan["faculties"]}
+    department_names = {
+        (item["faculty_code"], item["code"]): item["name"]
+        for item in plan["departments"]
+    }
+    preview_rows = []
+    for item in plan["programmes"]:
+        preview_rows.append({
+            "faculty": faculty_names.get(item["faculty_code"], item["faculty_code"]),
+            "department": department_names.get((item["faculty_code"], item["department_code"]), item["department_code"]),
+            "programme": item["name"],
+            "award": item["award"] or "Not specified",
+        })
+        if len(preview_rows) >= limit:
+            break
+    return preview_rows
+
+
+@admin_required
+def academic_csv_template(request):
+    response = HttpResponse(content_type="text/csv; charset=utf-8")
+    response["Content-Disposition"] = 'attachment; filename="rollnexa_academic_structure_template.csv"'
+    response.write("\ufeff")
+    writer = csv.writer(response)
+    writer.writerow(ACADEMIC_COLUMNS + ["source_url", "source_session", "verification_status", "notes"])
+    return response
+
+
+@admin_required
+@require_http_methods(["GET", "POST"])
+def academic_csv_import(request):
+    context = {"title": "Import academic structure", "errors": [], "preview": None}
+    if request.method == "POST":
+        action = request.POST.get("action", "preview")
+        if action == "preview":
+            request.session.pop(CSV_PREVIEW_SESSION_KEY, None)
+            uploaded = request.FILES.get("csv_file")
+            rows, parse_errors = parse_academic_csv(uploaded)
+            if parse_errors:
+                context["errors"] = parse_errors
+                return render(request, "academics/import_csv.html", context, status=400)
+            plan, counts, plan_errors = build_import_plan(rows)
+            if plan_errors:
+                context["errors"] = plan_errors
+                context["counts"] = counts
+                return render(request, "academics/import_csv.html", context, status=400)
+            request.session[CSV_PREVIEW_SESSION_KEY] = {
+                "created_at": time.time(),
+                "rows": rows,
+            }
+            context["preview"] = counts
+            context["record_totals"] = {
+                "faculties": len(plan["faculties"]),
+                "departments": len(plan["departments"]),
+                "programmes": len(plan["programmes"]),
+            }
+            context["sample_rows"] = _csv_preview_rows(plan)
+            context["sample_rows_truncated"] = len(plan["programmes"]) > len(context["sample_rows"])
+            return render(request, "academics/import_csv.html", context)
+
+        if action == "cancel":
+            request.session.pop(CSV_PREVIEW_SESSION_KEY, None)
+            messages.info(request, "CSV import preview cancelled. No records were changed.")
+            return redirect("academic_csv_import")
+
+        if action == "import":
+            pending = request.session.get(CSV_PREVIEW_SESSION_KEY)
+            if not pending or time.time() - pending.get("created_at", 0) > CSV_PREVIEW_MAX_AGE_SECONDS:
+                request.session.pop(CSV_PREVIEW_SESSION_KEY, None)
+                messages.error(request, "The CSV preview has expired. Upload the file again.")
+                return redirect("academic_csv_import")
+            plan, counts, plan_errors = build_import_plan(pending.get("rows", []))
+            if plan_errors:
+                request.session.pop(CSV_PREVIEW_SESSION_KEY, None)
+                context["errors"] = plan_errors
+                return render(request, "academics/import_csv.html", context, status=400)
+            try:
+                result = apply_import_plan(plan)
+            except (IntegrityError, ValidationError) as exc:
+                request.session.pop(CSV_PREVIEW_SESSION_KEY, None)
+                messages.error(request, f"The import was rolled back because a record failed validation: {exc}")
+                return redirect("academic_csv_import")
+            request.session.pop(CSV_PREVIEW_SESSION_KEY, None)
+            messages.success(
+                request,
+                "Import completed: "
+                f"{result['faculties_created']} faculties, {result['departments_created']} departments and "
+                f"{result['programmes_created']} programmes created; "
+                f"{result['faculties_updated'] + result['departments_updated'] + result['programmes_updated']} records updated. "
+                "Existing records not changed by this file were preserved."
+            )
+            return redirect("academic_overview")
+
+        context["errors"] = ["Unknown import action. Upload the CSV again."]
+        return render(request, "academics/import_csv.html", context, status=400)
+
+    pending = request.session.get(CSV_PREVIEW_SESSION_KEY)
+    if pending and time.time() - pending.get("created_at", 0) <= CSV_PREVIEW_MAX_AGE_SECONDS:
+        plan, counts, errors = build_import_plan(pending.get("rows", []))
+        if not errors:
+            context["preview"] = counts
+            context["record_totals"] = {
+                "faculties": len(plan["faculties"]),
+                "departments": len(plan["departments"]),
+                "programmes": len(plan["programmes"]),
+            }
+            context["sample_rows"] = _csv_preview_rows(plan)
+            context["sample_rows_truncated"] = len(plan["programmes"]) > len(context["sample_rows"])
+        else:
+            context["errors"] = errors
+            request.session.pop(CSV_PREVIEW_SESSION_KEY, None)
+    elif pending:
+        request.session.pop(CSV_PREVIEW_SESSION_KEY, None)
+    return render(request, "academics/import_csv.html", context)
 
 
 @admin_required

@@ -3,6 +3,8 @@ from . import views
 
 urlpatterns = [
     path("management/academic/", views.academic_overview, name="academic_overview"),
+    path("management/academic/import/", views.academic_csv_import, name="academic_csv_import"),
+    path("management/academic/import/template/", views.academic_csv_template, name="academic_csv_template"),
     path("management/academic/<str:kind>/", views.academic_list, name="academic_list"),
     path("management/academic/<str:kind>/create/", views.academic_create, name="academic_create"),
     path("management/academic/<str:kind>/<int:pk>/edit/", views.academic_edit, name="academic_edit"),

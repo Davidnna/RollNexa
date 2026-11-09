@@ -69,10 +69,14 @@ class Programme(AcademicRecord):
     department = models.ForeignKey(Department, on_delete=models.PROTECT, related_name="programmes")
     code = models.CharField(max_length=20, validators=[code_validator])
     name = models.CharField(max_length=180)
-    award = models.CharField(max_length=40, default="B.Sc.", help_text="For example: B.Sc., B.A., B.Eng., B.Ed.")
+    award = models.CharField(
+        max_length=40, blank=True, default="",
+        help_text="Optional. For example: B.Sc., B.A., B.Eng. Leave blank if not confirmed.",
+    )
     duration_years = models.PositiveSmallIntegerField(
-        default=4,
+        null=True, blank=True,
         validators=[MinValueValidator(1), MaxValueValidator(8)],
+        help_text="Optional. Leave blank if the official duration has not been confirmed.",
     )
     mode = models.CharField(max_length=20, choices=MODE_CHOICES, default=MODE_FULL_TIME)
     description = models.TextField(blank=True)
@@ -90,7 +94,8 @@ class Programme(AcademicRecord):
             raise ValidationError({"department": "Reactivate the department and its faculty before adding or moving a programme under it."})
 
     def __str__(self):
-        return f"{self.name} ({self.award}) — {self.department.name}"
+        award_label = f" ({self.award})" if self.award else ""
+        return f"{self.name}{award_label} — {self.department.name}"
 
 
 class AcademicSession(AcademicRecord):

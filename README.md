@@ -4,7 +4,7 @@
 
 RollNexa is a web-based Smart Academic Attendance Platform prototype. Its planned workflow connects academic users, attendance sessions, identity verification and institutional attendance records.
 
-## Current release: 0.3.0 — Academic Structure Management
+## Current release: 0.3.1 — EBSU catalogue and CSV import
 
 This release adds institutional academic structures and academic-calendar management to the existing authentication and role-based account system.
 
@@ -20,6 +20,8 @@ This release adds institutional academic structures and academic-calendar manage
 - One current academic session and one current semester, with parent-child validation
 - Student programme/level and lecturer department assignments
 - Editing existing accounts to add or update academic assignments
+- Administrator-only academic CSV import with validation, preview and atomic commit
+- EBSU starter catalogue with source and verification notes
 - Soft deactivation of academic records to preserve historical relationships
 - Neon PostgreSQL persistence
 - Render deployment with automatic deploys from GitHub
@@ -41,7 +43,7 @@ Do not describe planned modules as already implemented.
 - An academic session contains semesters. Only one session can be current at a time, and only one semester can be current at a time. A current semester must belong to the current session.
 - Academic records are deactivated rather than deleted. Deactivating a faculty also deactivates its departments and programmes; deactivating a department deactivates its programmes.
 
-No EBSU-specific faculty, department, programme or session records are preloaded. An administrator should enter the institution's approved structure. If 2025/2026 is still the current session, create it in Academic Management and use **Set current**.
+An EBSU starter catalogue is included under `static/downloads/ebsu_academic_structure.csv`. It is based on the university's published faculty directory and admissions information; some department groupings and programme details require institutional confirmation. Use the administrator-only CSV importer to preview and import it. The blank template is also downloadable from the importer. Academic session and semester dates are intentionally not preloaded; verify the current EBSU academic calendar before setting a current period.
 
 ## Production architecture
 - **Application:** https://rollnexa.onrender.com/
@@ -51,17 +53,18 @@ No EBSU-specific faculty, department, programme or session records are preloaded
 
 The application uses `DATABASE_URL` (Neon pooled connection) and `DIRECT_DATABASE_URL` (Neon direct connection for migrations). Never commit these credentials.
 
-## Upgrade from 0.2.1
-1. Extract the `RollNexa_0.3.0_Academic_Structure.zip` package.
+## Upgrade from 0.3.0 or earlier
+1. Extract the `RollNexa_0.3.1_EBSU_CSV_Import.zip` package.
 2. Upload the contents of its `rollnexa` folder to the root of the existing `Davidnna/RollNexa` repository, replacing existing files where prompted.
-3. Ensure the new `academics/` and `templates/academics/` folders are uploaded.
-4. Commit directly to `main` with: `Add academic structure management to RollNexa 0.3.0`.
+3. Ensure `academics/csv_import.py`, the new `academics/migrations/0002_optional_programme_award_duration.py`, `templates/academics/import_csv.html` and `static/downloads/` are included.
+4. Commit directly to `main` with: `Add EBSU academic catalogue and safe CSV import to RollNexa 0.3.1`.
 5. Allow the existing Render service to deploy. Do not create a new Render service or Neon database.
-6. The build runs Django checks, collects static files and applies the new migrations automatically.
-7. Sign in as the existing system administrator and open `/management/academic/`.
+6. The build runs Django checks, collects static files and applies migrations automatically.
+7. Sign in as the existing system administrator and open `/management/academic/import/`.
+8. Download the EBSU starter catalogue, validate it, review the preview and explicitly confirm the import.
 
 ## Database and migration safety
-This release adds the `academics` app and three nullable academic-assignment fields to existing user profiles. The migration does not delete or recreate users, passwords, roles or existing records. Existing profiles remain valid and unassigned until an administrator edits their academic assignment.
+The 0.3.1 migration makes programme award and duration optional so unknown values are not invented. Existing values are retained. The academic CSV importer is additive/updating only, runs atomically, and does not delete or deactivate records. It does not change users, passwords, roles, student/lecturer assignments or academic sessions.
 
 Do not reset, recreate or manually alter the Neon database. If Render reports a migration error, stop and share the relevant deployment-log lines after removing secrets.
 
@@ -70,4 +73,4 @@ Do not reset, recreate or manually alter the Neon database. If Render reports a 
 - Do not use real student or biometric data until privacy, security, retention, access and backup arrangements have been established.
 - The temporary administrator bootstrap token should be removed from Render after the first administrator has been created.
 
-For detailed upload and verification instructions, see `GITHUB_UPLOAD_GUIDE_0.3.0.md` and `RELEASE_NOTES_0.3.0.md`.
+For detailed upload and verification instructions, see `GITHUB_UPLOAD_GUIDE_0.3.1.md`, `CSV_IMPORT_GUIDE.md`, `EBSU_DATA_SOURCES.md` and `RELEASE_NOTES_0.3.1.md`.
