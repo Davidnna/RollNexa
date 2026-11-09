@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}Class roster — RollNexa{% endblock %}
+{% block content %}
+<section class="dashboard-section"><div class="container dashboard-container">
+  <div class="dashboard-heading"><div><span class="eyebrow">LECTURER WORKSPACE</span><h1>{{ offering.course.code }} — Class roster</h1><p>{{ offering.course.title }} · {{ offering.programme.name }} · {{ offering.get_level_display }} · {{ offering.semester.get_name_display }} {{ offering.semester.session.name }}</p></div><a class="button button-secondary" href="{% url 'lecturer_course_list' %}">My teaching</a></div>
+  <div class="panel-card">{% if registrations %}<div class="table-wrap"><table class="data-table"><thead><tr><th>STUDENT</th><th>INSTITUTIONAL ID</th><th>REGISTERED</th></tr></thead><tbody>{% for item in registrations %}<tr><td><strong>{{ item.student.user.get_full_name|default:item.student.user.username }}</strong><span class="table-subtext">{{ item.student.user.email }}</span></td><td>{{ item.student.institutional_id|default:"—" }}</td><td>{{ item.registered_at|date:"d M Y" }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty-state"><strong>No students are registered.</strong><p>The roster will populate as eligible students register.</p></div>{% endif %}</div>
+</div></section>
+{% endblock %}

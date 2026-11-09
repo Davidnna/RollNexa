@@ -32,6 +32,11 @@
           {% if user.is_superuser %}
             <a href="{% url 'user_list' %}">User management</a>
             <a href="{% url 'academic_overview' %}">Academic management</a>
+            <a href="{% url 'course_management' %}">Course management</a>
+          {% elif user.profile.role == "student" %}
+            <a href="{% url 'student_course_list' %}">My courses</a>
+          {% elif user.profile.role == "lecturer" %}
+            <a href="{% url 'lecturer_course_list' %}">My teaching</a>
           {% endif %}
           <form method="post" action="{% url 'logout' %}" class="nav-form">
             {% csrf_token %}

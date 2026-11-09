@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Course registrations — RollNexa{% endblock %}
+{% block content %}
+<section class="dashboard-section"><div class="container dashboard-container">
+  <div class="dashboard-heading"><div><span class="eyebrow">COURSE ENROLMENT</span><h1>Registered students</h1><p>{{ offering.course.code }} — {{ offering.course.title }} · {{ offering.programme.name }} · {{ offering.semester.session.name }}</p></div><a class="button button-secondary" href="{% url 'offering_detail' offering.pk %}">Back to offering</a></div>
+  <div class="panel-card"><form method="get" class="filter-bar"><input type="search" name="q" value="{{ search }}" placeholder="Search student name, username or ID"><button class="button button-primary button-small" type="submit">Search</button></form>
+    {% if page_obj.object_list %}<div class="table-wrap"><table class="data-table"><thead><tr><th>STUDENT</th><th>INSTITUTIONAL ID</th><th>PROGRAMME</th><th>LEVEL</th><th>REGISTERED</th></tr></thead><tbody>{% for item in page_obj.object_list %}<tr><td><strong>{{ item.student.user.get_full_name|default:item.student.user.username }}</strong><span class="table-subtext">{{ item.student.user.email }}</span></td><td>{{ item.student.institutional_id|default:"—" }}</td><td>{{ item.student.programme|default:"—" }}</td><td>{{ item.student.current_level|default:"—" }}</td><td>{{ item.registered_at|date:"d M Y, H:i" }}</td></tr>{% endfor %}</tbody></table></div><div class="pagination"><span>{{ page_obj.paginator.count }} registered students</span><div>{% if page_obj.has_previous %}<a href="?q={{ search|urlencode }}&page={{ page_obj.previous_page_number }}">Previous</a>{% endif %}{% if page_obj.has_next %}<a href="?q={{ search|urlencode }}&page={{ page_obj.next_page_number }}">Next</a>{% endif %}</div></div>{% else %}<div class="empty-state"><strong>No students registered yet.</strong><p>Registrations will appear here when eligible students enrol.</p></div>{% endif %}
+  </div>
+</div></section>
+{% endblock %}

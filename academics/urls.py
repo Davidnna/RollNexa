@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import include, path
 from . import views
 
 urlpatterns = [
@@ -12,3 +12,5 @@ urlpatterns = [
     path("management/academic/sessions/<int:pk>/set-current/", views.set_current_session, name="set_current_session"),
     path("management/academic/semesters/<int:pk>/set-current/", views.set_current_semester, name="set_current_semester"),
 ]
+
+urlpatterns += [path("", include("academics.course_urls"))]

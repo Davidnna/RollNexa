@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}My teaching — RollNexa{% endblock %}
+{% block content %}
+<section class="dashboard-section"><div class="container dashboard-container">
+  <div class="dashboard-heading"><div><span class="eyebrow">LECTURER WORKSPACE</span><h1>My teaching</h1><p>Course offerings assigned to your lecturer account.</p></div><span class="account-status"><i></i> Lecturer access</span></div>
+  <div class="panel-card">{% if assignments %}<div class="table-wrap"><table class="data-table"><thead><tr><th>COURSE</th><th>PROGRAMME</th><th>LEVEL</th><th>SEMESTER</th><th>REGISTERED</th><th>ACTION</th></tr></thead><tbody>{% for item in assignments %}<tr><td><strong>{{ item.offering.course.code }} — {{ item.offering.course.title }}</strong><span class="table-subtext">{{ item.offering.course.credit_units }} credit units</span></td><td>{{ item.offering.programme.name }}</td><td>{{ item.offering.get_level_display }}</td><td>{{ item.offering.semester.get_name_display }}<span class="table-subtext">{{ item.offering.semester.session.name }}</span></td><td>{{ item.registered_count }}</td><td><a class="text-action" href="{% url 'lecturer_course_roster' item.offering.pk %}">View class roster</a></td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty-state"><strong>No course offerings assigned.</strong><p>Contact your system administrator to be assigned to a course offering.</p></div>{% endif %}</div>
+</div></section>
+{% endblock %}

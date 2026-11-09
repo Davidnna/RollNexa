@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} — RollNexa{% endblock %}
+{% block content %}
+<section class="auth-section"><div class="auth-card auth-card-wide">
+  <span class="eyebrow">COURSE DELIVERY</span><h1>{{ title }}</h1><p class="auth-intro">Connect a catalogue course to a degree programme, academic semester and student level. A course may be offered to more than one programme, including as a service course.</p>
+  <form method="post" class="auth-form">{% csrf_token %}{% if form.non_field_errors %}<div class="form-error-summary">{{ form.non_field_errors }}</div>{% endif %}
+    {% for field in form %}<div class="field-group"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.help_text %}<span class="field-help">{{ field.help_text }}</span>{% endif %}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>{% endfor %}
+    <button class="button button-primary button-full" type="submit">{{ submit_label }}</button><a class="form-back-link" href="{% url 'offering_list' %}">Cancel and return to offerings</a>
+  </form>
+</div></section>
+{% endblock %}

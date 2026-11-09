@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Course management — RollNexa{% endblock %}
+{% block content %}
+<section class="dashboard-section"><div class="container dashboard-container">
+  <div class="dashboard-heading"><div><span class="eyebrow">ACADEMIC OPERATIONS</span><h1>Course management</h1><p>Maintain the course catalogue, publish programme-specific offerings and manage teaching assignments.</p></div><span class="account-status"><i></i> Administrator access</span></div>
+  <div class="stats-grid">
+    <a class="stat-card" href="{% url 'course_catalogue' %}"><span class="stat-label">COURSE CATALOGUE</span><strong>{{ course_count }}</strong><span class="stat-caption">Active master courses</span></a>
+    <a class="stat-card" href="{% url 'offering_list' %}"><span class="stat-label">COURSE OFFERINGS</span><strong>{{ offering_count }}</strong><span class="stat-caption">Active programme offerings</span></a>
+    <a class="stat-card" href="{% url 'offering_list' %}?status=open"><span class="stat-label">OPEN REGISTRATION</span><strong>{{ open_offering_count }}</strong><span class="stat-caption">Available for student registration</span></a>
+    <div class="stat-card"><span class="stat-label">REGISTERED ENROLMENTS</span><strong>{{ registration_count }}</strong><span class="stat-caption">Current registration records</span></div>
+  </div>
+  <div class="academic-layout-grid">
+    <article class="panel-card academic-panel"><div class="panel-heading"><div><span class="eyebrow">COURSE CATALOGUE</span><h2>Master course records</h2></div></div><p class="muted-copy">Define each course once with its code, title, credit units and owning department. The catalogue can be reused across programmes and academic periods.</p><div class="admin-actions"><a class="button button-primary button-small" href="{% url 'course_create' %}">Add course</a><a class="button button-secondary button-small" href="{% url 'course_catalogue' %}">View catalogue</a></div></article>
+    <article class="panel-card academic-panel"><div class="panel-heading"><div><span class="eyebrow">COURSE OFFERINGS</span><h2>Publish a course</h2></div></div><p class="muted-copy">An offering connects a catalogue course to a programme, academic semester and student level. Lecturer assignments and student registration are managed against the offering.</p><div class="admin-actions"><a class="button button-primary button-small" href="{% url 'offering_create' %}">Create offering</a><a class="button button-secondary button-small" href="{% url 'offering_list' %}">View offerings</a></div></article>
+  </div>
+  <div class="academic-help-note"><strong>Data model:</strong> A course is the reusable catalogue record. A course offering is the delivery of that course to a particular programme and level in a semester. A lecturer is assigned to an offering; students register for the offering.</div>
+  <div class="panel-card academic-panel"><div class="panel-heading"><div><span class="eyebrow">TEACHING ASSIGNMENTS</span><h2>Lecturer assignments</h2></div><span class="status-tag status-active">{{ lecturer_assignment_count }} active assignments</span></div><p class="muted-copy">Assign one or more active lecturer accounts to each course offering. Lecturers will only see offerings assigned to them.</p></div>
+</div></section>
+{% endblock %}

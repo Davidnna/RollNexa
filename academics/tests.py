@@ -155,3 +155,153 @@ class AcademicCSVImportTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertContains(response, "provide both department_code and department_name", status_code=400)
         self.assertEqual(Faculty.objects.count(), 0)
+
+
+from .models import Course, CourseLecturerAssignment, CourseOffering, CourseRegistration
+from accounts.models import UserProfile
+
+
+class CourseManagementTests(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_superuser(
+            username="courseadmin", email="courseadmin@example.test", password="StrongTestPassword!2026"
+        )
+        self.faculty = Faculty.objects.create(code="SCI", name="Faculty of Science")
+        self.department = Department.objects.create(
+            faculty=self.faculty, code="CSC", name="Computer Science"
+        )
+        self.programme = Programme.objects.create(
+            department=self.department, code="BSC-CS", name="Computer Science", award="B.Sc."
+        )
+        self.session = AcademicSession.objects.create(name="2025/2026", is_current=True)
+        self.semester = Semester.objects.create(
+            session=self.session, name=Semester.FIRST, is_current=True
+        )
+        self.course = Course.objects.create(
+            department=self.department, code="CSC301", title="Data Structures",
+            credit_units=3,
+        )
+        self.offering = CourseOffering.objects.create(
+            course=self.course, programme=self.programme, semester=self.semester,
+            level="300", registration_open=True,
+        )
+        self.student_user = User.objects.create_user(
+            username="course_student", email="course_student@example.test",
+            password="StrongTestPassword!2026",
+        )
+        self.student = self.student_user.profile
+        self.student.programme = self.programme
+        self.student.current_level = "300"
+        self.student.save()
+        self.lecturer_user = User.objects.create_user(
+            username="course_lecturer", email="course_lecturer@example.test",
+            password="StrongTestPassword!2026",
+        )
+        self.lecturer = self.lecturer_user.profile
+        self.lecturer.role = UserProfile.ROLE_LECTURER
+        self.lecturer.department = self.department
+        self.lecturer.save()
+
+    def test_admin_can_open_course_management(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse("course_management"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Course management")
+
+    def test_student_cannot_open_course_management(self):
+        self.client.force_login(self.student_user)
+        response = self.client.get(reverse("course_management"))
+        self.assertEqual(response.status_code, 403)
+
+    def test_admin_can_create_course(self):
+        self.client.force_login(self.admin)
+        response = self.client.post(reverse("course_create"), {
+            "department": self.department.pk, "code": "CSC302",
+            "title": "Algorithms", "credit_units": 3, "description": "",
+        })
+        self.assertRedirects(response, reverse("course_catalogue"))
+        self.assertTrue(Course.objects.filter(code="CSC302").exists())
+
+    def test_student_sees_only_matching_programme_and_level_offerings(self):
+        other_offering = CourseOffering.objects.create(
+            course=self.course,
+            programme=Programme.objects.create(
+                department=self.department, code="BSC-MATH", name="Mathematics"
+            ),
+            semester=self.semester, level="300", registration_open=True,
+        )
+        self.client.force_login(self.student_user)
+        response = self.client.get(reverse("student_course_list"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "CSC301")
+        self.assertEqual(list(response.context["offerings"]), [self.offering])
+
+    def test_student_can_register_for_eligible_open_offering(self):
+        self.client.force_login(self.student_user)
+        response = self.client.post(reverse("student_course_register", kwargs={"pk": self.offering.pk}))
+        self.assertRedirects(response, reverse("student_course_list"))
+        self.assertTrue(CourseRegistration.objects.filter(
+            offering=self.offering, student=self.student,
+            status=CourseRegistration.STATUS_REGISTERED,
+        ).exists())
+
+    def test_student_cannot_register_for_another_programme(self):
+        other_programme = Programme.objects.create(
+            department=self.department, code="BSC-MATH", name="Mathematics"
+        )
+        other_offering = CourseOffering.objects.create(
+            course=self.course, programme=other_programme, semester=self.semester,
+            level="300", registration_open=True,
+        )
+        self.client.force_login(self.student_user)
+        response = self.client.post(reverse("student_course_register", kwargs={"pk": other_offering.pk}))
+        self.assertEqual(response.status_code, 404)
+        self.assertFalse(CourseRegistration.objects.filter(offering=other_offering).exists())
+
+    def test_registration_capacity_is_enforced(self):
+        self.offering.max_students = 1
+        self.offering.save()
+        another_user = User.objects.create_user(
+            username="second_student", email="second_student@example.test",
+            password="StrongTestPassword!2026",
+        )
+        another = another_user.profile
+        another.programme = self.programme
+        another.current_level = "300"
+        another.save()
+        CourseRegistration.objects.create(offering=self.offering, student=self.student)
+        self.client.force_login(another_user)
+        self.client.post(reverse("student_course_register", kwargs={"pk": self.offering.pk}))
+        self.assertFalse(CourseRegistration.objects.filter(offering=self.offering, student=another).exists())
+
+    def test_lecturer_only_sees_assigned_offerings(self):
+        CourseLecturerAssignment.objects.create(offering=self.offering, lecturer=self.lecturer)
+        self.client.force_login(self.lecturer_user)
+        response = self.client.get(reverse("lecturer_course_list"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "CSC301")
+
+    def test_assigned_lecturer_can_view_roster_but_student_cannot(self):
+        CourseLecturerAssignment.objects.create(offering=self.offering, lecturer=self.lecturer)
+        CourseRegistration.objects.create(offering=self.offering, student=self.student)
+        self.client.force_login(self.lecturer_user)
+        response = self.client.get(reverse("lecturer_course_roster", kwargs={"pk": self.offering.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "course_student")
+        self.client.force_login(self.student_user)
+        denied = self.client.get(reverse("lecturer_course_roster", kwargs={"pk": self.offering.pk}))
+        self.assertEqual(denied.status_code, 403)
+
+    def test_course_offering_cannot_be_registered_when_closed(self):
+        self.offering.registration_open = False
+        self.offering.save()
+        self.client.force_login(self.student_user)
+        self.client.post(reverse("student_course_register", kwargs={"pk": self.offering.pk}))
+        self.assertFalse(CourseRegistration.objects.filter(offering=self.offering).exists())
+
+    def test_lecturer_assignment_rejects_student_profile(self):
+        assignment = CourseLecturerAssignment(
+            offering=self.offering, lecturer=self.student
+        )
+        with self.assertRaises(Exception):
+            assignment.full_clean()

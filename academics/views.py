@@ -14,7 +14,7 @@ from django.views.decorators.http import require_POST, require_http_methods
 from django.utils import timezone
 
 from .forms import AcademicSessionForm, DepartmentForm, FacultyForm, ProgrammeForm, SemesterForm
-from .models import AcademicSession, Department, Faculty, Programme, Semester
+from .models import AcademicSession, Course, CourseOffering, Department, Faculty, Programme, Semester
 from .csv_import import ACADEMIC_COLUMNS, apply_import_plan, build_import_plan, parse_academic_csv
 
 
@@ -197,9 +197,15 @@ def academic_toggle(request, kind, pk):
             Semester.objects.filter(session=obj, is_active=True).update(
                 is_active=False, is_current=False, updated_at=timezone.now()
             )
+            CourseOffering.objects.filter(semester__session=obj, is_active=True).update(
+                is_active=False, registration_open=False, updated_at=timezone.now()
+            )
         elif isinstance(obj, Semester) and not obj.is_active:
             obj.is_current = False
             obj.save(update_fields=["is_active", "is_current", "updated_at"])
+            CourseOffering.objects.filter(semester=obj, is_active=True).update(
+                is_active=False, registration_open=False, updated_at=timezone.now()
+            )
         else:
             obj.save(update_fields=["is_active", "updated_at"])
 
@@ -208,8 +214,22 @@ def academic_toggle(request, kind, pk):
         if isinstance(obj, Faculty) and not obj.is_active:
             Department.objects.filter(faculty=obj, is_active=True).update(is_active=False, updated_at=timezone.now())
             Programme.objects.filter(department__faculty=obj, is_active=True).update(is_active=False, updated_at=timezone.now())
+            Course.objects.filter(department__faculty=obj, is_active=True).update(is_active=False, updated_at=timezone.now())
+            CourseOffering.objects.filter(
+                Q(course__department__faculty=obj) | Q(programme__department__faculty=obj),
+                is_active=True,
+            ).update(is_active=False, registration_open=False, updated_at=timezone.now())
         elif isinstance(obj, Department) and not obj.is_active:
             Programme.objects.filter(department=obj, is_active=True).update(is_active=False, updated_at=timezone.now())
+            Course.objects.filter(department=obj, is_active=True).update(is_active=False, updated_at=timezone.now())
+            CourseOffering.objects.filter(
+                Q(course__department=obj) | Q(programme__department=obj),
+                is_active=True,
+            ).update(is_active=False, registration_open=False, updated_at=timezone.now())
+        elif isinstance(obj, Programme) and not obj.is_active:
+            CourseOffering.objects.filter(programme=obj, is_active=True).update(
+                is_active=False, registration_open=False, updated_at=timezone.now()
+            )
     messages.success(request, f"{config['singular']} {'activated' if obj.is_active else 'deactivated'}.")
     return redirect("academic_list", kind=kind)
 

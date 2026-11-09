@@ -74,3 +74,22 @@ Do not reset, recreate or manually alter the Neon database. If Render reports a 
 - The temporary administrator bootstrap token should be removed from Render after the first administrator has been created.
 
 For detailed upload and verification instructions, see `GITHUB_UPLOAD_GUIDE_0.3.1.md`, `CSV_IMPORT_GUIDE.md`, `EBSU_DATA_SOURCES.md` and `RELEASE_NOTES_0.3.1.md`.
+
+
+## Release 0.4.0 — Course catalogue and offerings
+
+The course management module introduces:
+- Department-owned master course records.
+- Programme-, semester- and level-specific course offerings.
+- Lecturer assignment to offerings.
+- Student course registration and withdrawal.
+- Lecturer class rosters.
+- Role-specific access restrictions.
+
+Administrator route: `/management/courses/`
+
+Student route: `/student/courses/`
+
+Lecturer route: `/lecturer/courses/`
+
+See `COURSE_MANAGEMENT_GUIDE.md` and `RELEASE_NOTES_0.4.0.md` for deployment and verification instructions. Course registration is not attendance marking; QR attendance is a later release.

@@ -10,7 +10,7 @@
       <div><strong>Academic profile</strong><p>Programme: {{ user.profile.programme|default:"Not assigned" }}{% if user.profile.current_level %} · {{ user.profile.current_level }} level{% endif %}</p></div>
     </div>
     <div class="dashboard-grid">
-      <article class="dashboard-card"><span class="dashboard-card-icon">▦</span><span class="feature-number">ATTENDANCE</span><h2>QR attendance</h2><p>Access active attendance sessions for your enrolled courses.</p><span class="module-status">Coming in a later release</span></article>
+      <article class="dashboard-card"><span class="dashboard-card-icon">▦</span><span class="feature-number">COURSE ENROLMENT</span><h2>My courses</h2><p>Review eligible course offerings and register for courses in your programme and level.</p><a class="text-action" href="{% url 'student_course_list' %}">Open my courses →</a></article>
       <article class="dashboard-card"><span class="dashboard-card-icon">◎</span><span class="feature-number">IDENTITY</span><h2>Identity verification</h2><p>Review your identity-verification setup when enrollment becomes available.</p><span class="module-status">Coming in a later release</span></article>
       <article class="dashboard-card"><span class="dashboard-card-icon">▤</span><span class="feature-number">RECORDS</span><h2>My attendance</h2><p>Review your attendance history and course participation.</p><span class="module-status">Coming in a later release</span></article>
     </div>

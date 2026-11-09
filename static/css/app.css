@@ -334,3 +334,17 @@ button, input { font: inherit; }
 @media(max-width:620px) { .csv-preview-stats { grid-template-columns:1fr 1fr; } .csv-confirm-form { flex-direction:column; } .csv-confirm-form .button { width:100%; } }
 
 .csv-sample-heading { margin:22px 0 9px; color:var(--navy); font-family:"Manrope",sans-serif; font-size:14px; }
+
+
+/* RollNexa 0.4.0 — course catalogue, offerings and registration */
+.assignment-form { display:flex; align-items:flex-end; gap:10px; margin-top:18px; padding-top:17px; border-top:1px solid #EEF1F5; }
+.assignment-form .field-group { flex:1; margin:0; }
+.assignment-form .button { flex:0 0 auto; }
+.course-stat-link { text-decoration:none; }
+.course-note { margin:15px 0; padding:13px 15px; border:1px solid #DDEFEA; border-radius:10px; color:#476A68; background:#F1FAF8; font-size:11px; line-height:1.65; }
+.data-table td form { margin:0; }
+.data-table button:disabled { opacity:.45; cursor:not-allowed; }
+@media (max-width:600px) {
+  .assignment-form { align-items:stretch; flex-direction:column; }
+  .assignment-form .button { width:100%; }
+}

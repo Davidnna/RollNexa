@@ -10,7 +10,7 @@
       <div><strong>Academic profile</strong><p>Department: {{ user.profile.department|default:"Not assigned" }}</p></div>
     </div>
     <div class="dashboard-grid">
-      <article class="dashboard-card"><span class="dashboard-card-icon">▣</span><span class="feature-number">TEACHING</span><h2>My courses</h2><p>View courses assigned to your lecturer account.</p><span class="module-status">Coming in a later release</span></article>
+      <article class="dashboard-card"><span class="dashboard-card-icon">▣</span><span class="feature-number">TEACHING</span><h2>My courses</h2><p>View course offerings assigned to you and access their registered student rosters.</p><a class="text-action" href="{% url 'lecturer_course_list' %}">Open my teaching →</a></article>
       <article class="dashboard-card"><span class="dashboard-card-icon">▦</span><span class="feature-number">SESSIONS</span><h2>Attendance sessions</h2><p>Create and manage QR-based attendance sessions.</p><span class="module-status">Coming in a later release</span></article>
       <article class="dashboard-card"><span class="dashboard-card-icon">▤</span><span class="feature-number">REPORTS</span><h2>Attendance reports</h2><p>Review attendance records for your assigned courses.</p><span class="module-status">Coming in a later release</span></article>
     </div>
