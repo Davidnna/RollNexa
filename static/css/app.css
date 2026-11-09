@@ -281,3 +281,34 @@ button, input { font: inherit; }
   --mist: #F3F7FB;
 }
 ::selection { color: #111B35; background: #B9F2EA; }
+
+
+/* RollNexa 0.3.0 — academic structure management */
+.form-control { width:100%; min-height:45px; padding:10px 12px; border:1px solid #DCE3EB; border-radius:8px; color:var(--navy); background:#fff; font:inherit; font-size:12px; }
+.form-control:focus { outline:none; border-color:var(--teal-dark); box-shadow:0 0 0 3px rgba(25,200,182,.13); }
+.academic-stats .stat-card { transition:transform .18s ease, box-shadow .18s ease; }
+.academic-stats .stat-card:hover { transform:translateY(-2px); box-shadow:0 12px 30px rgba(16,26,51,.07); }
+.academic-layout-grid { display:grid; grid-template-columns:1.05fr .95fr; gap:18px; }
+.academic-panel { margin-top:0; }
+.academic-links { display:grid; gap:5px; }
+.academic-links a { display:flex; align-items:center; gap:13px; padding:13px 9px; border-bottom:1px solid #EEF1F5; }
+.academic-links a:last-child { border-bottom:0; }
+.academic-links a > span:nth-child(2) { display:grid; gap:2px; flex:1; }
+.academic-links strong { color:var(--navy); font-size:12px; }
+.academic-links small { color:var(--slate-light); font-size:10px; }
+.academic-links b { color:var(--teal-dark); font-size:17px; }
+.academic-link-icon { display:grid; width:36px; height:36px; place-items:center; border-radius:10px; color:var(--teal-dark); background:#E9F9F6; font-size:10px; font-weight:800; }
+.current-period-block { display:grid; gap:5px; padding:5px 0 12px; }
+.current-period-block > strong { color:var(--navy); font-family:"Manrope",sans-serif; font-size:23px; letter-spacing:-.04em; }
+.current-period-block > small { color:var(--slate-light); font-size:10px; }
+.period-divider { height:1px; margin:12px 0; background:var(--line); }
+.academic-calendar-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+.academic-help-note { margin:18px 0; padding:15px 17px; border:1px solid #DDEFEA; border-radius:11px; color:#476A68; background:#F1FAF8; font-size:11px; line-height:1.7; }
+.muted-copy { color:var(--slate); font-size:11px; }
+.academic-breadcrumb { margin:-4px 0 14px; color:var(--slate-light); font-size:10px; }
+.academic-breadcrumb a { color:var(--teal-dark); font-weight:700; }
+.row-actions { display:flex; align-items:center; flex-wrap:wrap; gap:12px; }
+.row-actions form { margin:0; }
+.academic-table td { white-space:nowrap; }
+.academic-assignment { margin:14px 0 22px; }
+@media (max-width:760px) { .academic-layout-grid { grid-template-columns:1fr; } .academic-table { min-width:700px; } }

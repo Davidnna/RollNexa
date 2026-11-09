@@ -27,3 +27,22 @@ document.querySelectorAll("[data-copy-target]").forEach((button) => {
     }
   });
 });
+
+
+// Show the relevant academic assignment fields for the selected account role.
+(() => {
+  const role = document.getElementById("id_role");
+  const groups = document.querySelectorAll("[data-role-field]");
+  if (!role || !groups.length) return;
+  const update = () => {
+    groups.forEach((group) => {
+      const visible = group.dataset.roleField === role.value;
+      group.hidden = !visible;
+      group.querySelectorAll("input, select, textarea").forEach((field) => {
+        field.disabled = !visible;
+      });
+    });
+  };
+  role.addEventListener("change", update);
+  update();
+})();

@@ -24,14 +24,15 @@
         <a class="filter-reset" href="{% url 'user_list' %}">Reset</a>
       </form>
       {% if page_obj.object_list %}
-        <div class="table-wrap"><table class="data-table"><thead><tr><th>USER</th><th>ROLE</th><th>INSTITUTIONAL ID</th><th>STATUS</th><th>ACCOUNT ACTION</th></tr></thead><tbody>
+        <div class="table-wrap"><table class="data-table"><thead><tr><th>USER</th><th>ROLE</th><th>ACADEMIC ASSIGNMENT</th><th>INSTITUTIONAL ID</th><th>STATUS</th><th>ACCOUNT ACTION</th></tr></thead><tbody>
         {% for item in page_obj.object_list %}
           <tr>
             <td><strong>{{ item.get_full_name|default:item.username }}</strong><span class="table-subtext">{{ item.username }} · {{ item.email }}</span></td>
             <td>{{ item.profile.get_role_display }}</td>
+            <td>{% if item.profile.programme %}{{ item.profile.programme.name }}{% elif item.profile.department %}{{ item.profile.department.name }}{% else %}—{% endif %}{% if item.profile.current_level %}<span class="table-subtext">{{ item.profile.current_level }} level</span>{% endif %}</td>
             <td>{{ item.profile.institutional_id|default:"—" }}</td>
             <td><span class="status-tag {% if item.is_active %}status-active{% else %}status-inactive{% endif %}">{% if item.is_active %}Active{% else %}Inactive{% endif %}</span></td>
-            <td><form method="post" action="{% url 'toggle_account_status' item.pk %}" class="inline-action">{% csrf_token %}<button class="text-action {% if item.is_active %}text-danger{% endif %}" type="submit">{% if item.is_active %}Deactivate{% else %}Activate{% endif %}</button></form></td>
+            <td><div class="row-actions"><a class="text-action" href="{% url 'user_edit' item.pk %}">Edit</a><form method="post" action="{% url 'toggle_account_status' item.pk %}" class="inline-action">{% csrf_token %}<button class="text-action {% if item.is_active %}text-danger{% endif %}" type="submit">{% if item.is_active %}Deactivate{% else %}Activate{% endif %}</button></form></div></td>
           </tr>
         {% endfor %}
         </tbody></table></div>

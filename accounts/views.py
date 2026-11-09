@@ -15,7 +15,7 @@ from django.utils.cache import add_never_cache_headers
 from django.utils.crypto import constant_time_compare
 from django.views.decorators.http import require_POST, require_http_methods
 
-from .forms import AdminCreateAccountForm, InitialAdminSetupForm
+from .forms import AdminCreateAccountForm, AdminUpdateAccountForm, InitialAdminSetupForm
 from .models import UserProfile
 
 User = get_user_model()
@@ -78,7 +78,7 @@ def lecturer_dashboard(request):
 def user_list(request):
     users = (
         User.objects.filter(is_superuser=False)
-        .select_related("profile")
+        .select_related("profile", "profile__department", "profile__programme")
         .order_by("last_name", "first_name", "username")
     )
 
@@ -94,6 +94,8 @@ def user_list(request):
             | Q(last_name__icontains=search)
             | Q(email__icontains=search)
             | Q(profile__institutional_id__icontains=search)
+            | Q(profile__department__name__icontains=search)
+            | Q(profile__programme__name__icontains=search)
         )
 
     if role in {UserProfile.ROLE_STUDENT, UserProfile.ROLE_LECTURER}:
@@ -135,6 +137,14 @@ def user_create(request):
             profile.role = form.cleaned_data["role"]
             profile.institutional_id = form.cleaned_data["institutional_id"].strip()
             profile.phone_number = form.cleaned_data["phone_number"].strip()
+            if form.cleaned_data["role"] == UserProfile.ROLE_STUDENT:
+                profile.programme = form.cleaned_data.get("programme")
+                profile.department = profile.programme.department if profile.programme else None
+                profile.current_level = form.cleaned_data.get("current_level") or ""
+            else:
+                profile.department = form.cleaned_data.get("department")
+                profile.programme = None
+                profile.current_level = ""
             profile.must_change_password = True
             profile.created_by = request.user
             profile.save()
@@ -150,6 +160,34 @@ def user_create(request):
         return redirect("user_created")
 
     return render(request, "accounts/user_create.html", {"form": form})
+
+
+@system_admin_required
+@require_http_methods(["GET", "POST"])
+def user_edit(request, user_id):
+    target = get_object_or_404(User.objects.select_related("profile"), pk=user_id, is_superuser=False)
+    form = AdminUpdateAccountForm(request.POST or None, user=target)
+    if request.method == "POST" and form.is_valid():
+        with transaction.atomic():
+            target.first_name = form.cleaned_data["first_name"].strip()
+            target.last_name = form.cleaned_data["last_name"].strip()
+            target.email = form.cleaned_data["email"].strip().lower()
+            target.save(update_fields=["first_name", "last_name", "email"])
+            profile = target.profile
+            profile.institutional_id = form.cleaned_data["institutional_id"].strip()
+            profile.phone_number = form.cleaned_data["phone_number"].strip()
+            if profile.role == UserProfile.ROLE_STUDENT:
+                profile.programme = form.cleaned_data.get("programme")
+                profile.department = profile.programme.department if profile.programme else None
+                profile.current_level = form.cleaned_data.get("current_level") or ""
+            elif profile.role == UserProfile.ROLE_LECTURER:
+                profile.department = form.cleaned_data.get("department")
+                profile.programme = None
+                profile.current_level = ""
+            profile.save()
+        messages.success(request, f"The account for {target.get_username()} has been updated.")
+        return redirect("user_list")
+    return render(request, "accounts/user_edit.html", {"form": form, "target_user": target})
 
 
 @system_admin_required

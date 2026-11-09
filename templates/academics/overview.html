@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Academic management — RollNexa{% endblock %}
+{% block content %}
+<section class="dashboard-section">
+  <div class="container dashboard-container">
+    <div class="dashboard-heading">
+      <div><span class="eyebrow">ACADEMIC ADMINISTRATION</span><h1>Academic structure</h1><p>Configure the university's faculties, departments, programmes and academic calendar.</p></div>
+      <span class="account-status"><i></i> Administrator access</span>
+    </div>
+    <div class="stats-grid academic-stats">
+      <a class="stat-card" href="{% url 'academic_list' kind='faculties' %}"><span class="stat-label">FACULTIES</span><strong>{{ faculty_count }}</strong><span class="stat-caption">Active faculties</span></a>
+      <a class="stat-card" href="{% url 'academic_list' kind='departments' %}"><span class="stat-label">DEPARTMENTS</span><strong>{{ department_count }}</strong><span class="stat-caption">Active departments</span></a>
+      <a class="stat-card" href="{% url 'academic_list' kind='programmes' %}"><span class="stat-label">PROGRAMMES</span><strong>{{ programme_count }}</strong><span class="stat-caption">Active programmes</span></a>
+      <a class="stat-card" href="{% url 'academic_list' kind='sessions' %}"><span class="stat-label">SESSIONS</span><strong>{{ session_count }}</strong><span class="stat-caption">Active academic sessions</span></a>
+    </div>
+    <div class="academic-layout-grid">
+      <article class="panel-card academic-panel">
+        <div class="panel-heading"><div><span class="eyebrow">ACADEMIC STRUCTURE</span><h2>Institutional hierarchy</h2></div></div>
+        <div class="academic-links">
+          <a href="{% url 'academic_list' kind='faculties' %}"><span class="academic-link-icon">01</span><span><strong>Faculties</strong><small>Create and maintain faculties</small></span><b>→</b></a>
+          <a href="{% url 'academic_list' kind='departments' %}"><span class="academic-link-icon">02</span><span><strong>Departments</strong><small>Organise departments by faculty</small></span><b>→</b></a>
+          <a href="{% url 'academic_list' kind='programmes' %}"><span class="academic-link-icon">03</span><span><strong>Programmes</strong><small>Define degree programmes</small></span><b>→</b></a>
+        </div>
+      </article>
+      <article class="panel-card academic-panel">
+        <div class="panel-heading"><div><span class="eyebrow">ACADEMIC CALENDAR</span><h2>Current academic period</h2></div></div>
+        <div class="current-period-block">
+          <span class="stat-label">CURRENT SESSION</span>
+          {% if current_session %}<strong>{{ current_session.name }}</strong><small>{% if current_session.start_date %}{{ current_session.start_date|date:"d M Y" }}{% else %}Start date not specified{% endif %} – {% if current_session.end_date %}{{ current_session.end_date|date:"d M Y" }}{% else %}End date not specified{% endif %}</small>{% else %}<strong>Not configured</strong><small>Set an academic session as current.</small>{% endif %}
+          <div class="period-divider"></div>
+          <span class="stat-label">CURRENT SEMESTER</span>
+          {% if current_semester %}<strong>{{ current_semester.get_name_display }}</strong><small>{{ current_semester.session.name }}</small>{% else %}<strong>Not configured</strong><small>Set a semester as current after selecting the current session.</small>{% endif %}
+        </div>
+        <div class="academic-calendar-actions"><a class="button button-secondary button-small" href="{% url 'academic_list' kind='sessions' %}">Manage sessions</a><a class="button button-secondary button-small" href="{% url 'academic_list' kind='semesters' %}">Manage semesters</a></div>
+      </article>
+    </div>
+    <div class="academic-help-note"><strong>Data integrity:</strong> Academic records are deactivated rather than deleted. This protects the historical relationships that future student enrolment, course registration and attendance records will depend on.</div>
+    <div class="panel-card academic-panel"><div class="panel-heading"><div><span class="eyebrow">NEXT DEVELOPMENT STAGE</span><h2>Academic operations</h2></div></div><p class="muted-copy">Course catalogues, course offerings, lecturer-course assignments and student course registration will be introduced in a subsequent release.</p></div>
+  </div>
+</section>
+{% endblock %}

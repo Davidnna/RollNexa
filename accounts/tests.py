@@ -3,6 +3,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from .models import UserProfile
+from academics.models import Department, Faculty, Programme
 
 User = get_user_model()
 
@@ -59,6 +60,61 @@ class RollNexaAccountTests(TestCase):
         self.assertEqual(lecturer.profile.role, UserProfile.ROLE_LECTURER)
         self.assertTrue(lecturer.profile.must_change_password)
         self.assertEqual(lecturer.profile.created_by, self.admin)
+
+    def test_student_creation_requires_programme_when_programmes_exist(self):
+        faculty = Faculty.objects.create(code="SCI", name="Faculty of Science")
+        department = Department.objects.create(faculty=faculty, code="CSC", name="Computer Science")
+        Programme.objects.create(department=department, code="BSC-CS", name="Computer Science")
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse("user_create"),
+            {
+                "username": "student02", "first_name": "Ada", "last_name": "Okafor",
+                "email": "student02@example.test", "role": UserProfile.ROLE_STUDENT,
+                "institutional_id": "STU-002", "phone_number": "", "programme": "",
+                "department": "", "current_level": "100",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Select the student's programme.")
+
+    def test_admin_can_assign_existing_student_to_programme(self):
+        faculty = Faculty.objects.create(code="SCI", name="Faculty of Science")
+        department = Department.objects.create(faculty=faculty, code="CSC", name="Computer Science")
+        programme = Programme.objects.create(department=department, code="BSC-CS", name="Computer Science")
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse("user_edit", kwargs={"user_id": self.student.pk}),
+            {
+                "first_name": "Test", "last_name": "Student", "email": "student@example.test",
+                "institutional_id": "STU-001", "phone_number": "", "programme": str(programme.pk),
+                "department": "", "current_level": "400",
+            },
+        )
+        self.assertRedirects(response, reverse("user_list"))
+        self.student.refresh_from_db()
+        self.assertEqual(self.student.profile.programme, programme)
+        self.assertEqual(self.student.profile.current_level, "400")
+
+    def test_student_profile_can_be_assigned_to_programme(self):
+        faculty = Faculty.objects.create(code="SCI", name="Faculty of Science")
+        department = Department.objects.create(faculty=faculty, code="CSC", name="Computer Science")
+        programme = Programme.objects.create(department=department, code="BSC-CS", name="Computer Science")
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse("user_create"),
+            {
+                "username": "student03", "first_name": "Ada", "last_name": "Okafor",
+                "email": "student03@example.test", "role": UserProfile.ROLE_STUDENT,
+                "institutional_id": "STU-003", "phone_number": "", "programme": str(programme.pk),
+                "department": "", "current_level": "300",
+            },
+        )
+        self.assertRedirects(response, reverse("user_created"), fetch_redirect_response=False)
+        student = User.objects.get(username="student03")
+        self.assertEqual(student.profile.programme, programme)
+        self.assertEqual(student.profile.department, department)
+        self.assertEqual(student.profile.current_level, "300")
 
     @override_settings(BOOTSTRAP_ADMIN_TOKEN="test-bootstrap-token")
     def test_one_time_admin_setup_creates_a_superuser(self):

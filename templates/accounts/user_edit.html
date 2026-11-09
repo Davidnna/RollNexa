@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Edit account — RollNexa{% endblock %}
+{% block content %}
+<section class="auth-section">
+  <div class="auth-card auth-card-wide">
+    <span class="eyebrow">SYSTEM ADMINISTRATION</span>
+    <h1>Edit account</h1>
+    <p class="auth-intro">Update {{ target_user.get_full_name|default:target_user.username }}. The account role is <strong>{{ target_user.profile.get_role_display }}</strong> and cannot be changed here.</p>
+    <form method="post" class="auth-form">
+      {% csrf_token %}
+      {% if form.non_field_errors %}<div class="form-error-summary">{{ form.non_field_errors }}</div>{% endif %}
+      {% for field in form %}
+        <div class="field-group" {% if target_user.profile.role == "student" %}{% if field.name == "department" %}hidden{% endif %}{% elif target_user.profile.role == "lecturer" %}{% if field.name == "programme" or field.name == "current_level" %}hidden{% endif %}{% endif %}>
+          <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+          {% if field.help_text %}<span class="field-help">{{ field.help_text }}</span>{% endif %}
+          {% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}
+        </div>
+      {% endfor %}
+      <button class="button button-primary button-full" type="submit">Save account changes</button>
+      <a class="form-back-link" href="{% url 'user_list' %}">Cancel and return to user management</a>
+    </form>
+  </div>
+</section>
+{% endblock %}

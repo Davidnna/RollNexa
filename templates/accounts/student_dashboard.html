@@ -5,6 +5,10 @@
   <div class="container dashboard-container">
     <div class="dashboard-heading"><div><span class="eyebrow">STUDENT WORKSPACE</span><h1>Welcome, {{ user.first_name|default:user.username }}.</h1><p>Your RollNexa student workspace.</p></div><span class="account-status"><i></i> Student account</span></div>
     <div class="dashboard-notice"><div class="notice-icon">i</div><div><strong>Your account is active</strong><p>Your account was created by an RollNexa administrator. Attendance sessions, course enrolment and personal attendance history will become available as those modules are released.</p></div></div>
+    <div class="dashboard-notice academic-assignment">
+      <div class="notice-icon">⌂</div>
+      <div><strong>Academic profile</strong><p>Programme: {{ user.profile.programme|default:"Not assigned" }}{% if user.profile.current_level %} · {{ user.profile.current_level }} level{% endif %}</p></div>
+    </div>
     <div class="dashboard-grid">
       <article class="dashboard-card"><span class="dashboard-card-icon">▦</span><span class="feature-number">ATTENDANCE</span><h2>QR attendance</h2><p>Access active attendance sessions for your enrolled courses.</p><span class="module-status">Coming in a later release</span></article>
       <article class="dashboard-card"><span class="dashboard-card-icon">◎</span><span class="feature-number">IDENTITY</span><h2>Identity verification</h2><p>Review your identity-verification setup when enrollment becomes available.</p><span class="module-status">Coming in a later release</span></article>

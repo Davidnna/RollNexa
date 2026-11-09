@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} — RollNexa{% endblock %}
+{% block content %}
+<section class="dashboard-section">
+  <div class="container dashboard-container">
+    <div class="dashboard-heading">
+      <div><span class="eyebrow">ACADEMIC ADMINISTRATION</span><h1>{{ title }}</h1><p>Manage {{ title|lower }} and their relationships within RollNexa.</p></div>
+      <a class="button button-primary" href="{% url 'academic_create' kind=kind %}">Create {{ singular|lower }} <span aria-hidden="true">+</span></a>
+    </div>
+    <div class="academic-breadcrumb"><a href="{% url 'academic_overview' %}">Academic structure</a><span> / </span>{{ title }}</div>
+    <div class="panel-card">
+      <form method="get" class="filter-bar">
+        <input type="search" name="q" value="{{ search }}" placeholder="Search {{ title|lower }}" aria-label="Search {{ title|lower }}">
+        <select name="status" aria-label="Filter by status"><option value="">All statuses</option><option value="active" {% if selected_status == "active" %}selected{% endif %}>Active</option><option value="inactive" {% if selected_status == "inactive" %}selected{% endif %}>Inactive</option></select>
+        <button class="button button-primary button-small" type="submit">Apply filters</button><a class="filter-reset" href="{% url 'academic_list' kind=kind %}">Reset</a>
+      </form>
+      {% if rows %}
+        <div class="table-wrap"><table class="data-table academic-table"><thead><tr>{% for header in headers %}<th>{{ header }}</th>{% endfor %}<th>ACTIONS</th></tr></thead><tbody>
+        {% for row in rows %}<tr>
+          {% for cell in row.cells %}<td>{% if forloop.last and cell == "Active" or forloop.last and cell == "Inactive" %}<span class="status-tag {% if cell == 'Active' %}status-active{% else %}status-inactive{% endif %}">{{ cell }}</span>{% else %}{{ cell }}{% endif %}</td>{% endfor %}
+          <td><div class="row-actions"><a href="{{ row.edit_url }}" class="text-action">Edit</a>
+            {% if row.current_url and not row.is_current and row.is_active %}<form method="post" action="{{ row.current_url }}">{% csrf_token %}<button class="text-action" type="submit">Set current</button></form>{% endif %}
+            <form method="post" action="{{ row.toggle_url }}">{% csrf_token %}<button class="text-action {% if row.is_active %}text-danger{% endif %}" type="submit">{% if row.is_active %}Deactivate{% else %}Activate{% endif %}</button></form>
+          </div></td>
+        </tr>{% endfor %}
+        </tbody></table></div>
+        <div class="pagination"><span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} · {{ page_obj.paginator.count }} records</span><div>{% if page_obj.has_previous %}<a href="?q={{ search|urlencode }}&status={{ selected_status }}&page={{ page_obj.previous_page_number }}">Previous</a>{% endif %}{% if page_obj.has_next %}<a href="?q={{ search|urlencode }}&status={{ selected_status }}&page={{ page_obj.next_page_number }}">Next</a>{% endif %}</div></div>
+      {% else %}<div class="empty-state"><strong>No {{ title|lower }} found.</strong><p>Create the first record or adjust your search filters.</p><a class="button button-primary button-small" href="{% url 'academic_create' kind=kind %}">Create {{ singular|lower }}</a></div>{% endif %}
+    </div>
+  </div>
+</section>
+{% endblock %}

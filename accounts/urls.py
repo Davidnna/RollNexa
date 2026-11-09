@@ -19,6 +19,7 @@ urlpatterns = [
     path("dashboard/lecturer/", views.lecturer_dashboard, name="lecturer_dashboard"),
     path("management/users/", views.user_list, name="user_list"),
     path("management/users/create/", views.user_create, name="user_create"),
+    path("management/users/<int:user_id>/edit/", views.user_edit, name="user_edit"),
     path("management/users/created/", views.user_created, name="user_created"),
     path("management/users/<int:user_id>/toggle-status/", views.toggle_account_status, name="toggle_account_status"),
     path("setup/initial-admin/", views.initial_admin_setup, name="initial_admin_setup"),
