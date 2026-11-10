@@ -197,7 +197,7 @@ class Course(AcademicRecord):
     title = models.CharField(max_length=180)
     credit_units = models.PositiveSmallIntegerField(
         validators=[MinValueValidator(1), MaxValueValidator(30)],
-        help_text="Enter the approved course unit value (1–30).",
+        help_text="Catalogue default only; the approved units for each programme are stored on CourseOffering (1–30).",
     )
     description = models.TextField(blank=True)
     STRESS_CODE_CHOICES = [
@@ -209,7 +209,7 @@ class Course(AcademicRecord):
     ]
     stress_code = models.CharField(
         max_length=2, choices=STRESS_CODE_CHOICES, blank=True,
-        help_text="Optional curriculum classification, retained as published by the institution.",
+        help_text="Catalogue default only; programme-specific classification is stored on CourseOffering.",
     )
 
     class Meta:
@@ -262,6 +262,26 @@ class CourseOffering(AcademicRecord):
         Semester, on_delete=models.PROTECT, related_name="course_offerings"
     )
     level = models.CharField(max_length=3, choices=LEVEL_CHOICES)
+    credit_units = models.PositiveSmallIntegerField(
+        default=2,
+        validators=[MinValueValidator(1), MaxValueValidator(30)],
+        help_text="Approved credit units for this programme-specific offering (1–30).",
+    )
+    stress_code = models.CharField(
+        max_length=2,
+        choices=Course.STRESS_CODE_CHOICES,
+        blank=True,
+        default="",
+        help_text="Programme-specific curriculum classification, if published.",
+    )
+    source_url = models.URLField(
+        max_length=500, blank=True,
+        help_text="Optional source URL for this programme-specific curriculum entry.",
+    )
+    source_note = models.TextField(
+        blank=True,
+        help_text="Optional provenance or verification note for this offering.",
+    )
     registration_open = models.BooleanField(
         default=False,
         help_text="Students can register only while this offering is active and registration is open.",
@@ -282,6 +302,10 @@ class CourseOffering(AcademicRecord):
             models.CheckConstraint(
                 condition=Q(max_students__isnull=True) | Q(max_students__gte=1),
                 name="course_offering_capacity_positive",
+            ),
+            models.CheckConstraint(
+                condition=Q(credit_units__gte=1) & Q(credit_units__lte=30),
+                name="offering_credit_units_between_1_30",
             ),
         ]
         indexes = [

@@ -383,6 +383,48 @@ class CourseCSVImportTests(TestCase):
         self.assertEqual(Course.objects.count(), 2)
         self.assertEqual(CourseOffering.objects.count(), 2)
 
+    def test_same_course_can_have_different_units_in_different_programmes(self):
+        biology_department = Department.objects.create(
+            faculty=self.faculty, code="FSC-AB", name="Applied Biology"
+        )
+        biology_programme = Programme.objects.create(
+            department=biology_department,
+            code="FSC-AB-P01",
+            name="Applied Biology",
+        )
+        content = (
+            "faculty_code,department_code,course_code,course_title,credit_units,stress_code,"
+            "programme_code,academic_session,semester,level,offering_active,registration_open,max_students,source_url,source_note\n"
+            "FSC,FSC-AB,BIO 101,General Biology I,2,R,FSC-CS-P01,CURRENT,FIRST,100,true,false,,https://ebsu.edu.ng/department-of-applied-biology/,Source for the CS programme listing.\n"
+            "FSC,FSC-AB,BIO 101,General Biology I,3,R,FSC-AB-P01,CURRENT,FIRST,100,true,false,,https://ebsu.edu.ng/department-of-applied-biology/,Official Applied Biology curriculum.\n"
+        )
+        self.client.force_login(self.admin)
+        preview = self.client.post(
+            reverse("course_csv_import"),
+            {"action": "preview", "csv_file": self.upload(content)},
+        )
+        self.assertEqual(preview.status_code, 200)
+        self.assertContains(preview, "Import preview")
+        self.client.post(reverse("course_csv_import"), {"action": "import"})
+
+        course = Course.objects.get(department=biology_department, code="BIO 101")
+        self.assertEqual(Course.objects.filter(department=biology_department, code="BIO 101").count(), 1)
+        computer_science_offering = CourseOffering.objects.get(
+            course=course, programme=self.programme
+        )
+        biology_offering = CourseOffering.objects.get(
+            course=course, programme=biology_programme
+        )
+        self.assertEqual(computer_science_offering.credit_units, 2)
+        self.assertEqual(biology_offering.credit_units, 3)
+        self.assertEqual(computer_science_offering.stress_code, "R")
+        self.assertEqual(biology_offering.stress_code, "R")
+        self.assertEqual(
+            biology_offering.source_url,
+            "https://ebsu.edu.ng/department-of-applied-biology/",
+        )
+        self.assertIn("Official Applied Biology curriculum", biology_offering.source_note)
+
     def test_course_units_above_six_are_supported_for_siwes(self):
         self.client.force_login(self.admin)
         content = (
@@ -398,6 +440,7 @@ class CourseCSVImportTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.client.post(reverse("course_csv_import"), {"action": "import"})
         self.assertEqual(Course.objects.get(code="CSC 398").credit_units, 18)
+        self.assertEqual(CourseOffering.objects.get(course__code="CSC 398").credit_units, 18)
 
     def test_missing_current_session_is_reported(self):
         self.session.is_current = False

@@ -15,10 +15,11 @@
         <div class="panel-heading"><div><span class="eyebrow">STEP 1</span><h2>Upload a course CSV</h2></div></div>
         <p class="muted-copy">UTF-8 CSV only. Maximum file size: 2 MB and 1,500 data rows. One row represents a course offering. A course repeated across semesters is stored once in the catalogue and linked to each offering.</p>
         <div class="csv-download-links csv-download-stack">
-          <a href="{% static 'downloads/ebsu_computer_science_courses.csv' %}">Download EBSU Computer Science starter dataset</a>
-          <a href="{% static 'downloads/rollnexa_course_catalogue_template.csv' %}">Download course CSV template</a>
+          <a href="{% static 'downloads/ebsu_science_curriculum_expanded.csv' %}">Download EBSU Science curriculum expansion (11 programmes)</a>
+          <a href="{% static 'downloads/ebsu_course_curriculum_coverage.csv' %}">Download curriculum coverage register (all 81 programmes)</a>
+          <a href="{% static 'downloads/ebsu_science_curriculum_expansion_notes.txt' %}">Read EBSU Science dataset source notes and exclusions</a>
+          <a href="{% static 'downloads/rollnexa_course_catalogue_template.csv' %}">Download blank course CSV template</a>
           <a href="{% url 'course_csv_template' %}">Download template with example row</a>
-          <a href="{% static 'downloads/ebsu_computer_science_course_data_notes.txt' %}">EBSU dataset source notes (see release package)</a>
         </div>
         <form method="post" enctype="multipart/form-data" class="auth-form csv-upload-form">
           {% csrf_token %}
@@ -32,14 +33,14 @@
         <div class="panel-heading"><div><span class="eyebrow">CSV FORMAT</span><h2>How the columns work</h2></div></div>
         <div class="csv-column-list">
           <div><strong>faculty_code, department_code</strong><small>Identify the department that owns the master course record.</small></div>
-          <div><strong>course_code, course_title, credit_units</strong><small>Master catalogue fields. Credit units accept 1–30 to preserve the published 18-unit SIWES entry.</small></div>
-          <div><strong>stress_code</strong><small>Optional curriculum classification: C, R, E, G or AR, preserved as published.</small></div>
+          <div><strong>course_code, course_title, credit_units</strong><small>Master course identity. Credit units in each CSV row belong to that programme-specific offering, and may differ for the same course code in another programme.</small></div>
+          <div><strong>stress_code</strong><small>Programme-specific curriculum classification: C, R, E, G or AR. It is stored on the offering, not the master course.</small></div>
           <div><strong>programme_code, academic_session, semester, level</strong><small>Identify the programme-specific offering. Use CURRENT for the session marked current in RollNexa.</small></div>
           <div><strong>offering_active, registration_open, max_students</strong><small>Imported offerings remain closed for registration. Open registration manually after review.</small></div>
           <div><strong>description, source_url, source_note</strong><small>Optional reference fields. Source notes remain in the CSV and are not treated as course descriptions.</small></div>
         </div>
         <div class="academic-help-note"><strong>Before upload:</strong> Ensure the faculty, course-owning departments, target programme, current academic session and its First/Second semester records already exist and are active. If no current session exists, <a href="{% url 'academic_session_csv_import' %}">import academic sessions and semesters first</a>, then set the verified session as current.</div>
-        <div class="academic-help-note"><strong>Safe import:</strong> The importer previews records first, runs the final import in one transaction and does not delete or overwrite existing courses. Re-uploading the same file is idempotent. New offerings have registration closed.</div>
+        <div class="academic-help-note"><strong>Safe import:</strong> The importer previews records first, runs the final import in one transaction and does not delete or overwrite existing courses or non-empty offering provenance. Re-uploading the same file is idempotent; blank provenance fields on existing offerings may be filled from the CSV. New offerings have registration closed.</div>
       </article>
     </div>
 
@@ -70,8 +71,8 @@
         {% endif %}
         {% if sample_offerings %}
           <h3 class="csv-sample-heading">Course offering sample</h3>
-          <div class="table-wrap"><table class="data-table"><thead><tr><th>COURSE</th><th>PROGRAMME</th><th>SESSION / SEMESTER</th><th>LEVEL</th><th>ACTION</th></tr></thead><tbody>
-            {% for row in sample_offerings %}<tr><td>{{ row.code }}</td><td>{{ row.programme }}</td><td>{{ row.session }} · {{ row.semester }}</td><td>{{ row.level }}</td><td>{{ row.action }}</td></tr>{% endfor %}
+          <div class="table-wrap"><table class="data-table"><thead><tr><th>COURSE</th><th>PROGRAMME</th><th>SESSION / SEMESTER</th><th>LEVEL</th><th>UNITS</th><th>CLASSIFICATION</th><th>ACTION</th></tr></thead><tbody>
+            {% for row in sample_offerings %}<tr><td>{{ row.code }}</td><td>{{ row.programme }}</td><td>{{ row.session }} · {{ row.semester }}</td><td>{{ row.level }}</td><td>{{ row.units }}</td><td>{{ row.stress_code }}</td><td>{{ row.action }}</td></tr>{% endfor %}
           </tbody></table></div>
           {% if offerings_truncated %}<p class="field-help">Showing the first 15 offering records.</p>{% endif %}
         {% endif %}

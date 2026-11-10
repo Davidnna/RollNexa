@@ -105,3 +105,13 @@ Download the EBSU Computer Science starter CSV from the import page. See `EBSU_C
 ## Release 0.4.2 — Academic session and semester CSV import
 
 Administrators can import academic sessions and their First, Second or Summer semesters at `/management/academic/sessions/import/`. The importer validates and previews records, applies them atomically and never automatically marks a session or semester current. See `ACADEMIC_SESSION_CSV_IMPORT_GUIDE.md` and the EBSU session data notes.
+
+
+## Release 0.4.3 — Programme-specific course offering units
+
+Course credit units and curriculum classifications are stored on each programme-specific offering. This supports cross-listed/service courses whose approved units or classifications differ between programmes. Migration `academics.0005_offering_specific_units_and_stress` backfills existing offerings from their master course defaults. See `COURSE_CSV_IMPORT_GUIDE.md`.
+
+
+## Release 0.4.3 — Programme-specific course offerings and EBSU Science expansion
+
+Course credit units and curriculum classifications are now stored per programme-specific offering. Offerings also retain their curriculum source URL and verification note. The bundled EBSU Science curriculum CSV contains 785 offerings across 11 programmes; the coverage register lists all 81 programmes and flags those still requiring approved departmental outlines. See `RELEASE_NOTES_0.4.3.md` and `EBSU_SCIENCE_CURRICULUM_EXPANSION_NOTES.md`.

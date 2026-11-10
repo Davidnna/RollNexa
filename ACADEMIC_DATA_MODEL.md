@@ -37,3 +37,9 @@ Internal codes in the EBSU starter catalogue are RollNexa identifiers, not offic
 Academic foreign keys use `PROTECT` where deletion would break the hierarchy or historical references. The management interface uses deactivation, not deletion. Deactivating a faculty, department, programme, academic session or semester also deactivates dependent courses/offerings where relevant and closes registration. Existing lecturer assignments and course-registration records are retained. Reactivation is explicit and requires active parent records. Course-offering identity is locked after lecturer assignments or student registrations exist.
 
 Course registrations are not attendance records. QR attendance, facial enrollment/verification and attendance history are separate future modules.
+
+
+## Programme-specific course offering attributes
+- A master `Course` stores the shared course identity (owning department, code, title and description) plus default unit/classification values for catalogue reference.
+- A `CourseOffering` stores the programme-specific credit units and curriculum stress classification alongside programme, semester and level.
+- The same master course may therefore be offered to multiple programmes with different unit values or classifications without creating duplicate course identities.

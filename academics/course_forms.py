@@ -41,6 +41,7 @@ class CourseOfferingForm(forms.ModelForm):
         model = CourseOffering
         fields = [
             "course", "programme", "semester", "level",
+            "credit_units", "stress_code", "source_url", "source_note",
             "max_students", "registration_open", "notes",
         ]
         widgets = {"notes": forms.Textarea(attrs={"rows": 3})}
@@ -63,6 +64,13 @@ class CourseOfferingForm(forms.ModelForm):
         self.fields["course"].help_text = self.fields["course"].help_text or (
             "The department that owns the course may differ from the programme receiving it; "
             "this supports service courses."
+        )
+        self.fields["credit_units"].help_text = (
+            "Enter the approved units for this programme and semester. The same course code "
+            "may carry a different unit value in another programme."
+        )
+        self.fields["stress_code"].help_text = (
+            "Optional classification for this programme offering: C, R, E, G or AR."
         )
         for field in self.fields.values():
             field.widget.attrs["class"] = (

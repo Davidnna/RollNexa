@@ -3,6 +3,7 @@ import io
 import re
 
 from django.core.exceptions import ValidationError
+from django.core.validators import URLValidator
 from django.db import IntegrityError, transaction
 
 from .models import AcademicSession, Course, CourseOffering, Department, Programme, Semester
@@ -105,6 +106,8 @@ def build_course_import_plan(rows):
         title = row.get("course_title", "").strip()
         stress_code = row.get("stress_code", "").strip().upper()
         description = row.get("description", "").strip()
+        source_url = row.get("source_url", "").strip()
+        source_note = row.get("source_note", "").strip()
         programme_code = row.get("programme_code", "").strip().upper()
         session_name = row.get("academic_session", "").strip().upper()
         semester_raw = row.get("semester", "").strip().upper()
@@ -131,6 +134,15 @@ def build_course_import_plan(rows):
             errors.append(f"Row {line}: course_title must not exceed 180 characters.")
         if description and len(description) > 5000:
             errors.append(f"Row {line}: description must not exceed 5,000 characters.")
+        if source_url and len(source_url) > 500:
+            errors.append(f"Row {line}: source_url must not exceed 500 characters.")
+        elif source_url:
+            try:
+                URLValidator()(source_url)
+            except ValidationError:
+                errors.append(f"Row {line}: source_url must be a valid HTTP or HTTPS URL.")
+        if source_note and len(source_note) > 5000:
+            errors.append(f"Row {line}: source_note must not exceed 5,000 characters.")
         try:
             units = int(units_raw)
             if not 1 <= units <= 30:
@@ -170,12 +182,15 @@ def build_course_import_plan(rows):
             previous = course_rows.get(course_key)
             if previous and any(
                 previous[field] != course_value[field]
-                for field in ("title", "credit_units", "stress_code", "description")
+                for field in ("title", "description")
             ):
                 errors.append(
-                    f"Row {line}: {course_code} has conflicting course details elsewhere in this file."
+                    f"Row {line}: {course_code} has conflicting course identity details elsewhere in this file. "
+                    "Reconcile the course title or description before importing."
                 )
-            else:
+            elif previous is None:
+                # The first row supplies the catalogue's default unit/classification values.
+                # Authoritative programme-specific values are stored on CourseOffering below.
                 course_rows[course_key] = course_value
 
         if programme_code:
@@ -203,6 +218,10 @@ def build_course_import_plan(rows):
                     "session_name": session_name,
                     "semester": semester_value,
                     "level": level,
+                    "credit_units": units,
+                    "stress_code": stress_code,
+                    "source_url": source_url,
+                    "source_note": source_note,
                     "is_active": active,
                     "registration_open": False,
                     "max_students": max_students,
@@ -243,13 +262,11 @@ def build_course_import_plan(rows):
                 )
             elif (
                 existing.title != item["title"]
-                or existing.credit_units != item["credit_units"]
-                or existing.stress_code != item["stress_code"]
                 or existing.description != item["description"]
             ):
                 errors.append(
-                    f"Course {item['code']} already exists in {department.name} with different details. "
-                    "The importer will not overwrite existing course records; reconcile it in the catalogue first."
+                    f"Course {item['code']} already exists in {department.name} with a different title or description. "
+                    "The importer will not overwrite existing course identity details; reconcile it in the catalogue first."
                 )
             else:
                 pass
@@ -322,6 +339,16 @@ def build_course_import_plan(rows):
                 errors.append(
                     f"Offering {course.code} / {programme.code} / {item['level']} already exists but is inactive."
                 )
+            elif existing_offering and (
+                existing_offering.credit_units != item["credit_units"]
+                or existing_offering.stress_code != item["stress_code"]
+                or (existing_offering.source_url and item["source_url"] and existing_offering.source_url != item["source_url"])
+                or (existing_offering.source_note and item["source_note"] and existing_offering.source_note != item["source_note"])
+            ):
+                errors.append(
+                    f"Offering {course.code} / {programme.code} / {item['level']} already exists with different "
+                    "credit units, curriculum classification or non-empty provenance. The importer will not overwrite it."
+                )
         resolved_offerings[key] = {
             **item,
             "course_id": course.pk if course else None,
@@ -375,6 +402,17 @@ def apply_course_import_plan(plan):
 
         for item in plan["offerings"]:
             if item["existing_id"]:
+                existing_offering = CourseOffering.objects.get(pk=item["existing_id"])
+                provenance_changed = False
+                if not existing_offering.source_url and item["source_url"]:
+                    existing_offering.source_url = item["source_url"]
+                    provenance_changed = True
+                if not existing_offering.source_note and item["source_note"]:
+                    existing_offering.source_note = item["source_note"]
+                    provenance_changed = True
+                if provenance_changed:
+                    existing_offering.full_clean()
+                    existing_offering.save(update_fields=["source_url", "source_note"])
                 result["offerings_unchanged"] += 1
                 continue
             course = course_objects[item["course_key"]]
@@ -385,6 +423,10 @@ def apply_course_import_plan(plan):
                 programme=programme,
                 semester=semester,
                 level=item["level"],
+                credit_units=item["credit_units"],
+                stress_code=item["stress_code"],
+                source_url=item["source_url"],
+                source_note=item["source_note"],
                 is_active=item["is_active"],
                 registration_open=False,
                 max_students=item["max_students"],

@@ -66,6 +66,8 @@ def course_csv_import(request):
                     "session": item["session_name_resolved"],
                     "semester": item["semester_label"],
                     "level": item["level"],
+                    "units": item["credit_units"],
+                    "stress_code": item["stress_code"] or "—",
                     "action": "New" if item["existing_id"] is None else "Unchanged",
                 }
                 for item in plan["offerings"][:15]
@@ -150,6 +152,8 @@ def course_csv_import(request):
                         "session": item["session_name_resolved"],
                         "semester": item["semester_label"],
                         "level": item["level"],
+                        "units": item["credit_units"],
+                        "stress_code": item["stress_code"] or "—",
                         "action": "New" if item["existing_id"] is None else "Unchanged",
                     }
                     for item in plan["offerings"][:15]
