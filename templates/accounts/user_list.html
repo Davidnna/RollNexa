@@ -5,7 +5,7 @@
   <div class="container dashboard-container">
     <div class="dashboard-heading">
       <div><span class="eyebrow">SYSTEM ADMINISTRATION</span><h1>User management</h1><p>Create and manage student and lecturer accounts.</p></div>
-      <a class="button button-primary" href="{% url 'user_create' %}">Create account <span aria-hidden="true">+</span></a>
+      <div class="admin-actions"><a class="button button-secondary" href="{% url 'lecturer_management' %}">Lecturer management</a><a class="button button-primary" href="{% url 'user_create' %}">Create account <span aria-hidden="true">+</span></a></div>
     </div>
     <div class="panel-card">
       <form method="get" class="filter-bar">

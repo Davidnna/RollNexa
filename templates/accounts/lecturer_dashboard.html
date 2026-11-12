@@ -1,19 +1,13 @@
 {% extends "base.html" %}
 {% block title %}Lecturer workspace — RollNexa{% endblock %}
 {% block content %}
-<section class="dashboard-section">
-  <div class="container dashboard-container">
-    <div class="dashboard-heading"><div><span class="eyebrow">LECTURER WORKSPACE</span><h1>Welcome, {{ user.first_name|default:user.username }}.</h1><p>Your RollNexa teaching and attendance workspace.</p></div><span class="account-status"><i></i> Lecturer account</span></div>
-    <div class="dashboard-notice"><div class="notice-icon">i</div><div><strong>Your lecturer account is active</strong><p>Course assignment, attendance-session creation, class monitoring and reporting will become available as those modules are released.</p></div></div>
-    <div class="dashboard-notice academic-assignment">
-      <div class="notice-icon">⌂</div>
-      <div><strong>Academic profile</strong><p>Department: {{ user.profile.department|default:"Not assigned" }}</p></div>
-    </div>
-    <div class="dashboard-grid">
-      <article class="dashboard-card"><span class="dashboard-card-icon">▣</span><span class="feature-number">TEACHING</span><h2>My courses</h2><p>View course offerings assigned to you and access their registered student rosters.</p><a class="text-action" href="{% url 'lecturer_course_list' %}">Open my teaching →</a></article>
-      <article class="dashboard-card"><span class="dashboard-card-icon">▦</span><span class="feature-number">SESSIONS</span><h2>Attendance sessions</h2><p>Create and manage QR-based attendance sessions.</p><span class="module-status">Coming in a later release</span></article>
-      <article class="dashboard-card"><span class="dashboard-card-icon">▤</span><span class="feature-number">REPORTS</span><h2>Attendance reports</h2><p>Review attendance records for your assigned courses.</p><span class="module-status">Coming in a later release</span></article>
-    </div>
+<section class="dashboard-section"><div class="container dashboard-container">
+  <div class="dashboard-heading"><div><span class="eyebrow">LECTURER WORKSPACE</span><h1>Welcome, {{ user.first_name|default:user.username }}.</h1><p>Your assigned teaching responsibilities and class access.</p></div><span class="account-status"><i></i> Lecturer account</span></div>
+  <div class="dashboard-notice academic-assignment"><div class="notice-icon">⌂</div><div><strong>Academic profile</strong><p>Home department: {{ department|default:"Not assigned" }}. Teaching assignments may include offerings owned by other departments.</p></div></div>
+  <div class="stats-grid"><div class="stat-card"><span class="stat-label">ACTIVE TEACHING ASSIGNMENTS</span><strong>{{ assignment_count }}</strong><span class="stat-caption">Course offerings assigned to you</span></div></div>
+  <div class="panel-card"><div class="panel-heading"><div><span class="eyebrow">MY TEACHING</span><h2>Assigned course offerings</h2></div><a href="{% url 'lecturer_course_list' %}">View all →</a></div>
+    {% if assignments %}<div class="table-wrap"><table class="data-table"><thead><tr><th>COURSE</th><th>PROGRAMME</th><th>LEVEL / SEMESTER</th><th>REGISTERED</th><th>ACTION</th></tr></thead><tbody>{% for item in assignments|slice:":6" %}<tr><td><strong>{{ item.offering.course.code }} — {{ item.offering.course.title }}</strong><span class="table-subtext">{{ item.offering.credit_units }} credit units</span></td><td>{{ item.offering.programme.name }}</td><td>{{ item.offering.get_level_display }}<span class="table-subtext">{{ item.offering.semester.get_name_display }} · {{ item.offering.semester.session.name }}</span></td><td>{{ item.registered_count }}</td><td><a class="text-action" href="{% url 'lecturer_course_roster' item.offering.pk %}">View roster</a></td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty-state"><strong>No active course offerings assigned.</strong><p>Contact the system administrator to receive a teaching assignment.</p></div>{% endif %}
   </div>
-</section>
+  <div class="dashboard-grid"><article class="dashboard-card"><span class="feature-number">TEACHING</span><h2>My courses</h2><p>View all assigned course offerings and registered student rosters.</p><a class="text-action" href="{% url 'lecturer_course_list' %}">Open my teaching →</a></article><article class="dashboard-card"><span class="feature-number">ATTENDANCE</span><h2>QR attendance</h2><p>QR attendance-session creation and student check-in will be introduced in a later release.</p><span class="module-status">Planned module</span></article><article class="dashboard-card"><span class="feature-number">REPORTS</span><h2>Attendance reports</h2><p>Attendance analytics will become available after attendance recording is implemented.</p><span class="module-status">Planned module</span></article></div>
+</div></section>
 {% endblock %}

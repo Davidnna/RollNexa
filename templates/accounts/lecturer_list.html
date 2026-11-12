@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Lecturer management — RollNexa{% endblock %}
+{% block content %}
+<section class="dashboard-section"><div class="container dashboard-container">
+  <div class="dashboard-heading"><div><span class="eyebrow">ACADEMIC STAFF</span><h1>Lecturer management</h1><p>Manage lecturer profiles, departmental affiliations and teaching responsibilities.</p></div><div class="admin-actions"><a class="button button-primary" href="{% url 'user_create' %}?role=lecturer">Create lecturer account</a><a class="button button-secondary" href="{% url 'teaching_assignment_management' %}">Teaching assignments</a></div></div>
+  <div class="stats-grid">
+    <div class="stat-card"><span class="stat-label">LECTURER ACCOUNTS</span><strong>{{ lecturer_count }}</strong><span class="stat-caption">All lecturer profiles</span></div>
+    <div class="stat-card"><span class="stat-label">ACTIVE TEACHING ASSIGNMENTS</span><strong>{{ active_assignment_count }}</strong><span class="stat-caption">Assignments on active offerings</span></div>
+  </div>
+  <div class="panel-card">
+    <form method="get" class="filter-bar">
+      <input type="search" name="q" value="{{ search }}" placeholder="Search lecturer, email, ID or department" aria-label="Search lecturers">
+      <select name="department" aria-label="Filter by department"><option value="">All departments</option>{% for department in departments %}<option value="{{ department.pk }}" {% if selected_department_id == department.pk %}selected{% endif %}>{{ department.name }}</option>{% endfor %}</select>
+      <select name="status" aria-label="Filter by account status"><option value="">All statuses</option><option value="active" {% if selected_status == "active" %}selected{% endif %}>Active</option><option value="inactive" {% if selected_status == "inactive" %}selected{% endif %}>Inactive</option></select>
+      <button class="button button-primary button-small" type="submit">Apply filters</button><a class="filter-reset" href="{% url 'lecturer_management' %}">Reset</a>
+    </form>
+    {% if page_obj.object_list %}
+      <div class="table-wrap"><table class="data-table"><thead><tr><th>LECTURER</th><th>HOME DEPARTMENT</th><th>INSTITUTIONAL ID</th><th>ACTIVE ASSIGNMENTS</th><th>ACCOUNT</th><th>ACTION</th></tr></thead><tbody>
+      {% for item in page_obj.object_list %}<tr>
+        <td><strong>{{ item.user.get_full_name|default:item.user.username }}</strong><span class="table-subtext">{{ item.user.username }} · {{ item.user.email }}</span></td>
+        <td>{{ item.department.name|default:"Not assigned" }}{% if item.department %}<span class="table-subtext">{{ item.department.faculty.name }}</span>{% endif %}</td>
+        <td>{{ item.institutional_id|default:"—" }}</td><td>{{ item.active_assignment_count }}</td>
+        <td><span class="status-tag {% if item.user.is_active %}status-active{% else %}status-inactive{% endif %}">{% if item.user.is_active %}Active{% else %}Inactive{% endif %}</span></td>
+        <td><div class="row-actions"><a class="text-action" href="{% url 'lecturer_profile_detail' item.pk %}">View profile</a><a class="text-action" href="{% url 'user_edit' item.user_id %}">Edit account</a></div></td>
+      </tr>{% endfor %}
+      </tbody></table></div>
+      <div class="pagination"><span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span><div>{% if page_obj.has_previous %}<a href="?q={{ search|urlencode }}&department={{ selected_department }}&status={{ selected_status }}&page={{ page_obj.previous_page_number }}">Previous</a>{% endif %}{% if page_obj.has_next %}<a href="?q={{ search|urlencode }}&department={{ selected_department }}&status={{ selected_status }}&page={{ page_obj.next_page_number }}">Next</a>{% endif %}</div></div>
+    {% else %}<div class="empty-state"><strong>No lecturers match these filters.</strong><p>Create a lecturer account or adjust the search filters.</p></div>{% endif %}
+  </div>
+</div></section>
+{% endblock %}

@@ -8,6 +8,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import PasswordChangeView
 from django.core.paginator import Paginator
 from django.db import transaction
+from django.db.models import Count, Q
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -71,7 +72,25 @@ def student_dashboard(request):
 def lecturer_dashboard(request):
     if request.user.is_superuser or request.user.profile.role != UserProfile.ROLE_LECTURER:
         return render(request, "accounts/access_denied.html", status=403)
-    return render(request, "accounts/lecturer_dashboard.html")
+    from academics.models import CourseLecturerAssignment, CourseRegistration
+    profile = request.user.profile
+    assignments = CourseLecturerAssignment.objects.filter(
+        lecturer=profile, is_active=True, offering__is_active=True
+    ).select_related(
+        "offering__course", "offering__programme", "offering__semester",
+        "offering__semester__session",
+    ).annotate(
+        registered_count=Count(
+            "offering__registrations",
+            filter=Q(offering__registrations__status=CourseRegistration.STATUS_REGISTERED),
+            distinct=True,
+        )
+    ).order_by("offering__semester__session__name", "offering__course__code")
+    return render(request, "accounts/lecturer_dashboard.html", {
+        "assignments": assignments,
+        "assignment_count": assignments.count(),
+        "department": profile.department,
+    })
 
 
 @system_admin_required
@@ -120,9 +139,84 @@ def user_list(request):
 
 
 @system_admin_required
+def lecturer_management(request):
+    lecturers = UserProfile.objects.filter(
+        role=UserProfile.ROLE_LECTURER
+    ).select_related("user", "department", "department__faculty").annotate(
+        active_assignment_count=Count(
+            "course_lecturer_assignments",
+            filter=Q(
+                course_lecturer_assignments__is_active=True,
+            ),
+            distinct=True,
+        )
+    )
+    query = request.GET.get("q", "").strip()
+    department_id = request.GET.get("department", "").strip()
+    status = request.GET.get("status", "").strip()
+    if query:
+        lecturers = lecturers.filter(
+            Q(user__first_name__icontains=query)
+            | Q(user__last_name__icontains=query)
+            | Q(user__username__icontains=query)
+            | Q(user__email__icontains=query)
+            | Q(institutional_id__icontains=query)
+            | Q(department__name__icontains=query)
+        )
+    if department_id.isdigit():
+        lecturers = lecturers.filter(department_id=int(department_id))
+    if status == "active":
+        lecturers = lecturers.filter(user__is_active=True)
+    elif status == "inactive":
+        lecturers = lecturers.filter(user__is_active=False)
+    page_obj = Paginator(
+        lecturers.order_by("user__last_name", "user__first_name", "user__username"), 25
+    ).get_page(request.GET.get("page"))
+    from academics.models import Department, CourseLecturerAssignment
+    return render(request, "accounts/lecturer_list.html", {
+        "page_obj": page_obj,
+        "search": query,
+        "selected_department": department_id,
+        "selected_department_id": int(department_id) if department_id.isdigit() else None,
+        "selected_status": status,
+        "departments": Department.objects.filter(
+            is_active=True, faculty__is_active=True
+        ).select_related("faculty").order_by("name"),
+        "lecturer_count": UserProfile.objects.filter(role=UserProfile.ROLE_LECTURER).count(),
+        "active_assignment_count": CourseLecturerAssignment.objects.filter(
+            is_active=True, lecturer__user__is_active=True
+        ).count(),
+    })
+
+
+@system_admin_required
+def lecturer_profile_detail(request, profile_id):
+    profile = get_object_or_404(
+        UserProfile.objects.select_related("user", "department", "department__faculty"),
+        pk=profile_id, role=UserProfile.ROLE_LECTURER,
+    )
+    from academics.models import CourseLecturerAssignment
+    assignments = CourseLecturerAssignment.objects.filter(
+        lecturer=profile
+    ).select_related(
+        "offering__course", "offering__course__department", "offering__programme",
+        "offering__semester", "offering__semester__session", "assigned_by", "removed_by",
+    ).order_by("-assigned_at", "-pk")
+    return render(request, "accounts/lecturer_detail.html", {
+        "lecturer": profile,
+        "active_assignments": assignments.filter(is_active=True),
+        "assignment_history": assignments.filter(is_active=False),
+        "assignment_count": assignments.filter(is_active=True).count(),
+    })
+
+
+@system_admin_required
 @require_http_methods(["GET", "POST"])
 def user_create(request):
-    form = AdminCreateAccountForm(request.POST or None)
+    initial = {}
+    if request.method == "GET" and request.GET.get("role") == UserProfile.ROLE_LECTURER:
+        initial["role"] = UserProfile.ROLE_LECTURER
+    form = AdminCreateAccountForm(request.POST or None, initial=initial)
     if request.method == "POST" and form.is_valid():
         temporary_password = secrets.token_urlsafe(14)
         with transaction.atomic():
@@ -224,9 +318,24 @@ def toggle_account_status(request, user_id):
         return redirect("user_list")
 
     target.is_active = not target.is_active
-    target.save(update_fields=["is_active"])
+    with transaction.atomic():
+        target.save(update_fields=["is_active"])
+        revoked_count = 0
+        if not target.is_active and target.profile.role == UserProfile.ROLE_LECTURER:
+            from academics.models import CourseLecturerAssignment
+            revoked_count = CourseLecturerAssignment.objects.filter(
+                lecturer=target.profile, is_active=True
+            ).update(
+                is_active=False,
+                removed_at=timezone.now(),
+                removed_by=request.user,
+                removal_note="Lecturer account deactivated by administrator",
+            )
     state = "activated" if target.is_active else "deactivated"
-    messages.success(request, f"The account for {target.get_username()} has been {state}.")
+    message = f"The account for {target.get_username()} has been {state}."
+    if revoked_count:
+        message += f" {revoked_count} active teaching assignment(s) were revoked and retained in history."
+    messages.success(request, message)
     return redirect("user_list")
 
 

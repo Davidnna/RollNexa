@@ -83,9 +83,23 @@ class CourseOfferingAdmin(admin.ModelAdmin):
 
 @admin.register(CourseLecturerAssignment)
 class CourseLecturerAssignmentAdmin(admin.ModelAdmin):
-    list_display = ("offering", "lecturer", "assigned_at")
-    search_fields = ("offering__course__code", "lecturer__user__username", "lecturer__user__last_name")
-    readonly_fields = ("assigned_at",)
+    list_display = (
+        "offering", "lecturer", "is_active", "assigned_at", "assigned_by",
+        "removed_at", "removed_by",
+    )
+    list_filter = ("is_active", "offering__semester__session", "offering__programme")
+    search_fields = (
+        "offering__course__code", "lecturer__user__username",
+        "lecturer__user__last_name", "lecturer__institutional_id",
+    )
+    fields = (
+        "offering", "lecturer", "is_active", "assigned_at", "assigned_by",
+        "removed_at", "removed_by", "removal_note",
+    )
+    readonly_fields = fields
+
+    def has_add_permission(self, request):
+        return False
 
     def has_delete_permission(self, request, obj=None):
         return False

@@ -299,6 +299,159 @@ class CourseManagementTests(TestCase):
         self.client.post(reverse("student_course_register", kwargs={"pk": self.offering.pk}))
         self.assertFalse(CourseRegistration.objects.filter(offering=self.offering).exists())
 
+    def test_cross_department_lecturer_can_be_assigned_without_changing_home_department(self):
+        other_faculty = Faculty.objects.create(code="MGT", name="Faculty of Management Sciences")
+        other_department = Department.objects.create(
+            faculty=other_faculty, code="ACC", name="Accountancy"
+        )
+        other_lecturer_user = User.objects.create_user(
+            username="service_lecturer", email="service_lecturer@example.test",
+            password="StrongTestPassword!2026",
+        )
+        other_lecturer = other_lecturer_user.profile
+        other_lecturer.role = UserProfile.ROLE_LECTURER
+        other_lecturer.department = other_department
+        other_lecturer.save()
+
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse("offering_assign_lecturer", kwargs={"pk": self.offering.pk}),
+            {"lecturer": other_lecturer.pk}, follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        assignment = CourseLecturerAssignment.objects.get(
+            offering=self.offering, lecturer=other_lecturer, is_active=True
+        )
+        self.assertEqual(assignment.assigned_by, self.admin)
+        self.assertTrue(assignment.is_cross_department)
+        other_lecturer.refresh_from_db()
+        self.assertEqual(other_lecturer.department, other_department)
+        self.assertContains(response, "permitted cross-department teaching assignment")
+
+    def test_multiple_lecturers_can_be_assigned_to_one_offering(self):
+        second_user = User.objects.create_user(
+            username="second_lecturer", email="second_lecturer@example.test",
+            password="StrongTestPassword!2026",
+        )
+        second = second_user.profile
+        second.role = UserProfile.ROLE_LECTURER
+        second.department = self.department
+        second.save()
+        self.client.force_login(self.admin)
+        for lecturer in (self.lecturer, second):
+            response = self.client.post(
+                reverse("offering_assign_lecturer", kwargs={"pk": self.offering.pk}),
+                {"lecturer": lecturer.pk},
+            )
+            self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            CourseLecturerAssignment.objects.filter(offering=self.offering, is_active=True).count(), 2
+        )
+
+    def test_revoking_assignment_preserves_history_and_removes_lecturer_access(self):
+        assignment = CourseLecturerAssignment.objects.create(
+            offering=self.offering, lecturer=self.lecturer, assigned_by=self.admin
+        )
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse("offering_remove_lecturer", kwargs={
+                "pk": self.offering.pk, "assignment_id": assignment.pk,
+            }), {"removal_note": "Semester teaching reassignment"}, follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        assignment.refresh_from_db()
+        self.assertFalse(assignment.is_active)
+        self.assertIsNotNone(assignment.removed_at)
+        self.assertEqual(assignment.removed_by, self.admin)
+        self.assertEqual(assignment.removal_note, "Semester teaching reassignment")
+        self.client.force_login(self.lecturer_user)
+        self.assertFalse(
+            CourseLecturerAssignment.objects.filter(
+                lecturer=self.lecturer, offering=self.offering, is_active=True
+            ).exists()
+        )
+        denied = self.client.get(reverse("lecturer_course_roster", kwargs={"pk": self.offering.pk}))
+        self.assertEqual(denied.status_code, 404)
+
+    def test_reassignment_after_revocation_creates_a_new_audit_record(self):
+        old_assignment = CourseLecturerAssignment.objects.create(
+            offering=self.offering, lecturer=self.lecturer, assigned_by=self.admin
+        )
+        old_assignment.is_active = False
+        from django.utils import timezone
+        old_assignment.removed_at = timezone.now()
+        old_assignment.removed_by = self.admin
+        old_assignment.save(update_fields=["is_active", "removed_at", "removed_by"])
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse("offering_assign_lecturer", kwargs={"pk": self.offering.pk}),
+            {"lecturer": self.lecturer.pk},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            CourseLecturerAssignment.objects.filter(
+                offering=self.offering, lecturer=self.lecturer
+            ).count(), 2,
+        )
+        self.assertEqual(
+            CourseLecturerAssignment.objects.filter(
+                offering=self.offering, lecturer=self.lecturer, is_active=True
+            ).count(), 1,
+        )
+
+    def test_admin_can_open_central_teaching_assignment_register(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse("teaching_assignment_management"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Teaching assignments")
+        self.assertContains(response, "Cross-department teaching is permitted")
+
+    def test_central_assignment_form_allows_cross_department_teaching(self):
+        other_faculty = Faculty.objects.create(code="MGT", name="Faculty of Management Sciences")
+        other_department = Department.objects.create(
+            faculty=other_faculty, code="ACC", name="Accountancy"
+        )
+        lecturer_user = User.objects.create_user(
+            username="central_cross_lecturer", email="central_cross@example.test",
+            password="StrongTestPassword!2026",
+        )
+        lecturer = lecturer_user.profile
+        lecturer.role = UserProfile.ROLE_LECTURER
+        lecturer.department = other_department
+        lecturer.save()
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse("teaching_assignment_management"),
+            {"offering": self.offering.pk, "lecturer": lecturer.pk}, follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        assignment = CourseLecturerAssignment.objects.get(
+            offering=self.offering, lecturer=lecturer, is_active=True
+        )
+        self.assertTrue(assignment.is_cross_department)
+        self.assertContains(response, "Cross-department teaching assignment created")
+
+    def test_lecturer_cannot_view_another_lecturers_roster(self):
+        another_user = User.objects.create_user(
+            username="unassigned_lecturer", email="unassigned_lecturer@example.test",
+            password="StrongTestPassword!2026",
+        )
+        another = another_user.profile
+        another.role = UserProfile.ROLE_LECTURER
+        another.department = self.department
+        another.save()
+        CourseLecturerAssignment.objects.create(offering=self.offering, lecturer=self.lecturer)
+        self.client.force_login(another_user)
+        response = self.client.get(
+            reverse("lecturer_course_roster", kwargs={"pk": self.offering.pk})
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_student_cannot_open_central_teaching_assignment_register(self):
+        self.client.force_login(self.student_user)
+        response = self.client.get(reverse("teaching_assignment_management"))
+        self.assertEqual(response.status_code, 403)
+
     def test_lecturer_assignment_rejects_student_profile(self):
         assignment = CourseLecturerAssignment(
             offering=self.offering, lecturer=self.student

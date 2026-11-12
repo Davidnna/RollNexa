@@ -91,15 +91,29 @@ class CourseOfferingForm(forms.ModelForm):
         return cleaned
 
 
+class LecturerProfileChoiceField(forms.ModelChoiceField):
+    def __init__(self, *args, offering=None, **kwargs):
+        self.offering = offering
+        super().__init__(*args, **kwargs)
+
+    def label_from_instance(self, obj):
+        name = obj.user.get_full_name() or obj.user.get_username()
+        department = obj.department.name if obj.department_id else "Department not assigned"
+        if self.offering and obj.department_id and obj.department_id != self.offering.course.department_id:
+            return f"{name} — {department} (cross-department)"
+        return f"{name} — {department}"
+
+
 class LecturerAssignmentForm(forms.Form):
-    lecturer = forms.ModelChoiceField(
+    lecturer = LecturerProfileChoiceField(
         queryset=UserProfile.objects.none(),
         label="Lecturer",
         empty_label="Select a lecturer",
     )
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, offering=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["lecturer"].offering = offering
         self.fields["lecturer"].queryset = UserProfile.objects.filter(
             role=UserProfile.ROLE_LECTURER,
             user__is_active=True,
@@ -108,6 +122,56 @@ class LecturerAssignmentForm(forms.Form):
         )
         for field in self.fields.values():
             field.widget.attrs["class"] = "form-control"
+
+
+class TeachingAssignmentCreateForm(forms.Form):
+    offering = forms.ModelChoiceField(
+        queryset=CourseOffering.objects.none(),
+        label="Course offering",
+        empty_label="Select a course offering",
+    )
+    lecturer = LecturerProfileChoiceField(
+        queryset=UserProfile.objects.none(),
+        label="Lecturer",
+        empty_label="Select a lecturer",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["offering"].queryset = CourseOffering.objects.filter(
+            is_active=True, course__is_active=True,
+            course__department__is_active=True, course__department__faculty__is_active=True,
+            programme__is_active=True, programme__department__is_active=True,
+            programme__department__faculty__is_active=True,
+            semester__is_active=True, semester__session__is_active=True,
+        ).select_related("course", "programme", "semester", "semester__session").order_by(
+            "course__code", "programme__name", "level", "semester__session__name"
+        )
+        self.fields["offering"].label_from_instance = lambda obj: (
+            f"{obj.course.code} — {obj.course.title} · {obj.programme.name} · "
+            f"{obj.get_level_display()} · {obj.semester.get_name_display()} {obj.semester.session.name}"
+        )
+        self.fields["lecturer"].queryset = UserProfile.objects.filter(
+            role=UserProfile.ROLE_LECTURER, user__is_active=True,
+        ).select_related("user", "department").order_by(
+            "user__last_name", "user__first_name", "user__username"
+        )
+        self.fields["lecturer"].help_text = (
+            "Lecturers may be assigned outside their home department. "
+            "RollNexa will flag cross-department assignments without blocking them."
+        )
+        for field in self.fields.values():
+            field.widget.attrs["class"] = "form-control"
+
+    def clean(self):
+        cleaned = super().clean()
+        offering = cleaned.get("offering")
+        lecturer = cleaned.get("lecturer")
+        if offering and lecturer and CourseLecturerAssignment.objects.filter(
+            offering=offering, lecturer=lecturer, is_active=True
+        ).exists():
+            self.add_error("lecturer", "This lecturer is already assigned to the selected offering.")
+        return cleaned
 
 
 class StudentCourseFilterForm(forms.Form):

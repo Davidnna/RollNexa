@@ -3,7 +3,10 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from .models import UserProfile
-from academics.models import Department, Faculty, Programme
+from academics.models import (
+    AcademicSession, Course, CourseLecturerAssignment, CourseOffering, Department,
+    Faculty, Programme, Semester,
+)
 
 User = get_user_model()
 
@@ -115,6 +118,81 @@ class RollNexaAccountTests(TestCase):
         self.assertEqual(student.profile.programme, programme)
         self.assertEqual(student.profile.department, department)
         self.assertEqual(student.profile.current_level, "300")
+
+    def test_create_lecturer_account_link_preselects_lecturer_role(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse("user_create"), {"role": "lecturer"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["form"]["role"].value(), UserProfile.ROLE_LECTURER)
+
+    def test_admin_can_open_lecturer_directory_and_profile(self):
+        faculty = Faculty.objects.create(code="SCI", name="Faculty of Science")
+        department = Department.objects.create(
+            faculty=faculty, code="BIO", name="Applied Biology"
+        )
+        lecturer_user = User.objects.create_user(
+            username="lecturer_directory", email="lecturer_directory@example.test",
+            password="StrongTestPassword!2026",
+        )
+        lecturer_user.profile.role = UserProfile.ROLE_LECTURER
+        lecturer_user.profile.department = department
+        lecturer_user.profile.save()
+        self.client.force_login(self.admin)
+        directory = self.client.get(reverse("lecturer_management"))
+        self.assertEqual(directory.status_code, 200)
+        self.assertContains(directory, "Lecturer management")
+        self.assertContains(directory, "lecturer_directory")
+        detail = self.client.get(reverse(
+            "lecturer_profile_detail", kwargs={"profile_id": lecturer_user.profile.pk}
+        ))
+        self.assertEqual(detail.status_code, 200)
+        self.assertContains(detail, "Applied Biology")
+
+    def test_student_cannot_open_lecturer_management(self):
+        self.client.force_login(self.student)
+        response = self.client.get(reverse("lecturer_management"))
+        self.assertEqual(response.status_code, 403)
+
+    def test_deactivating_lecturer_revokes_active_assignments_and_keeps_history(self):
+        faculty = Faculty.objects.create(code="SCI", name="Faculty of Science")
+        department = Department.objects.create(
+            faculty=faculty, code="CSC", name="Computer Science"
+        )
+        programme = Programme.objects.create(
+            department=department, code="BSC-CS", name="Computer Science"
+        )
+        session = AcademicSession.objects.create(name="2025/2026", is_current=True)
+        semester = Semester.objects.create(
+            session=session, name=Semester.FIRST, is_current=True
+        )
+        course = Course.objects.create(
+            department=department, code="CSC101", title="Introduction to Computing", credit_units=2
+        )
+        offering = CourseOffering.objects.create(
+            course=course, programme=programme, semester=semester, level="100"
+        )
+        lecturer_user = User.objects.create_user(
+            username="lecturer_deactivate", email="lecturer_deactivate@example.test",
+            password="StrongTestPassword!2026",
+        )
+        lecturer_user.profile.role = UserProfile.ROLE_LECTURER
+        lecturer_user.profile.department = department
+        lecturer_user.profile.save()
+        assignment = CourseLecturerAssignment.objects.create(
+            offering=offering, lecturer=lecturer_user.profile, assigned_by=self.admin
+        )
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse("toggle_account_status", kwargs={"user_id": lecturer_user.pk}), follow=True
+        )
+        self.assertEqual(response.status_code, 200)
+        lecturer_user.refresh_from_db()
+        assignment.refresh_from_db()
+        self.assertFalse(lecturer_user.is_active)
+        self.assertFalse(assignment.is_active)
+        self.assertEqual(assignment.removed_by, self.admin)
+        self.assertIsNotNone(assignment.removed_at)
+        self.assertContains(response, "1 active teaching assignment(s) were revoked")
 
     @override_settings(BOOTSTRAP_ADMIN_TOKEN="test-bootstrap-token")
     def test_one_time_admin_setup_creates_a_superuser(self):

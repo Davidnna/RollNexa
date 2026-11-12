@@ -4,31 +4,29 @@
 
 RollNexa is a web-based Smart Academic Attendance Platform prototype. Its planned workflow connects academic users, attendance sessions, identity verification and institutional attendance records.
 
-## Current release: 0.3.1 — EBSU catalogue and CSV import
+## Current release: 0.5.0 — Lecturer management and teaching assignment audit
 
 This release adds institutional academic structures and academic-calendar management to the existing authentication and role-based account system.
 
 ### Current functionality
 - Django authentication and session management
 - System administrator, lecturer and student roles
-- Administrator-created student and lecturer accounts
-- Temporary passwords with mandatory change at first sign-in
+- Administrator-created student and lecturer accounts with temporary passwords and mandatory first-sign-in password change
 - Account activation and deactivation
 - Role-specific dashboards
-- Faculty, department and programme management
-- Academic session and semester management
-- One current academic session and one current semester, with parent-child validation
-- Student programme/level and lecturer department assignments
-- Editing existing accounts to add or update academic assignments
-- Administrator-only academic CSV import with validation, preview and atomic commit
-- EBSU starter catalogue with source and verification notes
-- Soft deactivation of academic records to preserve historical relationships
+- Faculty, department, programme, academic session and semester management
+- Administrator-only academic and course CSV import with validation, preview and atomic commit
+- Department-owned master course records and programme-specific course offerings
+- Programme-specific credit units, curriculum classifications and source provenance
+- Lecturer directory, profile management and departmental affiliation
+- Multiple lecturer assignments per course offering, including permitted cross-department teaching
+- Assignment revocation history and administrator audit details
+- Lecturer access restricted to actively assigned offerings and class rosters
+- Student course registration and withdrawal, subject to offering rules
 - Neon PostgreSQL persistence
 - Render deployment with automatic deploys from GitHub
 
 ### Planned modules
-- Course catalogue and course offerings
-- Lecturer-course allocation and student course registration
 - QR-code attendance sessions and verification
 - Facial enrollment and identity verification
 - Attendance records, analytics and exports
@@ -115,3 +113,8 @@ Course credit units and curriculum classifications are stored on each programme-
 ## Release 0.4.3 — Programme-specific course offerings and EBSU Science expansion
 
 Course credit units and curriculum classifications are now stored per programme-specific offering. Offerings also retain their curriculum source URL and verification note. The bundled EBSU Science curriculum CSV contains 785 offerings across 11 programmes; the coverage register lists all 81 programmes and flags those still requiring approved departmental outlines. See `RELEASE_NOTES_0.4.3.md` and `EBSU_SCIENCE_CURRICULUM_EXPANSION_NOTES.md`.
+
+
+## Release 0.5.0 — Lecturer management and teaching assignment audit
+
+This release adds a lecturer directory and profile history, a central teaching-assignment register, cross-department assignment warnings, soft revocation and assignment audit fields. Deactivating a lecturer account revokes active teaching assignments while preserving history. Lecturer course and roster access requires an active assignment. See `RELEASE_NOTES_0.5.0.md`, `LECTURER_MANAGEMENT_GUIDE.md` and `GITHUB_UPLOAD_GUIDE_0.5.0.md`.

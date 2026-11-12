@@ -1,5 +1,6 @@
 import re
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
@@ -354,6 +355,8 @@ class CourseOffering(AcademicRecord):
 
 
 class CourseLecturerAssignment(models.Model):
+    """A dated teaching-assignment event, including its revocation history."""
+
     offering = models.ForeignKey(
         CourseOffering, on_delete=models.PROTECT, related_name="lecturer_assignments"
     )
@@ -361,25 +364,52 @@ class CourseLecturerAssignment(models.Model):
         "accounts.UserProfile", on_delete=models.PROTECT,
         related_name="course_lecturer_assignments",
     )
+    assigned_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="created_course_lecturer_assignments",
+    )
     assigned_at = models.DateTimeField(auto_now_add=True)
+    is_active = models.BooleanField(default=True, db_index=True)
+    removed_at = models.DateTimeField(null=True, blank=True)
+    removed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="revoked_course_lecturer_assignments",
+    )
+    removal_note = models.CharField(max_length=240, blank=True)
 
     class Meta:
-        ordering = ["lecturer__user__last_name", "lecturer__user__first_name"]
+        ordering = ["-assigned_at", "lecturer__user__last_name", "lecturer__user__first_name"]
         constraints = [
             models.UniqueConstraint(
-                fields=["offering", "lecturer"], name="uniq_lecturer_per_course_offering"
+                fields=["offering", "lecturer"], condition=Q(is_active=True),
+                name="uniq_active_lecturer_per_offering",
             ),
         ]
+        indexes = [
+            models.Index(fields=["lecturer", "is_active"], name="lecturer_assign_active_idx"),
+            models.Index(fields=["offering", "is_active"], name="offering_assign_active_idx"),
+        ]
+
+    @property
+    def is_cross_department(self):
+        return bool(
+            self.lecturer_id
+            and self.offering_id
+            and self.lecturer.department_id
+            and self.lecturer.department_id != self.offering.course.department_id
+        )
 
     def clean(self):
         super().clean()
-        if self.lecturer_id:
-            if self.lecturer.role != "lecturer":
-                raise ValidationError({"lecturer": "Only lecturer accounts can be assigned to course offerings."})
-            if not self.lecturer.user.is_active:
+        if self.lecturer_id and self.lecturer.role != "lecturer":
+            raise ValidationError({"lecturer": "Only lecturer accounts can be assigned to course offerings."})
+        if self.is_active:
+            if self.lecturer_id and not self.lecturer.user.is_active:
                 raise ValidationError({"lecturer": "An inactive lecturer cannot be assigned."})
-        if self.offering_id and not self.offering.is_active:
-            raise ValidationError({"offering": "Reactivate the course offering before assigning a lecturer."})
+            if self.offering_id and not self.offering.is_active:
+                raise ValidationError({"offering": "Reactivate the course offering before assigning a lecturer."})
+            if self.removed_at:
+                raise ValidationError({"removed_at": "An active assignment cannot have a removal date."})
 
     def __str__(self):
         return f"{self.lecturer.user.get_full_name() or self.lecturer.user.username} — {self.offering.course.code}"

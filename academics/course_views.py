@@ -6,12 +6,15 @@ from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db import IntegrityError, transaction
 from django.db.models import Count, Exists, OuterRef, Q
+from django.utils import timezone
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST, require_http_methods
 
 from accounts.models import UserProfile
-from .course_forms import CourseForm, CourseOfferingForm, LecturerAssignmentForm
+from .course_forms import (
+    CourseForm, CourseOfferingForm, LecturerAssignmentForm, TeachingAssignmentCreateForm,
+)
 from .models import (
     Course, CourseLecturerAssignment, CourseOffering, CourseRegistration,
 )
@@ -63,7 +66,7 @@ def course_management(request):
             status=CourseRegistration.STATUS_REGISTERED
         ).count(),
         "lecturer_assignment_count": CourseLecturerAssignment.objects.filter(
-            offering__is_active=True, lecturer__user__is_active=True
+            is_active=True, offering__is_active=True, lecturer__user__is_active=True
         ).count(),
     }
     return render(request, "courses/overview.html", context)
@@ -258,15 +261,22 @@ def offering_detail(request, pk):
         ).prefetch_related("lecturer_assignments__lecturer__user"),
         pk=pk,
     )
-    assignment_form = LecturerAssignmentForm()
+    assignment_form = LecturerAssignmentForm(offering=offering)
     registered_count = offering.registrations.filter(
         status=CourseRegistration.STATUS_REGISTERED
     ).count()
+    assignments = offering.lecturer_assignments.filter(
+        is_active=True
+    ).select_related("lecturer__user", "lecturer__department")
+    assignment_history = offering.lecturer_assignments.filter(
+        is_active=False
+    ).select_related("lecturer__user", "lecturer__department", "removed_by").order_by("-removed_at", "-assigned_at")
     return render(request, "courses/offering_detail.html", {
         "offering": offering,
         "assignment_form": assignment_form,
         "registered_count": registered_count,
-        "assignments": offering.lecturer_assignments.all(),
+        "assignments": assignments,
+        "assignment_history": assignment_history,
     })
 
 
@@ -276,13 +286,21 @@ def offering_assign_lecturer(request, pk):
     offering = get_object_or_404(CourseOffering, pk=pk)
     form = LecturerAssignmentForm(request.POST)
     if form.is_valid():
+        lecturer = form.cleaned_data["lecturer"]
         assignment = CourseLecturerAssignment(
-            offering=offering, lecturer=form.cleaned_data["lecturer"]
+            offering=offering, lecturer=lecturer, assigned_by=request.user
         )
         try:
             assignment.full_clean()
             assignment.save()
-            messages.success(request, "Lecturer assigned to the course offering.")
+            if lecturer.department_id != offering.course.department_id:
+                messages.success(
+                    request,
+                    "Lecturer assigned. This is a permitted cross-department teaching assignment; "
+                    "the lecturer's home department has been retained.",
+                )
+            else:
+                messages.success(request, "Lecturer assigned to the course offering.")
         except ValidationError as exc:
             messages.error(request, "; ".join(exc.messages))
         except IntegrityError:
@@ -298,9 +316,105 @@ def offering_remove_lecturer(request, pk, assignment_id):
     assignment = get_object_or_404(
         CourseLecturerAssignment, pk=assignment_id, offering_id=pk
     )
-    assignment.delete()
-    messages.success(request, "Lecturer assignment removed.")
+    if not assignment.is_active:
+        messages.info(request, "This lecturer assignment has already been removed.")
+        return redirect("offering_detail", pk=pk)
+    assignment.is_active = False
+    assignment.removed_at = timezone.now()
+    assignment.removed_by = request.user
+    assignment.removal_note = request.POST.get("removal_note", "").strip()[:240]
+    assignment.save(update_fields=["is_active", "removed_at", "removed_by", "removal_note"])
+    messages.success(request, "Lecturer assignment removed. Its history has been retained.")
     return redirect("offering_detail", pk=pk)
+
+
+@admin_required
+@require_http_methods(["GET", "POST"])
+def teaching_assignment_management(request):
+    assignment_form = TeachingAssignmentCreateForm(request.POST or None)
+    if request.method == "POST" and assignment_form.is_valid():
+        offering = assignment_form.cleaned_data["offering"]
+        lecturer = assignment_form.cleaned_data["lecturer"]
+        assignment = CourseLecturerAssignment(
+            offering=offering, lecturer=lecturer, assigned_by=request.user
+        )
+        try:
+            assignment.full_clean()
+            assignment.save()
+            if lecturer.department_id != offering.course.department_id:
+                messages.success(
+                    request,
+                    "Cross-department teaching assignment created. The lecturer's home department "
+                    "remains unchanged.",
+                )
+            else:
+                messages.success(request, "Teaching assignment created successfully.")
+            return redirect("teaching_assignment_management")
+        except ValidationError as exc:
+            assignment_form.add_error(None, "; ".join(exc.messages))
+        except IntegrityError:
+            assignment_form.add_error("lecturer", "That lecturer is already assigned to this offering.")
+
+    assignments = CourseLecturerAssignment.objects.select_related(
+        "offering__course", "offering__course__department", "offering__programme",
+        "offering__semester", "offering__semester__session", "lecturer__user",
+        "lecturer__department", "assigned_by", "removed_by",
+    )
+    status = request.GET.get("status", "active").strip()
+    if status == "active":
+        assignments = assignments.filter(is_active=True)
+    elif status == "history":
+        assignments = assignments.filter(is_active=False)
+    elif status != "all":
+        status = "active"
+        assignments = assignments.filter(is_active=True)
+
+    query = request.GET.get("q", "").strip()
+    if query:
+        assignments = assignments.filter(
+            Q(lecturer__user__first_name__icontains=query)
+            | Q(lecturer__user__last_name__icontains=query)
+            | Q(lecturer__user__username__icontains=query)
+            | Q(lecturer__institutional_id__icontains=query)
+            | Q(offering__course__code__icontains=query)
+            | Q(offering__course__title__icontains=query)
+            | Q(offering__programme__name__icontains=query)
+            | Q(lecturer__department__name__icontains=query)
+            | Q(offering__course__department__name__icontains=query)
+        )
+
+    page_obj = Paginator(assignments.order_by("-assigned_at", "-pk"), 30).get_page(
+        request.GET.get("page")
+    )
+    return render(request, "courses/teaching_assignment_list.html", {
+        "assignment_form": assignment_form,
+        "page_obj": page_obj,
+        "search": query,
+        "selected_status": status,
+        "active_assignment_count": CourseLecturerAssignment.objects.filter(
+            is_active=True, lecturer__user__is_active=True
+        ).count(),
+        "history_count": CourseLecturerAssignment.objects.filter(is_active=False).count(),
+    })
+
+
+@admin_required
+@require_POST
+def teaching_assignment_revoke(request, assignment_id):
+    assignment = get_object_or_404(
+        CourseLecturerAssignment.objects.select_related("offering__course", "lecturer__user"),
+        pk=assignment_id,
+    )
+    if not assignment.is_active:
+        messages.info(request, "This assignment is already in the history archive.")
+        return redirect("teaching_assignment_management")
+    assignment.is_active = False
+    assignment.removed_at = timezone.now()
+    assignment.removed_by = request.user
+    assignment.removal_note = request.POST.get("removal_note", "").strip()[:240]
+    assignment.save(update_fields=["is_active", "removed_at", "removed_by", "removal_note"])
+    messages.success(request, "Teaching assignment revoked and retained in the audit history.")
+    return redirect("teaching_assignment_management")
 
 
 @admin_required
@@ -452,6 +566,7 @@ def lecturer_course_list(request):
     profile = request.user.profile
     assignments = CourseLecturerAssignment.objects.filter(
         lecturer=profile,
+        is_active=True,
         offering__is_active=True,
     ).select_related(
         "offering__course", "offering__programme", "offering__semester",
@@ -472,6 +587,7 @@ def lecturer_course_roster(request, pk):
     offering = get_object_or_404(
         CourseOffering.objects.filter(
             lecturer_assignments__lecturer=profile,
+            lecturer_assignments__is_active=True,
             is_active=True,
         ).select_related("course", "programme", "semester", "semester__session"),
         pk=pk,
