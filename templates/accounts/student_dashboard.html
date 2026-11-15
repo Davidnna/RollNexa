@@ -2,18 +2,18 @@
 {% block title %}Student workspace — RollNexa{% endblock %}
 {% block content %}
 <section class="dashboard-section">
-  <div class="container dashboard-container">
-    <div class="dashboard-heading"><div><span class="eyebrow">STUDENT WORKSPACE</span><h1>Welcome, {{ user.first_name|default:user.username }}.</h1><p>Your RollNexa student workspace.</p></div><span class="account-status"><i></i> Student account</span></div>
-    <div class="dashboard-notice"><div class="notice-icon">i</div><div><strong>Your account is active</strong><p>Your account was created by a RollNexa administrator. Course registration is available under My courses. Attendance check-in and personal attendance history will become available after QR Code and facial verification are integrated.</p></div></div>
-    <div class="dashboard-notice academic-assignment">
-      <div class="notice-icon">⌂</div>
-      <div><strong>Academic profile</strong><p>Programme: {{ user.profile.programme|default:"Not assigned" }}{% if user.profile.current_level %} · {{ user.profile.current_level }} level{% endif %}</p></div>
+    <div class="container dashboard-container">
+        <div class="dashboard-heading"><div><span class="eyebrow">STUDENT WORKSPACE</span><h1>Welcome, {{ user.first_name|default:user.username }}.</h1><p>Your RollNexa student workspace.</p></div><span class="account-status"><i></i> Student account</span></div>
+        <div class="dashboard-notice"><div class="notice-icon">i</div><div><strong>Your account is active</strong><p>Your account was created by a RollNexa administrator. Course registration is available under My courses. Attendance check-in and personal attendance history will become available after QR Code and facial verification are integrated.</p></div></div>
+        <div class="dashboard-notice academic-assignment">
+            <div class="notice-icon">⌂</div>
+            <div><strong>Academic profile</strong><p>Programme: {{ user.profile.programme|default:"Not assigned" }}{% if user.profile.current_level %} · {{ user.profile.current_level }} level{% endif %}</p></div>
+        </div>
+        <div class="dashboard-grid">
+            <article class="dashboard-card"><span class="dashboard-card-icon">▦</span><span class="feature-number">COURSE ENROLMENT</span><h2>My courses</h2><p>Review eligible course offerings and register for courses in your programme and level.</p><a class="text-action" href="{% url 'student_course_list' %}">Open my courses →</a></article>
+            <article class="dashboard-card"><span class="dashboard-card-icon">◎</span><span class="feature-number">IDENTITY</span><h2>Identity verification</h2><p>Review your identity-verification setup when enrollment becomes available.</p><span class="module-status">Coming in a later release</span></article>
+            <article class="dashboard-card"><span class="dashboard-card-icon">▤</span><span class="feature-number">RECORDS</span><h2>My attendance</h2><p>Review your attendance history and course participation.</p><span class="module-status">Coming in a later release</span></article>
+        </div>
     </div>
-    <div class="dashboard-grid">
-      <article class="dashboard-card"><span class="dashboard-card-icon">▦</span><span class="feature-number">COURSE ENROLMENT</span><h2>My courses</h2><p>Review eligible course offerings and register for courses in your programme and level.</p><a class="text-action" href="{% url 'student_course_list' %}">Open my courses →</a></article>
-      <article class="dashboard-card"><span class="dashboard-card-icon">◎</span><span class="feature-number">IDENTITY</span><h2>Identity verification</h2><p>Review your identity-verification setup when enrollment becomes available.</p><span class="module-status">Coming in a later release</span></article>
-      <article class="dashboard-card"><span class="dashboard-card-icon">▤</span><span class="feature-number">RECORDS</span><h2>My attendance</h2><p>Review your attendance history and course participation.</p><span class="module-status">Coming in a later release</span></article>
-    </div>
-  </div>
 </section>
 {% endblock %}

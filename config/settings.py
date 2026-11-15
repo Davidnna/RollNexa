@@ -89,7 +89,7 @@ DATABASES = {
         database_url,
         conn_max_age=60,
         conn_health_checks=True,
-        ssl_require=True,
+        ssl_require=not DEBUG,
     )
 }
 

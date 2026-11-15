@@ -3,101 +3,101 @@
 {% block title %}RollNexa — Attendance, connected.{% endblock %}
 {% block content %}
 <section class="hero-section">
-  <div class="container hero-grid">
-    <div class="hero-copy">
-      <div class="eyebrow"><span class="eyebrow-dot"></span> SMART ACADEMIC ATTENDANCE</div>
-      <h1>Attendance you can <span>verify.</span></h1>
-      <p class="hero-lead">A connected academic attendance platform bringing session access, identity verification and attendance records into one clear workflow.</p>
-      <div class="hero-actions">
-        {% if user.is_authenticated %}
-          <a class="button button-primary" href="{% url 'dashboard' %}">Open dashboard <span aria-hidden="true">→</span></a>
-        {% else %}
-          <a class="button button-primary" href="{% url 'login' %}">Sign in <span aria-hidden="true">→</span></a>
-          <a class="button button-secondary" href="#how-it-works">Explore the platform</a>
-        {% endif %}
-      </div>
-      <div class="hero-assurance">
-        <span class="assurance-icon">✓</span>
-        <span>Connected workflows. Clear records. Accountable attendance.</span>
-      </div>
+    <div class="container hero-grid">
+        <div class="hero-copy">
+            <div class="eyebrow"><span class="eyebrow-dot"></span> SMART ACADEMIC ATTENDANCE</div>
+            <h1>Attendance you can <span>verify.</span></h1>
+            <p class="hero-lead">A connected academic attendance platform bringing session access, identity verification and attendance records into one clear workflow.</p>
+            <div class="hero-actions">
+                {% if user.is_authenticated %}
+                    <a class="button button-primary" href="{% url 'dashboard' %}">Open dashboard <span aria-hidden="true">→</span></a>
+                {% else %}
+                    <a class="button button-primary" href="{% url 'login' %}">Sign in <span aria-hidden="true">→</span></a>
+                    <a class="button button-secondary" href="#how-it-works">Explore the platform</a>
+                {% endif %}
+            </div>
+            <div class="hero-assurance">
+                <span class="assurance-icon">✓</span>
+                <span>Connected workflows. Clear records. Accountable attendance.</span>
+            </div>
+        </div>
+        <div class="hero-visual" aria-label="Illustration of an attendance verification interface">
+            <div class="visual-glow"></div>
+            <div class="verification-card">
+                <div class="card-topline">
+                    <div class="mini-brand"><img src="{% static 'images/rollnexa-mark.svg' %}" alt="" width="25" height="25"><span>RollNexa</span></div>
+                    <span class="live-pill"><i></i> SESSION PREVIEW</span>
+                </div>
+                <div class="scan-frame">
+                    <div class="scan-corner corner-tl"></div><div class="scan-corner corner-tr"></div>
+                    <div class="scan-corner corner-bl"></div><div class="scan-corner corner-br"></div>
+                    <div class="scan-symbol">
+                        <div class="scan-grid"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+                        <div class="scan-check">✓</div>
+                    </div>
+                    <span class="scan-caption">Identity verification</span>
+                </div>
+                <div class="verification-status">
+                    <div class="status-icon">✓</div>
+                    <div><strong>Verification workflow</strong><span>QR and face checks are in development</span></div>
+                    <span class="status-arrow">↗</span>
+                </div>
+            </div>
+            <div class="floating-chip chip-one"><span class="chip-check">✓</span> Secure by design</div>
+            <div class="floating-chip chip-two"><span class="chip-dot"></span> Built for the classroom</div>
+        </div>
     </div>
-    <div class="hero-visual" aria-label="Illustration of an attendance verification interface">
-      <div class="visual-glow"></div>
-      <div class="verification-card">
-        <div class="card-topline">
-          <div class="mini-brand"><img src="{% static 'images/rollnexa-mark.svg' %}" alt="" width="25" height="25"><span>RollNexa</span></div>
-          <span class="live-pill"><i></i> SESSION PREVIEW</span>
-        </div>
-        <div class="scan-frame">
-          <div class="scan-corner corner-tl"></div><div class="scan-corner corner-tr"></div>
-          <div class="scan-corner corner-bl"></div><div class="scan-corner corner-br"></div>
-          <div class="scan-symbol">
-            <div class="scan-grid"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
-            <div class="scan-check">✓</div>
-          </div>
-          <span class="scan-caption">Identity verification</span>
-        </div>
-        <div class="verification-status">
-          <div class="status-icon">✓</div>
-          <div><strong>Verification workflow</strong><span>QR and face checks are in development</span></div>
-          <span class="status-arrow">↗</span>
-        </div>
-      </div>
-      <div class="floating-chip chip-one"><span class="chip-check">✓</span> Secure by design</div>
-      <div class="floating-chip chip-two"><span class="chip-dot"></span> Built for the classroom</div>
-    </div>
-  </div>
 </section>
 
 <section class="trust-strip">
-  <div class="container trust-inner">
-    <span>ONE CONNECTED WORKFLOW</span>
-    <div><b>01</b> Session access</div>
-    <div><b>02</b> Identity checks</div>
-    <div><b>03</b> Attendance records</div>
-  </div>
+    <div class="container trust-inner">
+        <span>ONE CONNECTED WORKFLOW</span>
+        <div><b>01</b> Session access</div>
+        <div><b>02</b> Identity checks</div>
+        <div><b>03</b> Attendance records</div>
+    </div>
 </section>
 
 <section class="section section-light" id="how-it-works">
-  <div class="container">
-    <div class="section-heading">
-      <span class="eyebrow">THE ROLLNEXA APPROACH</span>
-      <h2>Built around better attendance records.</h2>
-      <p>The platform is being developed in focused stages, with each capability tested before it becomes part of the live workflow.</p>
+    <div class="container">
+        <div class="section-heading">
+            <span class="eyebrow">THE ROLLNEXA APPROACH</span>
+            <h2>Built around better attendance records.</h2>
+            <p>The platform is being developed in focused stages, with each capability tested before it becomes part of the live workflow.</p>
+        </div>
+        <div class="feature-grid">
+            <article class="feature-card">
+                <div class="feature-icon feature-icon-teal">▦</div>
+                <span class="feature-number">01 / SESSION ACCESS</span>
+                <h3>QR-code verification</h3>
+                <p>Time-limited session codes will provide a simple way for enrolled students to access the correct attendance session.</p>
+            </article>
+            <article class="feature-card">
+                <div class="feature-icon feature-icon-navy">◎</div>
+                <span class="feature-number">02 / IDENTITY CHECK</span>
+                <h3>Facial verification</h3>
+                <p>Facial matching will add an identity check to help reduce attendance impersonation. It will be introduced with clear privacy safeguards.</p>
+            </article>
+            <article class="feature-card">
+                <div class="feature-icon feature-icon-amber">▤</div>
+                <span class="feature-number">03 / RECORDS</span>
+                <h3>Centralised records</h3>
+                <p>Course attendance, session history and reports will be organised in one web-based management system.</p>
+            </article>
+        </div>
     </div>
-    <div class="feature-grid">
-      <article class="feature-card">
-        <div class="feature-icon feature-icon-teal">▦</div>
-        <span class="feature-number">01 / SESSION ACCESS</span>
-        <h3>QR-code verification</h3>
-        <p>Time-limited session codes will provide a simple way for enrolled students to access the correct attendance session.</p>
-      </article>
-      <article class="feature-card">
-        <div class="feature-icon feature-icon-navy">◎</div>
-        <span class="feature-number">02 / IDENTITY CHECK</span>
-        <h3>Facial verification</h3>
-        <p>Facial matching will add an identity check to help reduce attendance impersonation. It will be introduced with clear privacy safeguards.</p>
-      </article>
-      <article class="feature-card">
-        <div class="feature-icon feature-icon-amber">▤</div>
-        <span class="feature-number">03 / RECORDS</span>
-        <h3>Centralised records</h3>
-        <p>Course attendance, session history and reports will be organised in one web-based management system.</p>
-      </article>
-    </div>
-  </div>
 </section>
 
 <section class="closing-section">
-  <div class="container closing-inner">
-    <div>
-      <span class="eyebrow eyebrow-light">ROLLNEXA</span>
-      <h2>Make every attendance record count.</h2>
-      <p>RollNexa accounts are created by authorised system administrators. Contact your administrator if you need access.</p>
+    <div class="container closing-inner">
+        <div>
+            <span class="eyebrow eyebrow-light">ROLLNEXA</span>
+            <h2>Make every attendance record count.</h2>
+            <p>RollNexa accounts are created by authorised system administrators. Contact your administrator if you need access.</p>
+        </div>
+        <a class="button button-light" href="{% if user.is_authenticated %}{% url 'dashboard' %}{% else %}{% url 'login' %}{% endif %}">
+            {% if user.is_authenticated %}Go to dashboard{% else %}Sign in to RollNexa{% endif %} <span aria-hidden="true">→</span>
+        </a>
     </div>
-    <a class="button button-light" href="{% if user.is_authenticated %}{% url 'dashboard' %}{% else %}{% url 'login' %}{% endif %}">
-      {% if user.is_authenticated %}Go to dashboard{% else %}Sign in to RollNexa{% endif %} <span aria-hidden="true">→</span>
-    </a>
-  </div>
 </section>
 {% endblock %}
