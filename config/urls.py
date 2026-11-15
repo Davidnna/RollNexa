@@ -10,6 +10,7 @@ urlpatterns = [
     path("", include("core.urls")),
     path("", include("accounts.urls")),
     path("", include("academics.urls")),
+    path("", include("attendance.urls")),
 ]
 
 handler403 = "core.views.error_403"

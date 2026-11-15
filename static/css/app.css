@@ -358,3 +358,21 @@ button, input { font: inherit; }
 
 .revoke-assignment-form { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin:0; }
 .assignment-reason { width:150px; max-width:100%; min-height:29px; padding:5px 7px; border:1px solid #DCE3EB; border-radius:6px; font:inherit; font-size:9px; }
+
+
+/* RollNexa 0.6.0 — attendance session management */
+.status-success { color:#187D6D; background:#E8F8F3; }
+.status-danger { color:#9A3F3F; background:#FFF0F0; }
+.status-muted { color:#66758A; background:#EEF2F6; }
+.filter-bar form { display:flex; align-items:center; flex-wrap:wrap; gap:9px; width:100%; }
+.filter-bar label { color:var(--slate); font-size:10px; font-weight:700; }
+.filter-bar .form-control { width:auto; min-width:180px; min-height:39px; font-size:10px; }
+.pagination-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px 12px 0; color:var(--slate); font-size:10px; }
+.pagination-row a { color:var(--teal-dark); font-weight:700; }
+.detail-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:17px; margin:18px 0; }
+.detail-grid > div { display:grid; gap:5px; }
+.detail-label { color:#8997A9; font-size:9px; font-weight:800; letter-spacing:.1em; }
+.detail-grid strong { color:var(--navy); font-size:11px; }
+.admin-actions { display:flex; flex-wrap:wrap; align-items:center; gap:9px; margin-top:16px; }
+.admin-actions form { margin:0; }
+@media(max-width:620px) { .detail-grid { grid-template-columns:1fr; } .filter-bar .form-control { flex:1 1 100%; width:100%; } .admin-actions { align-items:stretch; flex-direction:column; } .admin-actions .button { width:100%; } }

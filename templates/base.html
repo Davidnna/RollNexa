@@ -38,6 +38,7 @@
             <a href="{% url 'student_course_list' %}">My courses</a>
           {% elif user.profile.role == "lecturer" %}
             <a href="{% url 'lecturer_course_list' %}">My teaching</a>
+            <a href="{% url 'lecturer_attendance_sessions' %}">Attendance sessions</a>
           {% endif %}
           <form method="post" action="{% url 'logout' %}" class="nav-form">
             {% csrf_token %}

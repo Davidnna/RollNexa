@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} — RollNexa{% endblock %}
+{% block content %}
+<section class="auth-section"><div class="auth-card auth-card-wide">
+  <span class="eyebrow">ATTENDANCE MANAGEMENT</span><h1>{{ title }}</h1>
+  <p class="auth-intro">Create a scheduled attendance session for a course offering assigned to you. Students must be registered for the selected offering.</p>
+  <div class="form-notice">A scheduled session must be activated during its configured time window. QR Code and facial verification are not yet enabled in this release.</div>
+  <form method="post" class="auth-form">{% csrf_token %}
+    {% if form.non_field_errors %}<div class="form-error-summary">{% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}</div>{% endif %}
+    {% for field in form %}<div class="field-group"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.help_text %}<span class="field-help">{{ field.help_text }}</span>{% endif %}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>{% endfor %}
+    <button class="button button-primary button-full" type="submit">{{ submit_label }}</button>
+    <a class="form-back-link" href="{% url 'lecturer_attendance_sessions' %}">Cancel and return to attendance sessions</a>
+  </form>
+</div></section>
+{% endblock %}

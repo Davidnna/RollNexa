@@ -4,7 +4,7 @@
 <section class="dashboard-section">
   <div class="container dashboard-container">
     <div class="dashboard-heading"><div><span class="eyebrow">STUDENT WORKSPACE</span><h1>Welcome, {{ user.first_name|default:user.username }}.</h1><p>Your RollNexa student workspace.</p></div><span class="account-status"><i></i> Student account</span></div>
-    <div class="dashboard-notice"><div class="notice-icon">i</div><div><strong>Your account is active</strong><p>Your account was created by an RollNexa administrator. Attendance sessions, course enrolment and personal attendance history will become available as those modules are released.</p></div></div>
+    <div class="dashboard-notice"><div class="notice-icon">i</div><div><strong>Your account is active</strong><p>Your account was created by a RollNexa administrator. Course registration is available under My courses. Attendance check-in and personal attendance history will become available after QR Code and facial verification are integrated.</p></div></div>
     <div class="dashboard-notice academic-assignment">
       <div class="notice-icon">⌂</div>
       <div><strong>Academic profile</strong><p>Programme: {{ user.profile.programme|default:"Not assigned" }}{% if user.profile.current_level %} · {{ user.profile.current_level }} level{% endif %}</p></div>

@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     "core",
     "academics.apps.AcademicsConfig",
     "accounts.apps.AccountsConfig",
+    "attendance.apps.AttendanceConfig",
 ]
 
 MIDDLEWARE = [

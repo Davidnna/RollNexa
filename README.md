@@ -4,9 +4,9 @@
 
 RollNexa is a web-based Smart Academic Attendance Platform prototype. Its planned workflow connects academic users, attendance sessions, identity verification and institutional attendance records.
 
-## Current release: 0.5.0 — Lecturer management and teaching assignment audit
+## Current release: 0.6.0 — Attendance management foundation
 
-This release adds institutional academic structures and academic-calendar management to the existing authentication and role-based account system.
+This release extends the existing authentication, academic-management and course-delivery platform with lecturer-managed attendance sessions and the dual-verification attendance-record foundation.
 
 ### Current functionality
 - Django authentication and session management
@@ -22,14 +22,20 @@ This release adds institutional academic structures and academic-calendar manage
 - Multiple lecturer assignments per course offering, including permitted cross-department teaching
 - Assignment revocation history and administrator audit details
 - Lecturer access restricted to actively assigned offerings and class rosters
+- Lecturer attendance-session scheduling, activation, closure and cancellation
+- Attendance-session management restricted to active teaching assignments
+- Attendance-record schema and server-side gate requiring successful QR and facial verification outcomes plus both timestamps
 - Student course registration and withdrawal, subject to offering rules
 - Neon PostgreSQL persistence
 - Render deployment with automatic deploys from GitHub
 
 ### Planned modules
-- QR-code attendance sessions and verification
-- Facial enrollment and identity verification
-- Attendance records, analytics and exports
+- Dynamic QR Code generation, scanning and session-token verification
+- Student facial enrolment, liveness checks and identity matching
+- Student check-in interface that invokes the dual-verification attendance service
+- Attendance analytics, summaries and exports
+
+The 0.6.0 release does not yet generate QR Codes, capture faces or allow students to check in. Activating a session only changes its lifecycle state; it does not create attendance records. The attendance-record service accepts a record only when both verifiers report success, the QR check precedes the face check, and both timestamps are valid.
 
 Do not describe planned modules as already implemented.
 
@@ -118,3 +124,7 @@ Course credit units and curriculum classifications are now stored per programme-
 ## Release 0.5.0 — Lecturer management and teaching assignment audit
 
 This release adds a lecturer directory and profile history, a central teaching-assignment register, cross-department assignment warnings, soft revocation and assignment audit fields. Deactivating a lecturer account revokes active teaching assignments while preserving history. Lecturer course and roster access requires an active assignment. See `RELEASE_NOTES_0.5.0.md`, `LECTURER_MANAGEMENT_GUIDE.md` and `GITHUB_UPLOAD_GUIDE_0.5.0.md`.
+
+## Release 0.6.0 — Attendance management foundation
+
+This release adds lecturer-managed attendance sessions, with scheduled, active, closed and cancelled states. Session creation is limited to active course offerings assigned to the lecturer; overlapping non-cancelled sessions for the same offering are rejected. The database includes an attendance record that the service creates only when both QR and facial verifiers explicitly report success, QR verification precedes facial verification, and both timestamps are valid and within the active session window. QR generation, facial enrolment/recognition and student check-in are not yet enabled. See `ATTENDANCE_DATA_MODEL.md`, `RELEASE_NOTES_0.6.0.md` and `GITHUB_UPLOAD_GUIDE_0.6.0.md`.
