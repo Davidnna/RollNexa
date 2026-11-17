@@ -1,12 +1,12 @@
-# RollNexa 0.8.0
+# RollNexa 0.9.0
 
 **Attendance, connected.**
 
 RollNexa is an academic administration and smart attendance platform. It connects institutional structure, user accounts, academic sessions, course catalogues, course offerings, lecturer assignments, student registrations and attendance-session management. Its attendance policy requires both QR Code verification and facial identity verification to succeed, in that order, before a present record can be created.
 
-Version 0.8.0 completes the first React migration of the role-based workspaces. The public website, authenticated React application and Django REST API are served from the same origin. Django remains the source of truth for authentication, authorisation, business rules, validation and database operations.
+Version 0.9.0 adds secure QR Code session verification to the React-based role workspaces. The public website, authenticated React application and Django REST API are served from the same origin. Django remains the source of truth for authentication, authorisation, business rules, validation and database operations.
 
-## 1. Version 0.8.0 scope
+## 1. Version 0.9.0 scope
 
 ### Platform capabilities
 
@@ -23,6 +23,10 @@ Version 0.8.0 completes the first React migration of the role-based workspaces. 
 - Student course discovery, registration and withdrawal where registration is open.
 - Lecturer course workspace and registered-student class rosters.
 - Lecturer attendance-session scheduling, activation, closure and cancellation.
+- Rotating session QR Code display for authorised lecturers.
+- Student QR Code scanning using the device camera or a direct RollNexa check-in link.
+- Short-lived, cryptographically signed QR tokens with server-side session, lecturer-assignment, account and course-registration validation.
+- Pending QR verification records with expiry, duplicate-attempt protection and status visibility.
 - Administrator attendance-session monitoring.
 - Student verified attendance history.
 - Role-scoped academic and attendance summary reports.
@@ -33,9 +37,21 @@ Version 0.8.0 completes the first React migration of the role-based workspaces. 
 
 ### Attendance implementation status
 
-The attendance session foundation and lifecycle management are implemented. The server-side verification service requires both successful QR Code and facial verification outcomes, both verification timestamps, and QR verification before facial verification.
+The attendance session foundation and lifecycle management are implemented. Version 0.9.0 generates rotating, short-lived signed QR Codes for active sessions and allows eligible students to scan them. The server validates the signed token, active session window, issuing lecturer assignment, student account, programme, level and course registration. The browser camera decodes the QR locally; only the signed token is sent to Django. A successful scan creates a pending QR verification record, not an attendance record.
 
-Version 0.8.0 does **not** generate or scan QR Codes, enrol student faces, capture facial images, perform liveness detection or run a facial-recognition model. Student attendance check-in is therefore not operational. Attendance records are created only through the existing server-side verification service when both verification outcomes are supplied and all session, registration and integrity checks pass. No manual attendance-entry interface is provided.
+QR tokens are signed using Django's signing framework and are not stored in plaintext. The lecturer display requests a new token every 30 seconds; each token is valid for up to 60 seconds. A pending QR verification expires after five minutes or at the end of the attendance session, whichever occurs first. Repeated scans reuse an unexpired pending verification for the same student and session.
+
+Version 0.9.0 does **not** enrol student faces, capture facial images, perform liveness detection or run a facial-recognition model. Student attendance is therefore not yet fully operational. An `AttendanceRecord` is still created only after both QR Code and facial verification succeed in the required order and all session, registration and integrity checks pass. QR verification alone never marks a student present. The attendance-recording service requires a persisted verification attempt in the server-side `face_verified` state; it does not accept browser-supplied success booleans. No manual attendance-entry interface is provided.
+
+A rotating QR Code limits the useful lifetime of a copied image but does not independently prove physical proximity. A valid code can still be forwarded to another eligible student during its short validity window. The required facial identity check remains the second control; additional proximity safeguards may be evaluated separately.
+
+The QR API surface is:
+
+- `GET /api/v1/attendance/sessions/{session_id}/qr/` — lecturer-only issuance of a short-lived signed token for an active assigned session.
+- `POST /api/v1/attendance/verify-qr/` — student-only QR token verification and creation or reuse of a pending verification attempt.
+- `GET /api/v1/attendance/verifications/{verification_id}/` — student-only status lookup for the student's own verification attempt.
+
+The face-completion service is an internal server-side boundary and is not exposed as an API accepting a client-supplied success flag.
 
 ## 2. Attendance verification policy
 
@@ -43,20 +59,21 @@ RollNexa uses **QR Code AND Facial Recognition**, not either method independentl
 
 1. An authorised lecturer schedules and activates an attendance session for an assigned course offering.
 2. A student must be eligible for the course offering and access the active session.
-3. QR Code verification must succeed first.
-4. Facial Recognition must then successfully verify the student's identity against an enrolled reference.
-5. Both verification timestamps must fall within the active session window.
-6. The server records attendance only when both checks succeed and all eligibility and integrity checks pass.
+3. The student scans the rotating QR Code. The server validates its signature and expiry, then checks the active session, issuing lecturer assignment and student course registration.
+4. A successful QR scan creates a pending verification attempt. It does not create an attendance record.
+5. Facial Recognition must then successfully verify the student's identity against an enrolled reference.
+6. Both verification timestamps must fall within the active session window and the pending verification must remain valid.
+7. The server records attendance only when both checks succeed and all eligibility and integrity checks pass.
 
-If either verification fails or is missing, no present record is created. QR Code generation, face enrolment, liveness detection and recognition will be introduced in later releases. The frontend must not imply that these planned verification capabilities are already operational.
+If either verification fails or is missing, no present record is created. QR generation and scanning are operational in this release; face enrolment, liveness detection and facial recognition will be introduced in a later release. The frontend must distinguish the operational QR stage from the planned facial stage.
 
 ## 3. User roles and permissions
 
 | Role | React workspace capabilities |
 | --- | --- |
 | System administrator | Manage user accounts, faculties, departments, programmes, academic sessions, semesters, course catalogue, course offerings, lecturer assignments; monitor attendance sessions; review platform reports. |
-| Lecturer | View assigned course offerings, review registered student rosters, schedule attendance sessions, activate or close sessions, review session activity and role-scoped reports. |
-| Student | View eligible course offerings, register or withdraw where registration is open, review verified attendance history and update personal contact details. |
+| Lecturer | View assigned course offerings, review registered student rosters, schedule attendance sessions, activate or close sessions, display rotating session QR Codes, review QR verification counts and role-scoped reports. |
+| Student | View eligible course offerings, register or withdraw where registration is open, scan an active session QR Code, review verified attendance history and update personal contact details. |
 
 The administrator role is represented by Django superuser accounts. Lecturer and student roles are stored on `UserProfile`. Permissions are enforced by Django API views and services. Hiding a link or action in React is not treated as an access-control mechanism.
 
@@ -68,6 +85,8 @@ The administrator role is represented by Django superuser accounts. Lecturer and
 | UI styling | Tailwind CSS and project CSS |
 | Frontend routing | React Router |
 | API state | TanStack React Query |
+| QR rendering | qrcode.react |
+| Camera QR scanning | html5-qrcode |
 | Backend | Python 3.12 and Django 5.2 |
 | API | Django REST Framework |
 | Authentication | Django session authentication and CSRF protection |
@@ -313,7 +332,7 @@ cd frontend
 npm install
 ```
 
-The first installation generates `frontend/package-lock.json`. Keep that lockfile in Git so subsequent installs and Docker builds can use the exact resolved dependency tree.
+The first installation generates `frontend/package-lock.json`. Keep that lockfile in Git so subsequent installs and Docker builds can use the exact resolved dependency tree. The QR workflow uses `qrcode.react` to render lecturer codes and `html5-qrcode` to scan them with a device camera.
 
 ### 8. Start the React development server
 
@@ -362,7 +381,7 @@ npm run typecheck
 npm run build
 ```
 
-Run these checks before committing a release. Also test account creation and deactivation, academic record management, course offerings, lecturer assignments, student registration and withdrawal, class rosters, attendance session lifecycle actions, report scope, profile updates, login, logout and forced password change in a browser.
+Run these checks before committing a release. Also test account creation and deactivation, academic record management, course offerings, lecturer assignments, student registration and withdrawal, class rosters, attendance session lifecycle actions, QR display and 30-second rotation, student camera scanning, token expiry, unregistered-student rejection, duplicate-scan handling, closed-session rejection, report scope, profile updates, login, logout and forced password change in a browser.
 
 ## 8. Docker development and deployment
 
@@ -371,13 +390,13 @@ Run these checks before committing a release. Also test account creation and dea
 From the repository root:
 
 ```bash
-docker build -t rollnexa:0.8.0 .
+docker build -t rollnexa:0.9.0 .
 ```
 
 Run the container with the required environment variables configured. Use a local or development PostgreSQL database, not the production database, for local container tests.
 
 ```bash
-docker run --rm -p 8000:8000 --env-file .env rollnexa:0.8.0
+docker run --rm -p 8000:8000 --env-file .env rollnexa:0.9.0
 ```
 
 The container entrypoint applies Django migrations and then starts Gunicorn. If `DIRECT_DATABASE_URL` is configured, migrations use that connection; the running application continues to use `DATABASE_URL`.
@@ -432,10 +451,10 @@ Every RollNexa update must follow these project rules:
 5. Extend the existing application. Do not replace working functionality or reset production data without explicit approval.
 6. Each release must include source validation and the relevant backend and frontend test results. Do not describe checks as passed if they were not executed.
 
-### Version 0.8.0 GitHub commit message
+### Version 0.9.0 GitHub commit message
 
 ```text
-Complete role-based React dashboards and workspace APIs for RollNexa 0.8.0
+Add secure rotating QR Code attendance verification to RollNexa 0.9.0
 ```
 
 ## 11. Development roadmap
@@ -444,7 +463,7 @@ Complete role-based React dashboards and workspace APIs for RollNexa 0.8.0
 | --- | --- |
 | 0.7.0 | React foundation, public website, session-authenticated API and dashboard shell. |
 | 0.8.0 | Complete administrator, lecturer and student dashboards and migrate core management workflows to React. |
-| 0.9.0 | Secure dynamic QR Code generation, scanning, token expiry, replay protection and server-side validation. |
+| 0.9.0 | Secure dynamic QR Code generation, scanning, short-lived signed tokens, pending verification records and server-side validation. |
 | 1.0.0 | Facial enrolment, facial recognition, liveness safeguards, integrated dual verification and comprehensive testing. |
 
 The roadmap is a development plan. A feature becomes operational only after implementation, testing and deployment in the corresponding release.

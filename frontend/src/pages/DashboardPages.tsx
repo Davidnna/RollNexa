@@ -68,7 +68,7 @@ export function DashboardHome() {
                     <h1>Good day, {greetingName}.</h1>
                     <p>Here is an overview of the information available to your account.</p>
                 </div>
-                <span className="release-chip"><span /> ROLLNEXA 0.8.0</span>
+                <span className="release-chip"><span /> ROLLNEXA 0.9.0</span>
             </div>
 
             {summaryQuery.isLoading && <div className="dashboard-loading"><span className="loading-spinner" /> Loading your workspace summary…</div>}
@@ -228,7 +228,7 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
     }
 
     if (!isAuthenticated) {
-        return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+        return <Navigate to="/login" replace state={{ from: `${location.pathname}${location.search}` }} />;
     }
 
     if (user?.mustChangePassword && location.pathname !== "/app/password-change") {

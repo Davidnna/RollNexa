@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import AttendanceRecord, AttendanceSession
+from .models import AttendanceRecord, AttendanceSession, AttendanceVerification
 
 
 @admin.register(AttendanceSession)
@@ -26,6 +26,39 @@ class AttendanceRecordAdmin(admin.ModelAdmin):
     list_filter = ("session__status", "session__offering__semester__session")
     search_fields = ("student__user__username", "student__user__first_name", "student__user__last_name", "session__offering__course__code")
     readonly_fields = ("session", "student", "qr_verified_at", "face_verified_at", "recorded_at")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(AttendanceVerification)
+class AttendanceVerificationAdmin(admin.ModelAdmin):
+    list_display = ("student", "session", "status", "qr_verified_at", "expires_at")
+    list_filter = ("status", "session__offering__semester__session")
+    search_fields = (
+        "student__user__username",
+        "student__user__first_name",
+        "student__user__last_name",
+        "session__offering__course__code",
+    )
+    readonly_fields = (
+        "id",
+        "session",
+        "student",
+        "qr_token_fingerprint",
+        "qr_verified_at",
+        "face_verified_at",
+        "expires_at",
+        "status",
+        "created_at",
+        "updated_at",
+    )
 
     def has_add_permission(self, request):
         return False

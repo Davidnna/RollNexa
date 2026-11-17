@@ -1,3 +1,5 @@
+import uuid
+
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -284,3 +286,123 @@ class AttendanceRecord(models.Model):
 
     def __str__(self):
         return f"{self.student.user.get_username()} — {self.session}"
+
+
+class AttendanceVerification(models.Model):
+    """Tracks the QR stage while the required facial check is pending."""
+
+    STATUS_QR_VERIFIED = "qr_verified"
+    STATUS_FACE_VERIFIED = "face_verified"
+    STATUS_COMPLETED = "completed"
+    STATUS_FAILED = "failed"
+    STATUS_EXPIRED = "expired"
+    STATUS_CHOICES = [
+        (STATUS_QR_VERIFIED, "QR verified; face check pending"),
+        (STATUS_FACE_VERIFIED, "Face verified"),
+        (STATUS_COMPLETED, "Completed"),
+        (STATUS_FAILED, "Failed"),
+        (STATUS_EXPIRED, "Expired"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    session = models.ForeignKey(
+        AttendanceSession,
+        on_delete=models.PROTECT,
+        related_name="verifications",
+    )
+    student = models.ForeignKey(
+        "accounts.UserProfile",
+        on_delete=models.PROTECT,
+        related_name="attendance_verifications",
+    )
+    qr_token_fingerprint = models.CharField(max_length=64)
+    qr_verified_at = models.DateTimeField()
+    face_verified_at = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField()
+    status = models.CharField(
+        max_length=16,
+        choices=STATUS_CHOICES,
+        default=STATUS_QR_VERIFIED,
+        db_index=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-qr_verified_at"]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(expires_at__gt=F("qr_verified_at")),
+                name="att_verify_expiry_after_qr",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    Q(status="qr_verified", face_verified_at__isnull=True)
+                    | Q(status__in=["face_verified", "completed"], face_verified_at__isnull=False)
+                    | Q(status__in=["failed", "expired"])
+                ),
+                name="att_verify_face_state_valid",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    Q(face_verified_at__isnull=True)
+                    | Q(face_verified_at__gte=F("qr_verified_at"))
+                ),
+                name="att_verify_face_after_qr",
+            ),
+            models.UniqueConstraint(
+                fields=["session", "student"],
+                condition=Q(status="qr_verified"),
+                name="uniq_pending_att_verify_per_student",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["session", "student", "status"],
+                name="att_verify_session_student_idx",
+            ),
+            models.Index(fields=["expires_at"], name="att_verify_expiry_idx"),
+        ]
+
+    def clean(self):
+        super().clean()
+        errors = {}
+
+        if len(self.qr_token_fingerprint) != 64:
+            errors["qr_token_fingerprint"] = "The QR token fingerprint is invalid."
+
+        if self.student_id:
+            from accounts.models import UserProfile
+            from academics.models import CourseRegistration
+
+            if self.student.role != UserProfile.ROLE_STUDENT or not self.student.user.is_active:
+                errors["student"] = "An active student account is required for attendance verification."
+            elif self.session_id:
+                offering = self.session.offering
+                if (
+                    self.student.programme_id != offering.programme_id
+                    or self.student.current_level != offering.level
+                ):
+                    errors["student"] = "The student's current programme and level must match the course offering."
+                elif not CourseRegistration.objects.filter(
+                    offering=offering,
+                    student=self.student,
+                    status=CourseRegistration.STATUS_REGISTERED,
+                ).exists():
+                    errors["student"] = "The student must be currently registered for this course offering."
+
+        if self.session_id and self.qr_verified_at:
+            if not (self.session.starts_at <= self.qr_verified_at < self.session.ends_at):
+                errors["qr_verified_at"] = "QR verification must occur within the attendance session window."
+
+        if self.expires_at and self.session_id and self.expires_at > self.session.ends_at:
+            errors["expires_at"] = "The verification cannot remain valid beyond the attendance session."
+
+        if self.face_verified_at and self.expires_at and self.face_verified_at > self.expires_at:
+            errors["face_verified_at"] = "Facial verification must occur before the verification expires."
+
+        if errors:
+            raise ValidationError(errors)
+
+    def __str__(self):
+        return f"{self.student.user.get_username()} — {self.session} ({self.get_status_display()})"

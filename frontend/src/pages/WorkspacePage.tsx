@@ -191,17 +191,17 @@ function getResourceConfig(resource: string, role: string): ResourceConfig {
             readOnly: true,
         },
         "attendance-sessions": {
-            resource, title: "Attendance sessions", description: "Schedule and manage sessions for course offerings assigned to you. Attendance recording remains disabled until both QR Code and facial verification are operational.", createLabel: "Schedule session",
-            columns: [{ key: "course_code", label: "Course" }, { key: "title", label: "Session title" }, { key: "programme_name", label: "Programme" }, { key: "starts_at", label: "Starts" }, { key: "ends_at", label: "Ends" }, { key: "status", label: "Status" }, { key: "registered_count", label: "Enrolled" }, { key: "attendance_count", label: "Present" }],
+            resource, title: "Attendance sessions", description: "Schedule and manage sessions for your assigned course offerings. Display a rotating QR Code for the first verification stage; facial verification remains mandatory before attendance is recorded.", createLabel: "Schedule session",
+            columns: [{ key: "course_code", label: "Course" }, { key: "title", label: "Session title" }, { key: "programme_name", label: "Programme" }, { key: "starts_at", label: "Starts" }, { key: "ends_at", label: "Ends" }, { key: "status", label: "Status" }, { key: "registered_count", label: "Enrolled" }, { key: "qr_verified_count", label: "QR verified" }, { key: "attendance_count", label: "Present" }],
             fields: [{ name: "offering", label: "Assigned course offering", type: "select", optionKey: "offerings", required: true }, { name: "title", label: "Session title" }, { name: "starts_at", label: "Starts at", type: "datetime-local", required: true }, { name: "ends_at", label: "Ends at", type: "datetime-local", required: true }, { name: "notes", label: "Lecturer notes", type: "textarea" }],
         },
         "attendance-monitor": {
             resource, title: "Attendance monitoring", description: "Review attendance session activity across the institution. Verified attendance records are only created after both identity checks succeed.",
-            columns: [{ key: "course_code", label: "Course" }, { key: "title", label: "Session" }, { key: "programme_name", label: "Programme" }, { key: "academic_session", label: "Academic session" }, { key: "starts_at", label: "Starts" }, { key: "status", label: "Status" }, { key: "registered_count", label: "Enrolled" }, { key: "attendance_count", label: "Present" }],
+            columns: [{ key: "course_code", label: "Course" }, { key: "title", label: "Session" }, { key: "programme_name", label: "Programme" }, { key: "academic_session", label: "Academic session" }, { key: "starts_at", label: "Starts" }, { key: "status", label: "Status" }, { key: "registered_count", label: "Enrolled" }, { key: "qr_verified_count", label: "QR verified" }, { key: "attendance_count", label: "Present" }],
             readOnly: true,
         },
         "attendance-history": {
-            resource, title: "Attendance history", description: "Review attendance entries recorded after successful QR Code and facial verification.",
+            resource, title: "Attendance history", description: "Review attendance entries created only after successful QR Code and facial verification.",
             columns: [{ key: "course_code", label: "Course" }, { key: "course_title", label: "Course title" }, { key: "session_title", label: "Session" }, { key: "academic_session", label: "Academic session" }, { key: "recorded_at", label: "Recorded at" }],
             readOnly: true,
         },
@@ -391,6 +391,7 @@ function ResourceWorkspace({
     const [mutationError, setMutationError] = useState("");
     const [temporaryPassword, setTemporaryPassword] = useState("");
     const [actionBusy, setActionBusy] = useState<number | null>(null);
+    const navigate = useNavigate();
     const mutation = useMutation({
         mutationFn: async (payload: { values: Row; item: Row | null }) => {
             const url = payload.item
@@ -451,7 +452,10 @@ function ResourceWorkspace({
                 if (item.can_activate) actions.push({ label: "Activate", action: "activate" });
                 actions.push({ label: "Cancel", action: "cancel" });
             }
-            if (item.status === "active") actions.push({ label: "Close", action: "close" });
+            if (item.status === "active") {
+                actions.push({ label: "Display QR", action: "qr" });
+                actions.push({ label: "Close", action: "close" });
+            }
         }
         if (config.resource === "lecturer-courses") actions.push({ label: "View roster", action: "roster" });
         return actions;
@@ -465,6 +469,10 @@ function ResourceWorkspace({
         }
         if (action === "roster") {
             onOfferingChange?.(Number(item.id));
+            return;
+        }
+        if (action === "qr") {
+            navigate(`/app/attendance/sessions/${Number(item.id)}/qr`);
             return;
         }
         const labels: Record<string, string> = {
@@ -715,7 +723,7 @@ export function WorkspacePage() {
     const showTabs = section === "academic" || (section === "courses" && role === "admin");
     const pageTitle = section === "attendance" && role === "student" ? "Attendance check-in" : config.title;
     const pageDescription = section === "attendance" && role === "student"
-        ? "Student attendance check-in will become available when secure QR Code and facial verification are implemented together."
+        ? "Scan your lecturer's current session QR Code. Facial verification remains mandatory before attendance is recorded."
         : config.description;
 
     if (section === "reports") {
@@ -728,7 +736,7 @@ export function WorkspacePage() {
         return <div className="dashboard-page workspace-page"><PageHeading title="Class rosters" description="Select an assigned course offering to view its currently registered students." /><RosterWorkspace /></div>;
     }
     if (section === "attendance" && role === "student") {
-        return <div className="dashboard-page workspace-page"><PageHeading title={pageTitle} description={pageDescription} /><div className="workspace-feature-notice"><span><ShieldCheck size={26} /></span><h2>Dual verification is required</h2><p>RollNexa will only record attendance after a valid session QR Code has been scanned and the student's face has been successfully verified. Neither check-in method will be available independently.</p><span className="workspace-coming-soon">QR and facial verification are scheduled for subsequent releases.</span></div></div>;
+        return <div className="dashboard-page workspace-page"><PageHeading title={pageTitle} description={pageDescription} /><div className="workspace-feature-notice"><span><ShieldCheck size={26} /></span><h2>Two-stage verification is required</h2><p>Scan the QR Code displayed by your lecturer to complete the first stage. Facial recognition must also succeed before RollNexa records attendance. QR verification alone never creates a present record.</p><Link className="button button-primary" to="/app/attendance/check-in">Scan QR Code <ArrowRight size={16} /></Link><span className="workspace-coming-soon">Facial verification will be introduced in the next release.</span></div></div>;
     }
 
     return (
@@ -768,5 +776,5 @@ export function WorkspacePage() {
 }
 
 function PageHeading({ title, description }: { title: string; description: string }) {
-    return <div className="dashboard-page-heading workspace-page-heading"><div><span className="eyebrow">ROLLNEXA WORKSPACE</span><h1>{title}</h1><p>{description}</p></div><span className="release-chip"><span /> ROLLNEXA 0.8.0</span></div>;
+    return <div className="dashboard-page-heading workspace-page-heading"><div><span className="eyebrow">ROLLNEXA WORKSPACE</span><h1>{title}</h1><p>{description}</p></div><span className="release-chip"><span /> ROLLNEXA 0.9.0</span></div>;
 }

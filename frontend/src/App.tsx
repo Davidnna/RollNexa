@@ -6,6 +6,7 @@ import { DashboardLayout } from "./layouts/DashboardLayout";
 import { PublicLayout } from "./layouts/PublicLayout";
 import { DashboardHome, PasswordChangePage, ProtectedRoute } from "./pages/DashboardPages";
 import { WorkspacePage } from "./pages/WorkspacePage";
+import { AttendanceQRPage, AttendanceScanPage } from "./pages/AttendanceQRPages";
 import { LoginPage } from "./pages/LoginPage";
 import {
     AboutPage,
@@ -68,6 +69,8 @@ export default function App() {
                             <Route path="courses" element={<WorkspacePage />} />
                             <Route path="rosters" element={<WorkspacePage />} />
                             <Route path="attendance" element={<WorkspacePage />} />
+                            <Route path="attendance/check-in" element={<AttendanceScanPage />} />
+                            <Route path="attendance/sessions/:sessionId/qr" element={<AttendanceQRPage />} />
                             <Route path="history" element={<WorkspacePage />} />
                             <Route path="reports" element={<WorkspacePage />} />
                             <Route path="settings" element={<WorkspacePage />} />

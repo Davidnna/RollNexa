@@ -304,6 +304,9 @@ def _attendance_session_data(item):
         "registered_count": item.offering.registrations.filter(
             status=CourseRegistration.STATUS_REGISTERED
         ).count(),
+        "qr_verified_count": item.verifications.filter(
+            status="qr_verified", expires_at__gt=timezone.now()
+        ).count(),
         "attendance_count": item.records.count(),
         "created_at": item.created_at.isoformat(),
         "notes": item.notes,
@@ -1146,6 +1149,6 @@ class ReportsView(NoCacheAPIView):
                         "offering__course", "offering__programme", "offering__semester__session"
                     ).order_by("-starts_at")[:10]
                 ],
-                "notice": "Attendance records remain empty until QR Code and facial verification are implemented and enabled.",
+                "notice": "Attendance records remain empty until facial verification is implemented and both required checks are enabled.",
             })
         raise PermissionDenied("Reports are not available for this account role.")

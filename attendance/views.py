@@ -166,7 +166,7 @@ def _run_session_action(request, pk, service, success_message):
 def attendance_session_activate(request, pk):
     return _run_session_action(
         request, pk, activate_attendance_session,
-        "Attendance session activated. QR and facial verification will be enabled in a subsequent release.",
+        "Attendance session activated. Display the session QR Code from the RollNexa React workspace. Facial verification is still required before attendance is recorded.",
     )
 
 

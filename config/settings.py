@@ -137,6 +137,8 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_THROTTLE_RATES": {
         "login": "10/minute",
+        "qr_issue": "5/minute",
+        "qr_verify": "10/minute",
     },
 }
 

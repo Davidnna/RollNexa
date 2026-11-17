@@ -203,7 +203,7 @@ export function FeaturesPage() {
         { icon: <CalendarDaysIcon />, title: "Academic calendar", text: "Configure academic sessions, semesters and the current academic period." },
         { icon: <BookOpen size={22} />, title: "Course management", text: "Maintain the course catalogue, programme-specific offerings and registration rules." },
         { icon: <Users size={22} />, title: "User and role management", text: "Create and manage administrator, lecturer and student accounts with role-based access." },
-        { icon: <QrCode size={22} />, title: "QR session verification", text: "Planned dynamic, session-specific QR codes with server-side validation and expiry." },
+        { icon: <QrCode size={22} />, title: "QR session verification", text: "Available rotating session QR Codes with short-lived signed tokens, server-side validation and student registration checks. QR verification alone does not record attendance." },
         { icon: <ScanFace size={22} />, title: "Facial identity verification", text: "Planned facial enrolment and matching as the second required attendance check." },
         { icon: <FileBarChartIcon />, title: "Attendance reporting", text: "A planned reporting layer for session history, attendance summaries and exports." },
         { icon: <ShieldCheck size={22} />, title: "Access and audit controls", text: "Enforce permissions on the server and retain important academic and attendance history." },
@@ -222,7 +222,7 @@ export function FeaturesPage() {
                         {features.map((feature, index) => (
                             <article className="feature-detail-card" key={feature.title}>
                                 <span className="feature-icon feature-icon-teal">{feature.icon}</span>
-                                <div className="feature-detail-title"><h3>{feature.title}</h3><span className={`status-tag ${index < 4 || index === 7 ? "status-available" : "status-planned"}`}>{index < 4 || index === 7 ? "Available foundation" : "Planned"}</span></div>
+                                <div className="feature-detail-title"><h3>{feature.title}</h3><span className={`status-tag ${index < 5 || index === 7 ? "status-available" : "status-planned"}`}>{index < 5 || index === 7 ? "Available foundation" : "Planned"}</span></div>
                                 <p>{feature.text}</p>
                             </article>
                         ))}
@@ -232,7 +232,7 @@ export function FeaturesPage() {
             <section className="section section-mist">
                 <div className="container feature-note">
                     <span className="feature-note-icon"><Clock3 size={21} /></span>
-                    <div><strong>Features are introduced in controlled releases.</strong><p>QR scanning, facial enrolment, facial matching and attendance analytics are not represented as operational until their implementation and testing are complete.</p></div>
+                    <div><strong>Features are introduced in controlled releases.</strong><p>Dynamic QR generation and scanning are available in version 0.9.0. Facial enrolment, facial matching and verified attendance recording remain planned until their implementation and testing are complete.</p></div>
                 </div>
             </section>
         </>
@@ -242,7 +242,7 @@ export function FeaturesPage() {
 export function HowItWorksPage() {
     const steps = [
         { number: "01", icon: <CalendarDaysIcon />, title: "A lecturer opens a session", text: "An authorised lecturer creates an attendance session for a course offering they are actively assigned to. The session has a defined start and end time." },
-        { number: "02", icon: <QrCode size={23} />, title: "The student verifies session access", text: "The student scans the session's time-limited QR Code. The server validates the token, session status, expiry and course registration." },
+        { number: "02", icon: <QrCode size={23} />, title: "The student verifies session access", text: "The student scans the lecturer's rotating, time-limited QR Code. The server validates the signed token, session status, expiry, lecturer assignment and student course registration. This completes only the first verification stage." },
         { number: "03", icon: <ScanFace size={23} />, title: "The student verifies identity", text: "The system captures a live face sample and compares it with the student's previously enrolled facial reference, subject to liveness and quality checks." },
         { number: "04", icon: <CheckCircle2 size={23} />, title: "Attendance is recorded", text: "Only after both checks succeed, in the required order and within the session window, does the server create a present record." },
     ];
@@ -258,7 +258,7 @@ export function HowItWorksPage() {
                 <div className="container">
                     <div className="implementation-note">
                         <Clock3 size={18} />
-                        <span>This page describes the agreed target workflow. QR scanning, facial enrolment and facial recognition are planned capabilities and are not yet operational in this release.</span>
+                        <span>QR generation and scanning are operational in version 0.9.0. Facial enrolment and recognition remain planned. A successful QR scan is not an attendance record; the second verification stage must also succeed.</span>
                     </div>
                     <div className="process-list">
                         {steps.map((step) => (
@@ -320,9 +320,9 @@ export function PrivacyPage() {
                 <div className="container legal-content">
                     <div className="legal-review-note"><ShieldCheck size={19} /><span>This product overview is not a substitute for an institution-approved privacy notice. Each deploying institution must publish its controller details, lawful basis, retention schedule and contact route before collecting personal or biometric data.</span></div>
                     <h2>Information used by the current platform</h2>
-                    <p>The existing platform processes account details, role and institutional profile information, academic structure, course assignments, course registrations and attendance-session administration records.</p>
-                    <h2>Planned biometric processing</h2>
-                    <p>Facial enrolment and recognition are planned capabilities. The current attendance foundation does not capture facial images or store biometric templates. Biometric processing must not be enabled until the institution has approved its privacy notice, security controls, retention and deletion rules, access restrictions and an appropriate alternative process.</p>
+                    <p>The existing platform processes account details, role and institutional profile information, academic structure, course assignments, course registrations, attendance-session administration records and pending QR verification metadata, including a one-way token fingerprint and verification expiry.</p>
+                    <h2>QR verification and planned biometric processing</h2>
+                    <p>The current release uses the browser camera locally to decode the lecturer's QR Code; camera frames are not uploaded to the server. It validates short-lived signed QR tokens and stores a fingerprint of the token with a pending student verification record. It does not store the raw QR token. Facial enrolment and recognition are planned capabilities. The current system does not capture facial images or store biometric templates. Biometric processing must not be enabled until the institution has approved its privacy notice, security controls, retention and deletion rules, access restrictions and an appropriate alternative process.</p>
                     <h2>Access and security</h2>
                     <p>Access to platform functions is role-based and enforced by the Django backend. The platform is designed to use authenticated sessions, CSRF protection and restricted access to institutional records.</p>
                     <h2>Institutional responsibility</h2>

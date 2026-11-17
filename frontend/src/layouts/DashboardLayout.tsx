@@ -13,6 +13,7 @@ import {
     Menu,
     Settings,
     Users,
+    QrCode,
     X,
 } from "lucide-react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
@@ -47,6 +48,7 @@ const navigation: Record<string, NavigationItem[]> = {
         { label: "Overview", to: "/app", icon: LayoutDashboard },
         { label: "My courses", to: "/app/courses", icon: BookOpen },
         { label: "Attendance", to: "/app/attendance", icon: ClipboardCheck },
+        { label: "Scan QR Code", to: "/app/attendance/check-in", icon: QrCode },
         { label: "Attendance history", to: "/app/history", icon: CalendarDays },
         { label: "Profile", to: "/app/profile", icon: Settings },
     ],
@@ -94,7 +96,7 @@ export function DashboardLayout() {
                             <NavLink
                                 key={item.to}
                                 to={item.to}
-                                end={item.to === "/app"}
+                                end={item.to === "/app" || (item.to === "/app/attendance" && user?.role === "student")}
                                 className={({ isActive }) => `dashboard-nav-link ${isActive ? "is-active" : ""}`}
                                 onClick={() => setSidebarOpen(false)}
                             >
@@ -107,7 +109,7 @@ export function DashboardLayout() {
                 <div className="sidebar-bottom">
                     <div className="sidebar-help-card">
                         <span className="help-card-icon"><Activity size={17} /></span>
-                        <strong>RollNexa 0.8.0</strong>
+                        <strong>RollNexa 0.9.0</strong>
                         <p>Manage your academic workflows from one secure workspace.</p>
                     </div>
                     <button className="sidebar-logout" onClick={handleLogout}>

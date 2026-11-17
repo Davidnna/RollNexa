@@ -1,6 +1,9 @@
+import json
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.core import signing
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.urls import reverse
@@ -20,13 +23,16 @@ from academics.models import (
 )
 
 from .forms import AttendanceSessionForm
-from .models import AttendanceRecord, AttendanceSession
+from .models import AttendanceRecord, AttendanceSession, AttendanceVerification
 from .services import (
     activate_attendance_session,
+    complete_attendance_verification,
     cancel_attendance_session,
     close_attendance_session,
     create_attendance_session,
+    issue_attendance_qr_token,
     record_verified_attendance,
+    verify_attendance_qr,
 )
 
 User = get_user_model()
@@ -276,128 +282,64 @@ class AttendanceManagementTests(TestCase):
         response = self.client.get(reverse("attendance_session_detail", kwargs={"pk": session.pk}))
         self.assertEqual(response.status_code, 404)
 
-    def test_both_verification_timestamps_are_required_to_record_attendance(self):
-        session = self.create_session()
-        activate_attendance_session(
-            session_id=session.pk,
-            lecturer_profile=self.lecturer,
-            at=self.now,
-        )
+    def test_qr_only_verification_cannot_record_attendance(self):
+        session = self._active_session()
+        verification = self._pending_verification(session)
         with self.assertRaises(ValidationError):
-            record_verified_attendance(
-                session_id=session.pk,
-                student_profile=self.student,
-                qr_verified_at=self.now,
-                face_verified_at=None,
-                qr_verified=True,
-                face_verified=True,
-                recorded_at=self.now,
-            )
+            record_verified_attendance(verification_id=verification.pk)
         self.assertEqual(AttendanceRecord.objects.count(), 0)
 
-    def test_attendance_is_rejected_when_either_verifier_fails(self):
-        session = self.create_session()
-        activate_attendance_session(
-            session_id=session.pk,
-            lecturer_profile=self.lecturer,
-            at=self.now,
-        )
+    def test_failed_face_verification_cannot_record_attendance(self):
+        session = self._active_session()
+        verification = self._pending_verification(session)
+        verification.status = AttendanceVerification.STATUS_FAILED
+        verification.save(update_fields=["status", "updated_at"])
         with self.assertRaises(ValidationError):
-            record_verified_attendance(
-                session_id=session.pk,
-                student_profile=self.student,
-                qr_verified_at=self.now - timedelta(seconds=3),
-                face_verified_at=self.now - timedelta(seconds=1),
-                qr_verified=True,
-                face_verified=False,
-                recorded_at=self.now,
-            )
+            record_verified_attendance(verification_id=verification.pk)
         self.assertEqual(AttendanceRecord.objects.count(), 0)
 
     def test_facial_verification_must_follow_qr_verification(self):
-        session = self.create_session()
-        activate_attendance_session(
-            session_id=session.pk,
-            lecturer_profile=self.lecturer,
-            at=self.now,
-        )
+        session = self._active_session()
+        verification = self._pending_verification(session)
         with self.assertRaises(ValidationError):
-            record_verified_attendance(
-                session_id=session.pk,
-                student_profile=self.student,
-                qr_verified_at=self.now - timedelta(seconds=1),
-                face_verified_at=self.now - timedelta(seconds=3),
-                qr_verified=True,
-                face_verified=True,
-                recorded_at=self.now,
+            complete_attendance_verification(
+                verification_id=verification.pk,
+                verified_at=verification.qr_verified_at - timedelta(seconds=1),
             )
         self.assertEqual(AttendanceRecord.objects.count(), 0)
 
     def test_attendance_is_recorded_after_both_checks_succeed(self):
-        session = self.create_session()
-        activate_attendance_session(
-            session_id=session.pk,
-            lecturer_profile=self.lecturer,
-            at=self.now,
-        )
-        record = record_verified_attendance(
-            session_id=session.pk,
-            student_profile=self.student,
-            qr_verified_at=self.now - timedelta(seconds=3),
-            face_verified_at=self.now - timedelta(seconds=1),
-            qr_verified=True,
-            face_verified=True,
-            recorded_at=self.now,
-        )
+        session = self._active_session()
+        verification = self._pending_verification(session)
+        record = complete_attendance_verification(verification_id=verification.pk)
+        verification.refresh_from_db()
         self.assertEqual(record.session, session)
         self.assertEqual(record.student, self.student)
+        self.assertEqual(verification.status, AttendanceVerification.STATUS_COMPLETED)
         self.assertEqual(AttendanceRecord.objects.count(), 1)
 
     def test_duplicate_attendance_for_same_student_and_session_is_rejected(self):
-        session = self.create_session()
-        activate_attendance_session(
-            session_id=session.pk,
-            lecturer_profile=self.lecturer,
-            at=self.now,
-        )
-        kwargs = {
-            "session_id": session.pk,
-            "student_profile": self.student,
-            "qr_verified_at": self.now - timedelta(seconds=3),
-            "face_verified_at": self.now - timedelta(seconds=1),
-            "qr_verified": True,
-            "face_verified": True,
-            "recorded_at": self.now,
-        }
-        record_verified_attendance(**kwargs)
+        session = self._active_session()
+        verification = self._pending_verification(session)
+        complete_attendance_verification(verification_id=verification.pk)
         with self.assertRaises(ValidationError):
-            record_verified_attendance(**kwargs)
-        self.assertEqual(AttendanceRecord.objects.count(), 1)
+            record_verified_attendance(verification_id=verification.pk)
+        self.assertEqual(AttendanceRecord.objects.filter(session=session, student=self.student).count(), 1)
 
     def test_attendance_cannot_be_recorded_when_all_lecturer_assignments_are_revoked(self):
-        session = self.create_session()
-        activate_attendance_session(
-            session_id=session.pk,
-            lecturer_profile=self.lecturer,
-            at=self.now,
-        )
+        session = self._active_session()
+        verification = self._pending_verification(session)
         self.assignment.is_active = False
-        self.assignment.removed_at = self.now
+        self.assignment.removed_at = timezone.now()
         self.assignment.removed_by = self.admin
         self.assignment.save(update_fields=["is_active", "removed_at", "removed_by"])
         with self.assertRaises(ValidationError):
-            record_verified_attendance(
-                session_id=session.pk,
-                student_profile=self.student,
-                qr_verified_at=self.now - timedelta(seconds=3),
-                face_verified_at=self.now - timedelta(seconds=1),
-                qr_verified=True,
-                face_verified=True,
-                recorded_at=self.now,
-            )
+            complete_attendance_verification(verification_id=verification.pk)
         self.assertEqual(AttendanceRecord.objects.count(), 0)
 
     def test_student_profile_must_still_match_the_registered_offering(self):
+        session = self._active_session()
+        verification = self._pending_verification(session)
         other_programme = Programme.objects.create(
             department=self.programme.department,
             code="BSC-IT",
@@ -405,22 +347,8 @@ class AttendanceManagementTests(TestCase):
         )
         self.student.programme = other_programme
         self.student.save(update_fields=["programme"])
-        session = self.create_session()
-        activate_attendance_session(
-            session_id=session.pk,
-            lecturer_profile=self.lecturer,
-            at=self.now,
-        )
         with self.assertRaises(ValidationError):
-            record_verified_attendance(
-                session_id=session.pk,
-                student_profile=self.student,
-                qr_verified_at=self.now - timedelta(seconds=3),
-                face_verified_at=self.now - timedelta(seconds=1),
-                qr_verified=True,
-                face_verified=True,
-                recorded_at=self.now,
-            )
+            complete_attendance_verification(verification_id=verification.pk)
         self.assertEqual(AttendanceRecord.objects.count(), 0)
 
     def test_unregistered_student_cannot_be_marked_present(self):
@@ -433,20 +361,266 @@ class AttendanceManagementTests(TestCase):
         other_student.programme = self.programme
         other_student.current_level = "300"
         other_student.save()
+        session = self._active_session()
+        qr_verified_at = timezone.now()
+        verification = AttendanceVerification.objects.create(
+            session=session,
+            student=other_student,
+            qr_token_fingerprint="f" * 64,
+            qr_verified_at=qr_verified_at,
+            expires_at=session.ends_at,
+            status=AttendanceVerification.STATUS_QR_VERIFIED,
+        )
+        with self.assertRaises(ValidationError):
+            complete_attendance_verification(verification_id=verification.pk)
+        self.assertEqual(AttendanceRecord.objects.count(), 0)
+
+    def _active_session(self):
         session = self.create_session()
         activate_attendance_session(
             session_id=session.pk,
             lecturer_profile=self.lecturer,
             at=self.now,
         )
-        with self.assertRaises(ValidationError):
-            record_verified_attendance(
-                session_id=session.pk,
-                student_profile=other_student,
-                qr_verified_at=self.now - timedelta(seconds=3),
-                face_verified_at=self.now - timedelta(seconds=1),
-                qr_verified=True,
-                face_verified=True,
-                recorded_at=self.now,
-            )
+        return session
+
+    def _issued_qr(self, session):
+        return issue_attendance_qr_token(
+            session_id=session.pk,
+            lecturer_profile=self.lecturer,
+        )
+
+    def _pending_verification(self, session, student=None):
+        issued = self._issued_qr(session)
+        verification, _ = verify_attendance_qr(
+            token=issued["token"],
+            student_profile=student or self.student,
+        )
+        return verification
+
+    def test_assigned_lecturer_can_issue_short_lived_qr_token(self):
+        session = self._active_session()
+        self.client.force_login(self.lecturer_user)
+        response = self.client.get(reverse("api_attendance_qr", kwargs={"session_id": session.pk}))
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["token"])
+        self.assertGreater(payload["ttlSeconds"], 0)
+        self.assertEqual(payload["session"]["id"], session.pk)
+
+    def test_scheduled_session_cannot_issue_qr_token(self):
+        session = self.create_session()
+        self.client.force_login(self.lecturer_user)
+        response = self.client.get(reverse("api_attendance_qr", kwargs={"session_id": session.pk}))
+        self.assertEqual(response.status_code, 400)
+
+    def test_student_cannot_issue_lecturer_qr_token(self):
+        session = self._active_session()
+        self.client.force_login(self.student_user)
+        response = self.client.get(reverse("api_attendance_qr", kwargs={"session_id": session.pk}))
+        self.assertEqual(response.status_code, 403)
+
+    def test_unassigned_lecturer_cannot_issue_qr_token(self):
+        session = self._active_session()
+        other_user = User.objects.create_user(
+            username="unassigned_qr_lecturer",
+            email="unassigned_qr_lecturer@example.test",
+            password="StrongTestPassword!2026",
+        )
+        other_user.profile.role = UserProfile.ROLE_LECTURER
+        other_user.profile.save()
+        self.client.force_login(other_user)
+        response = self.client.get(reverse("api_attendance_qr", kwargs={"session_id": session.pk}))
+        self.assertEqual(response.status_code, 404)
+
+    def test_valid_qr_scan_creates_pending_verification_not_attendance(self):
+        session = self._active_session()
+        issued = self._issued_qr(session)
+        self.client.force_login(self.student_user)
+        response = self.client.post(
+            reverse("api_attendance_verify_qr"),
+            data=json.dumps({"token": issued["token"]}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 201)
+        verification = AttendanceVerification.objects.get(pk=response.json()["verificationId"])
+        self.assertEqual(verification.session, session)
+        self.assertEqual(verification.student, self.student)
+        self.assertEqual(verification.status, AttendanceVerification.STATUS_QR_VERIFIED)
+        self.assertEqual(len(verification.qr_token_fingerprint), 64)
+        self.assertNotEqual(verification.qr_token_fingerprint, issued["token"])
         self.assertEqual(AttendanceRecord.objects.count(), 0)
+
+    def test_repeated_qr_scan_reuses_active_pending_verification(self):
+        session = self._active_session()
+        issued = self._issued_qr(session)
+        self.client.force_login(self.student_user)
+        url = reverse("api_attendance_verify_qr")
+        body = json.dumps({"token": issued["token"]})
+        first = self.client.post(url, data=body, content_type="application/json")
+        second = self.client.post(url, data=body, content_type="application/json")
+        self.assertEqual(first.status_code, 201)
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(first.json()["verificationId"], second.json()["verificationId"])
+        self.assertEqual(AttendanceVerification.objects.filter(
+            session=session,
+            student=self.student,
+            status=AttendanceVerification.STATUS_QR_VERIFIED,
+        ).count(), 1)
+
+    def test_unregistered_student_cannot_verify_qr_code(self):
+        session = self._active_session()
+        issued = self._issued_qr(session)
+        other_user = User.objects.create_user(
+            username="unregistered_qr_student",
+            email="unregistered_qr_student@example.test",
+            password="StrongTestPassword!2026",
+        )
+        other_student = other_user.profile
+        other_student.programme = self.programme
+        other_student.current_level = "300"
+        other_student.save()
+        self.client.force_login(other_user)
+        response = self.client.post(
+            reverse("api_attendance_verify_qr"),
+            data=json.dumps({"token": issued["token"]}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(AttendanceVerification.objects.count(), 0)
+
+    def test_lecturer_cannot_submit_student_qr_verification(self):
+        session = self._active_session()
+        issued = self._issued_qr(session)
+        self.client.force_login(self.lecturer_user)
+        response = self.client.post(
+            reverse("api_attendance_verify_qr"),
+            data=json.dumps({"token": issued["token"]}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_tampered_qr_token_is_rejected(self):
+        session = self._active_session()
+        issued = self._issued_qr(session)
+        self.client.force_login(self.student_user)
+        response = self.client.post(
+            reverse("api_attendance_verify_qr"),
+            data=json.dumps({"token": issued["token"] + "tampered"}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(AttendanceVerification.objects.count(), 0)
+
+    def test_qr_token_is_rejected_after_session_is_closed(self):
+        session = self._active_session()
+        issued = self._issued_qr(session)
+        close_attendance_session(
+            session_id=session.pk,
+            lecturer_profile=self.lecturer,
+            at=timezone.now(),
+        )
+        self.client.force_login(self.student_user)
+        response = self.client.post(
+            reverse("api_attendance_verify_qr"),
+            data=json.dumps({"token": issued["token"]}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(AttendanceVerification.objects.count(), 0)
+
+    def test_revoked_issuer_assignment_invalidates_qr_token(self):
+        session = self._active_session()
+        issued = self._issued_qr(session)
+        self.assignment.is_active = False
+        self.assignment.removed_at = timezone.now()
+        self.assignment.removed_by = self.admin
+        self.assignment.save(update_fields=["is_active", "removed_at", "removed_by"])
+        self.client.force_login(self.student_user)
+        response = self.client.post(
+            reverse("api_attendance_verify_qr"),
+            data=json.dumps({"token": issued["token"]}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(AttendanceVerification.objects.count(), 0)
+
+    def test_expired_pending_verification_can_be_replaced_by_new_scan(self):
+        session = self._active_session()
+        issued = self._issued_qr(session)
+        first, reused = verify_attendance_qr(token=issued["token"], student_profile=self.student)
+        self.assertFalse(reused)
+        expired_at = first.qr_verified_at + timedelta(seconds=1)
+        first.expires_at = expired_at
+        first.save(update_fields=["expires_at", "updated_at"])
+        second, reused = verify_attendance_qr(
+            token=issued["token"],
+            student_profile=self.student,
+            at=expired_at + timedelta(seconds=1),
+        )
+        self.assertFalse(reused)
+        self.assertNotEqual(first.pk, second.pk)
+        first.refresh_from_db()
+        self.assertEqual(first.status, AttendanceVerification.STATUS_EXPIRED)
+
+    def test_closing_session_expires_pending_qr_verifications(self):
+        session = self._active_session()
+        issued = self._issued_qr(session)
+        verification, _ = verify_attendance_qr(token=issued["token"], student_profile=self.student)
+        close_attendance_session(
+            session_id=session.pk,
+            lecturer_profile=self.lecturer,
+            at=timezone.now(),
+        )
+        verification.refresh_from_db()
+        self.assertEqual(verification.status, AttendanceVerification.STATUS_EXPIRED)
+
+    def test_student_can_only_read_their_own_verification_status(self):
+        session = self._active_session()
+        issued = self._issued_qr(session)
+        verification, _ = verify_attendance_qr(token=issued["token"], student_profile=self.student)
+        other_user = User.objects.create_user(
+            username="other_qr_student",
+            email="other_qr_student@example.test",
+            password="StrongTestPassword!2026",
+        )
+        other_user.profile.programme = self.programme
+        other_user.profile.current_level = "300"
+        other_user.profile.save()
+        self.client.force_login(other_user)
+        response = self.client.get(reverse(
+            "api_attendance_verification_status",
+            kwargs={"verification_id": verification.pk},
+        ))
+        self.assertEqual(response.status_code, 404)
+
+    def test_attendance_verification_expires_no_later_than_session_end(self):
+        session = self.create_session(
+            starts_at=timezone.now() - timedelta(minutes=1),
+            ends_at=timezone.now() + timedelta(seconds=30),
+        )
+        activate_attendance_session(
+            session_id=session.pk,
+            lecturer_profile=self.lecturer,
+            at=timezone.now(),
+        )
+        issued = self._issued_qr(session)
+        verification, _ = verify_attendance_qr(token=issued["token"], student_profile=self.student)
+        self.assertLessEqual(verification.expires_at, session.ends_at)
+
+
+    def test_signed_qr_token_expires_after_its_validity_window(self):
+        session = self._active_session()
+        issued = self._issued_qr(session)
+        self.client.force_login(self.student_user)
+        with patch(
+            "attendance.services.signing.loads",
+            side_effect=signing.SignatureExpired("expired"),
+        ):
+            response = self.client.post(
+                reverse("api_attendance_verify_qr"),
+                data=json.dumps({"token": issued["token"]}),
+                content_type="application/json",
+            )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(AttendanceVerification.objects.count(), 0)
