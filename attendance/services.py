@@ -179,6 +179,7 @@ def record_verified_attendance(*, verification_id, recorded_at=None):
             record = AttendanceRecord(
                 session=session,
                 student=student_profile,
+                recording_method=AttendanceRecord.METHOD_DUAL_VERIFIED,
                 qr_verified_at=qr_verified_at,
                 face_verified_at=face_verified_at,
                 recorded_at=moment,
@@ -226,6 +227,84 @@ def complete_attendance_verification(*, verification_id, verified_at=None):
     verification.full_clean()
     verification.save(update_fields=["face_verified_at", "status", "updated_at"])
     return record_verified_attendance(verification_id=verification.pk, recorded_at=moment)
+
+
+@transaction.atomic
+def record_manual_attendance_exception(
+    *,
+    session_id,
+    student_id,
+    lecturer_profile,
+    reason,
+    notes="",
+    recorded_at=None,
+):
+    """Record a lecturer-approved alternative when automated biometrics cannot be used."""
+    moment = recorded_at or timezone.now()
+    session = AttendanceSession.objects.select_for_update().select_related(
+        "offering__programme",
+        "offering__course",
+    ).get(pk=session_id)
+
+    if session.status != AttendanceSession.STATUS_ACTIVE or not session.is_open_at(moment):
+        raise ValidationError("Manual attendance exceptions can only be approved during an active attendance session.")
+    if not session.offering.is_active:
+        raise ValidationError("The course offering is inactive.")
+
+    if not isinstance(lecturer_profile, UserProfile):
+        lecturer_profile = UserProfile.objects.select_related("user").get(pk=lecturer_profile)
+    if lecturer_profile.role != UserProfile.ROLE_LECTURER or not lecturer_profile.user.is_active:
+        raise ValidationError("An active lecturer account is required to approve a manual attendance exception.")
+    assignment = CourseLecturerAssignment.objects.select_for_update().filter(
+        offering=session.offering,
+        lecturer=lecturer_profile,
+        is_active=True,
+    ).first()
+    if not assignment:
+        raise ValidationError("You must have an active teaching assignment for this course offering.")
+
+    if student_id in (None, ""):
+        raise ValidationError("Select a registered student.")
+    if not isinstance(student_id, UserProfile):
+        try:
+            student_profile = UserProfile.objects.select_related("user").get(pk=student_id)
+        except (UserProfile.DoesNotExist, TypeError, ValueError) as exc:
+            raise ValidationError("The selected student account does not exist.") from exc
+    else:
+        student_profile = student_id
+
+    if student_profile.role != UserProfile.ROLE_STUDENT or not student_profile.user.is_active:
+        raise ValidationError("An active student account is required.")
+    if (
+        student_profile.programme_id != session.offering.programme_id
+        or student_profile.current_level != session.offering.level
+    ):
+        raise ValidationError("The student's programme and level do not match this course offering.")
+    if not CourseRegistration.objects.filter(
+        offering=session.offering,
+        student=student_profile,
+        status=CourseRegistration.STATUS_REGISTERED,
+    ).exists():
+        raise ValidationError("The student must be currently registered for this course offering.")
+    if AttendanceRecord.objects.filter(session=session, student=student_profile).exists():
+        raise ValidationError("Attendance has already been recorded for this student and session.")
+
+    record = AttendanceRecord(
+        session=session,
+        student=student_profile,
+        recording_method=AttendanceRecord.METHOD_MANUAL_EXCEPTION,
+        recorded_by=lecturer_profile.user,
+        manual_reason=reason,
+        manual_notes=(notes or "").strip(),
+        recorded_at=moment,
+    )
+    record.full_clean()
+    try:
+        with transaction.atomic():
+            record.save()
+    except IntegrityError as exc:
+        raise ValidationError("Attendance has already been recorded for this student and session.") from exc
+    return record
 
 
 QR_TOKEN_TTL_SECONDS = 60

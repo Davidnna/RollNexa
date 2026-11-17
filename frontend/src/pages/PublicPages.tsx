@@ -204,9 +204,9 @@ export function FeaturesPage() {
         { icon: <BookOpen size={22} />, title: "Course management", text: "Maintain the course catalogue, programme-specific offerings and registration rules." },
         { icon: <Users size={22} />, title: "User and role management", text: "Create and manage administrator, lecturer and student accounts with role-based access." },
         { icon: <QrCode size={22} />, title: "QR session verification", text: "Available rotating session QR Codes with short-lived signed tokens, server-side validation and student registration checks. QR verification alone does not record attendance." },
-        { icon: <ScanFace size={22} />, title: "Facial identity verification", text: "Planned facial enrolment and matching as the second required attendance check." },
-        { icon: <FileBarChartIcon />, title: "Attendance reporting", text: "A planned reporting layer for session history, attendance summaries and exports." },
-        { icon: <ShieldCheck size={22} />, title: "Access and audit controls", text: "Enforce permissions on the server and retain important academic and attendance history." },
+        { icon: <ScanFace size={22} />, title: "Facial identity verification", text: "Server-side YuNet face detection and SFace matching with encrypted templates and a randomised head-turn challenge." },
+        { icon: <FileBarChartIcon />, title: "Attendance reporting", text: "Review session history and attendance summaries, with automated dual-verification records distinguished from lecturer-approved manual exceptions." },
+        { icon: <ShieldCheck size={22} />, title: "Consent and alternative attendance", text: "Students can manage biometric consent and use a lecturer-approved manual exception when automated biometric attendance is not suitable." },
     ];
 
     return (
@@ -219,10 +219,10 @@ export function FeaturesPage() {
             <section className="section section-white">
                 <div className="container">
                     <div className="feature-detail-grid">
-                        {features.map((feature, index) => (
+                        {features.map((feature) => (
                             <article className="feature-detail-card" key={feature.title}>
                                 <span className="feature-icon feature-icon-teal">{feature.icon}</span>
-                                <div className="feature-detail-title"><h3>{feature.title}</h3><span className={`status-tag ${index < 5 || index === 7 ? "status-available" : "status-planned"}`}>{index < 5 || index === 7 ? "Available foundation" : "Planned"}</span></div>
+                                <div className="feature-detail-title"><h3>{feature.title}</h3><span className="status-tag status-available">Available in 1.0.0</span></div>
                                 <p>{feature.text}</p>
                             </article>
                         ))}
@@ -232,7 +232,7 @@ export function FeaturesPage() {
             <section className="section section-mist">
                 <div className="container feature-note">
                     <span className="feature-note-icon"><Clock3 size={21} /></span>
-                    <div><strong>Features are introduced in controlled releases.</strong><p>Dynamic QR generation and scanning are available in version 0.9.0. Facial enrolment, facial matching and verified attendance recording remain planned until their implementation and testing are complete.</p></div>
+                    <div><strong>Features are introduced in controlled releases.</strong><p>Version 1.0.0 adds server-side facial enrolment and matching to the existing QR workflow. Automated attendance requires both checks. The current head-turn liveness challenge is a basic safeguard, not a certified anti-spoofing system; students who cannot use biometrics can request a lecturer-approved manual attendance exception.</p></div>
                 </div>
             </section>
         </>
@@ -243,8 +243,8 @@ export function HowItWorksPage() {
     const steps = [
         { number: "01", icon: <CalendarDaysIcon />, title: "A lecturer opens a session", text: "An authorised lecturer creates an attendance session for a course offering they are actively assigned to. The session has a defined start and end time." },
         { number: "02", icon: <QrCode size={23} />, title: "The student verifies session access", text: "The student scans the lecturer's rotating, time-limited QR Code. The server validates the signed token, session status, expiry, lecturer assignment and student course registration. This completes only the first verification stage." },
-        { number: "03", icon: <ScanFace size={23} />, title: "The student verifies identity", text: "The system captures a live face sample and compares it with the student's previously enrolled facial reference, subject to liveness and quality checks." },
-        { number: "04", icon: <CheckCircle2 size={23} />, title: "Attendance is recorded", text: "Only after both checks succeed, in the required order and within the session window, does the server create a present record." },
+        { number: "03", icon: <ScanFace size={23} />, title: "The student verifies identity", text: "The browser captures two frames for a randomised head-turn challenge. Django performs face detection, feature extraction, template matching and the pose-change check on the server." },
+        { number: "04", icon: <CheckCircle2 size={23} />, title: "Attendance is recorded", text: "Only after both checks succeed, in the required order and within the session window, does the server create an automated present record. A lecturer-approved manual exception is recorded separately when biometrics cannot be used." },
     ];
 
     return (
@@ -252,13 +252,13 @@ export function HowItWorksPage() {
             <PageIntro
                 eyebrow="HOW IT WORKS"
                 title="Two independent checks. One attendance decision."
-                description="The agreed RollNexa attendance policy requires successful QR Code verification followed by successful facial identity verification. Neither check is sufficient on its own."
+                description="The automated RollNexa attendance policy requires successful QR Code verification followed by successful server-side facial identity verification. Neither check is sufficient on its own; a manual exception remains available when biometric attendance cannot be used."
             />
             <section className="section section-white">
                 <div className="container">
                     <div className="implementation-note">
                         <Clock3 size={18} />
-                        <span>QR generation and scanning are operational in version 0.9.0. Facial enrolment and recognition remain planned. A successful QR scan is not an attendance record; the second verification stage must also succeed.</span>
+                        <span>Version 1.0.0 implements server-side facial enrolment and matching after QR verification. A successful QR scan alone is not an attendance record. A lecturer-approved manual exception remains available when biometric attendance cannot be used.</span>
                     </div>
                     <div className="process-list">
                         {steps.map((step) => (
@@ -315,16 +315,18 @@ export function ContactPage() {
 export function PrivacyPage() {
     return (
         <>
-            <PageIntro eyebrow="PRIVACY INFORMATION" title="Privacy is part of the system design." description="This overview describes the data categories and safeguards relevant to the current RollNexa platform and its planned attendance capabilities." />
+            <PageIntro eyebrow="PRIVACY INFORMATION" title="Privacy is part of the system design." description="This overview describes the data categories and safeguards relevant to the current RollNexa platform, including server-side biometric verification." />
             <section className="section section-white">
                 <div className="container legal-content">
                     <div className="legal-review-note"><ShieldCheck size={19} /><span>This product overview is not a substitute for an institution-approved privacy notice. Each deploying institution must publish its controller details, lawful basis, retention schedule and contact route before collecting personal or biometric data.</span></div>
                     <h2>Information used by the current platform</h2>
                     <p>The existing platform processes account details, role and institutional profile information, academic structure, course assignments, course registrations, attendance-session administration records and pending QR verification metadata, including a one-way token fingerprint and verification expiry.</p>
-                    <h2>QR verification and planned biometric processing</h2>
-                    <p>The current release uses the browser camera locally to decode the lecturer's QR Code; camera frames are not uploaded to the server. It validates short-lived signed QR tokens and stores a fingerprint of the token with a pending student verification record. It does not store the raw QR token. Facial enrolment and recognition are planned capabilities. The current system does not capture facial images or store biometric templates. Biometric processing must not be enabled until the institution has approved its privacy notice, security controls, retention and deletion rules, access restrictions and an appropriate alternative process.</p>
+                    <h2>QR verification and biometric processing</h2>
+                    <p>The browser camera is used locally to decode the lecturer's QR Code. QR tokens are short-lived and signed; the server stores a token fingerprint rather than the raw token. For facial enrolment and attendance verification, the browser sends camera frames to the same-origin Django backend over HTTPS. The server processes those frames in memory, extracts facial features and compares them with the student's enrolled template. The application stores an encrypted facial feature template and limited verification audit metadata; it does not save the submitted camera frames as image files.</p>
+                    <h2>Consent and alternative attendance</h2>
+                    <p>Students must review the versioned biometric notice and grant consent before facial enrolment. They can withdraw consent through Biometric Settings; withdrawal deletes the stored facial template and expires pending QR verification attempts. Students who do not consent or cannot complete biometric verification may ask their lecturer to record a separately labelled manual attendance exception. The institution must approve the legal basis, privacy notice, retention schedule and alternative procedure before collecting biometric data.</p>
                     <h2>Access and security</h2>
-                    <p>Access to platform functions is role-based and enforced by the Django backend. The platform is designed to use authenticated sessions, CSRF protection and restricted access to institutional records.</p>
+                    <p>Access to platform functions is role-based and enforced by the Django backend. The platform uses authenticated sessions, CSRF protection, encrypted biometric templates and restricted access to institutional records. The biometric encryption key is held in deployment secrets and must be backed up securely.</p>
                     <h2>Institutional responsibility</h2>
                     <p>The institution operating RollNexa is responsible for determining its applicable data-protection obligations, communicating them to users and responding to requests concerning their personal information.</p>
                 </div>
@@ -345,9 +347,9 @@ export function TermsPage() {
                     <h2>Permitted use</h2>
                     <p>The platform is intended for institutional academic administration and attendance workflows. Users must not attempt to access records outside their authorised role or interfere with the availability, security or integrity of the service.</p>
                     <h2>Academic and attendance records</h2>
-                    <p>Users must provide accurate information and use attendance functions only for their intended institutional purpose. Attendance is recorded only after the verification requirements configured by the platform are satisfied.</p>
+                    <p>Users must provide accurate information and use attendance functions only for their intended institutional purpose. Automated attendance is recorded only after both QR Code and server-side facial verification succeed. A lecturer-approved manual exception may be recorded when biometric attendance cannot be used; it is labelled separately and attributed to the approving lecturer.</p>
                     <h2>Availability and staged functionality</h2>
-                    <p>RollNexa is released in stages. A feature described on the public website as planned is not necessarily available for operational use. Institutions should rely on the deployed release and its administrator guidance when determining available functionality.</p>
+                    <p>RollNexa is released in stages. Institutions should rely on the deployed release and its administrator guidance when determining available functionality. The current head-turn liveness check is a basic challenge-response heuristic, not a certified presentation-attack-detection system.</p>
                     <h2>Institutional policies</h2>
                     <p>Use of RollNexa remains subject to the institution's applicable academic, information-security, acceptable-use and data-protection policies.</p>
                 </div>

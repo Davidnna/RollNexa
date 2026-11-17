@@ -7,8 +7,8 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 
 from accounts.models import UserProfile
-from attendance.models import AttendanceSession, AttendanceVerification
-from attendance.services import issue_attendance_qr_token, verify_attendance_qr
+from attendance.models import AttendanceRecord, AttendanceSession, AttendanceVerification
+from attendance.services import issue_attendance_qr_token, record_manual_attendance_exception, verify_attendance_qr
 
 from .views import NoCacheAPIView
 
@@ -127,3 +127,78 @@ class AttendanceVerificationStatusView(NoCacheAPIView):
             verification.save(update_fields=["status", "updated_at"])
 
         return Response(_verification_data(verification))
+
+
+class ManualAttendanceRecordsView(NoCacheAPIView):
+    """Allow an assigned lecturer to record a clearly-labelled manual exception."""
+
+    permission_classes = [IsAuthenticated]
+
+    def _session(self, session_id, lecturer_profile):
+        return get_object_or_404(
+            AttendanceSession.objects.select_related(
+                "offering__course",
+                "offering__programme",
+                "offering__semester__session",
+            ).filter(
+                offering__lecturer_assignments__lecturer=lecturer_profile,
+                offering__lecturer_assignments__is_active=True,
+                offering__is_active=True,
+            ).distinct(),
+            pk=session_id,
+        )
+
+    def get(self, request, session_id):
+        lecturer_profile = _profile_for_role(request, UserProfile.ROLE_LECTURER)
+        session = self._session(session_id, lecturer_profile)
+        records = AttendanceRecord.objects.filter(session=session).select_related(
+            "student__user", "recorded_by"
+        ).order_by("-recorded_at")
+        return Response({
+            "session": {
+                "id": session.pk,
+                "courseCode": session.offering.course.code,
+                "courseTitle": session.offering.course.title,
+                "title": session.title or "Attendance session",
+                "status": session.status,
+                "isOpen": session.is_open,
+            },
+            "alreadyRecordedStudentIds": list(records.values_list("student_id", flat=True)),
+            "manualRecords": [
+                {
+                    "id": item.pk,
+                    "studentId": item.student_id,
+                    "studentName": item.student.user.get_full_name() or item.student.user.username,
+                    "institutionalId": item.student.institutional_id,
+                    "reason": item.get_manual_reason_display(),
+                    "notes": item.manual_notes,
+                    "recordedAt": item.recorded_at.isoformat(),
+                }
+                for item in records.filter(recording_method=AttendanceRecord.METHOD_MANUAL_EXCEPTION)
+            ],
+        })
+
+    def post(self, request, session_id):
+        lecturer_profile = _profile_for_role(request, UserProfile.ROLE_LECTURER)
+        session = self._session(session_id, lecturer_profile)
+        try:
+            record = record_manual_attendance_exception(
+                session_id=session.pk,
+                student_id=request.data.get("studentId"),
+                lecturer_profile=lecturer_profile,
+                reason=str(request.data.get("reason", "")).strip(),
+                notes=str(request.data.get("notes", "")),
+            )
+        except ValidationError as exc:
+            return Response({"detail": " ".join(exc.messages), "errors": exc.messages}, status=400)
+        return Response({
+            "detail": "Manual attendance exception recorded and attributed to the approving lecturer.",
+            "record": {
+                "id": record.pk,
+                "studentId": record.student_id,
+                "studentName": record.student.user.get_full_name() or record.student.user.username,
+                "reason": record.get_manual_reason_display(),
+                "recordedAt": record.recorded_at.isoformat(),
+                "recordingMethod": record.recording_method,
+            },
+        }, status=201)

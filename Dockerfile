@@ -23,7 +23,8 @@ RUN python -m pip install --no-cache-dir --upgrade pip \
 COPY . ./
 COPY --from=frontend-builder /app/static/frontend/ ./static/frontend/
 
-RUN DATABASE_URL=postgresql://rollnexa:build-only@127.0.0.1:5432/rollnexa \
+RUN python biometrics/download_models.py \
+    && DATABASE_URL=postgresql://rollnexa:build-only@127.0.0.1:5432/rollnexa \
     python manage.py collectstatic --noinput \
     && addgroup --system rollnexa \
     && adduser --system --ingroup rollnexa rollnexa \

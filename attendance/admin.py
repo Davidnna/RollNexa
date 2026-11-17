@@ -22,10 +22,10 @@ class AttendanceSessionAdmin(admin.ModelAdmin):
 
 @admin.register(AttendanceRecord)
 class AttendanceRecordAdmin(admin.ModelAdmin):
-    list_display = ("student", "session", "qr_verified_at", "face_verified_at", "recorded_at")
-    list_filter = ("session__status", "session__offering__semester__session")
-    search_fields = ("student__user__username", "student__user__first_name", "student__user__last_name", "session__offering__course__code")
-    readonly_fields = ("session", "student", "qr_verified_at", "face_verified_at", "recorded_at")
+    list_display = ("student", "session", "recording_method", "manual_reason", "recorded_by", "recorded_at")
+    list_filter = ("recording_method", "manual_reason", "session__status", "session__offering__semester__session")
+    search_fields = ("student__user__username", "student__user__first_name", "student__user__last_name", "session__offering__course__code", "recorded_by__username")
+    readonly_fields = ("session", "student", "recording_method", "qr_verified_at", "face_verified_at", "recorded_by", "manual_reason", "manual_notes", "recorded_at")
 
     def has_add_permission(self, request):
         return False

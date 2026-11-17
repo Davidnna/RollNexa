@@ -304,13 +304,19 @@ class DashboardSummaryView(NoCacheAPIView):
         )
         offering_ids = registrations.values_list("offering_id", flat=True)
         attendance_records = AttendanceRecord.objects.filter(student=profile)
+        automated_attendance_records = attendance_records.filter(
+            recording_method=AttendanceRecord.METHOD_DUAL_VERIFIED
+        )
+        manual_attendance_records = attendance_records.filter(
+            recording_method=AttendanceRecord.METHOD_MANUAL_EXCEPTION
+        )
         current_time = timezone.now()
 
         return {
             "role": UserProfile.ROLE_STUDENT,
             "cards": [
                 {"key": "registeredCourses", "label": "Registered courses", "value": registrations.count(), "description": "Your active course registrations"},
-                {"key": "attendanceRecords", "label": "Attendance records", "value": attendance_records.count(), "description": "Verified attendance entries"},
+                {"key": "attendanceRecords", "label": "Attendance records", "value": attendance_records.count(), "description": "Automated and approved manual entries"},
                 {"key": "availableSessions", "label": "Available sessions", "value": AttendanceSession.objects.filter(
                     offering_id__in=offering_ids,
                     status=AttendanceSession.STATUS_ACTIVE,
@@ -319,7 +325,9 @@ class DashboardSummaryView(NoCacheAPIView):
                 ).count(), "description": "Active sessions for your courses"},
             ],
             "attendance": {
-                "verifiedRecords": attendance_records.count(),
+                "presentRecords": attendance_records.count(),
+                "verifiedRecords": automated_attendance_records.count(),
+                "manualExceptions": manual_attendance_records.count(),
             },
             "courses": [
                 {

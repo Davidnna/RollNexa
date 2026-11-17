@@ -105,7 +105,7 @@ export function AttendanceQRPage() {
                     <h1>Live attendance QR Code</h1>
                     <p>Display this rotating code for students registered in the selected course offering.</p>
                 </div>
-                <span className="release-chip"><span /> ROLLNEXA 0.9.1</span>
+                <span className="release-chip"><span /> ROLLNEXA 1.0.0</span>
             </div>
 
             <Link to="/app/attendance" className="attendance-back-link"><ArrowLeft size={16} /> Back to attendance sessions</Link>
@@ -313,7 +313,7 @@ export function AttendanceScanPage() {
                     <h1>Scan attendance QR Code</h1>
                     <p>Scan the current code displayed by your lecturer to complete the first verification stage.</p>
                 </div>
-                <span className="release-chip"><span /> ROLLNEXA 0.9.1</span>
+                <span className="release-chip"><span /> ROLLNEXA 1.0.0</span>
             </div>
             <Link to="/app/attendance" className="attendance-back-link"><ArrowLeft size={16} /> Back to attendance</Link>
 
@@ -329,8 +329,9 @@ export function AttendanceScanPage() {
                         <p>Facial recognition must also verify your identity. RollNexa will only create a present record after both checks succeed. Your QR verification is valid until {new Date(verification.expiresAt).toLocaleTimeString()}.</p>
                     </div>
                     <div className="attendance-result-actions">
+                        <Link to={`/app/attendance/face-check/${verification.verificationId}`} className="button button-primary"><ShieldCheck size={15} /> Continue to facial verification</Link>
                         <Link to="/app/history" className="button button-outline">View attendance history</Link>
-                        <button type="button" className="button button-primary" onClick={() => { verificationMutation.reset(); processingRef.current = false; cameraRequestedRef.current = true; setScannerEnabled(true); }}>Scan another code</button>
+                        <button type="button" className="button button-outline" onClick={() => { verificationMutation.reset(); processingRef.current = false; cameraRequestedRef.current = true; setScannerEnabled(true); }}>Scan another code</button>
                     </div>
                 </section>
             ) : (

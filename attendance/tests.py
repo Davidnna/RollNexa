@@ -32,6 +32,7 @@ from .services import (
     create_attendance_session,
     issue_attendance_qr_token,
     record_verified_attendance,
+    record_manual_attendance_exception,
     verify_attendance_qr,
 )
 
@@ -624,3 +625,94 @@ class AttendanceManagementTests(TestCase):
             )
         self.assertEqual(response.status_code, 400)
         self.assertEqual(AttendanceVerification.objects.count(), 0)
+
+
+    def test_lecturer_can_record_manual_attendance_exception_for_registered_student(self):
+        session = self._active_session()
+        record = record_manual_attendance_exception(
+            session_id=session.pk,
+            student_id=self.student.pk,
+            lecturer_profile=self.lecturer,
+            reason=AttendanceRecord.MANUAL_REASON_CONSENT_WITHDRAWN,
+        )
+        self.assertEqual(record.recording_method, AttendanceRecord.METHOD_MANUAL_EXCEPTION)
+        self.assertIsNone(record.qr_verified_at)
+        self.assertIsNone(record.face_verified_at)
+        self.assertEqual(record.recorded_by, self.lecturer_user)
+        self.assertEqual(AttendanceRecord.objects.filter(session=session, student=self.student).count(), 1)
+
+    def test_manual_attendance_exception_requires_assigned_lecturer(self):
+        session = self._active_session()
+        other_user = User.objects.create_user(
+            username="manual_other_lecturer",
+            email="manual_other_lecturer@example.test",
+            password="StrongTestPassword!2026",
+        )
+        other_user.profile.role = UserProfile.ROLE_LECTURER
+        other_user.profile.save(update_fields=["role", "updated_at"])
+        with self.assertRaises(ValidationError):
+            record_manual_attendance_exception(
+                session_id=session.pk,
+                student_id=self.student.pk,
+                lecturer_profile=other_user.profile,
+                reason=AttendanceRecord.MANUAL_REASON_CAMERA_UNAVAILABLE,
+            )
+        self.assertEqual(AttendanceRecord.objects.count(), 0)
+
+    def test_manual_attendance_other_reason_requires_notes(self):
+        session = self._active_session()
+        with self.assertRaises(ValidationError):
+            record_manual_attendance_exception(
+                session_id=session.pk,
+                student_id=self.student.pk,
+                lecturer_profile=self.lecturer,
+                reason=AttendanceRecord.MANUAL_REASON_OTHER,
+            )
+        self.assertEqual(AttendanceRecord.objects.count(), 0)
+
+    def test_manual_attendance_exception_cannot_be_recorded_after_session_closes(self):
+        session = self._active_session()
+        close_attendance_session(
+            session_id=session.pk,
+            lecturer_profile=self.lecturer,
+            at=self.now + timedelta(minutes=1),
+        )
+        with self.assertRaises(ValidationError):
+            record_manual_attendance_exception(
+                session_id=session.pk,
+                student_id=self.student.pk,
+                lecturer_profile=self.lecturer,
+                reason=AttendanceRecord.MANUAL_REASON_TECHNICAL_ISSUE,
+                recorded_at=self.now + timedelta(minutes=2),
+            )
+
+    def test_manual_attendance_api_is_lecturer_scoped_and_returns_audit_records(self):
+        session = self._active_session()
+        self.client.force_login(self.lecturer_user)
+        create_response = self.client.post(
+            reverse("api_attendance_manual_records", kwargs={"session_id": session.pk}),
+            data=json.dumps({
+                "studentId": self.student.pk,
+                "reason": AttendanceRecord.MANUAL_REASON_CAMERA_UNAVAILABLE,
+                "notes": "Student camera permission was unavailable.",
+            }),
+            content_type="application/json",
+        )
+        self.assertEqual(create_response.status_code, 201)
+        list_response = self.client.get(
+            reverse("api_attendance_manual_records", kwargs={"session_id": session.pk})
+        )
+        self.assertEqual(list_response.status_code, 200)
+        self.assertEqual(list_response.json()["alreadyRecordedStudentIds"], [self.student.pk])
+        self.assertEqual(len(list_response.json()["manualRecords"]), 1)
+
+    def test_student_cannot_create_manual_attendance_exception(self):
+        session = self._active_session()
+        self.client.force_login(self.student_user)
+        response = self.client.post(
+            reverse("api_attendance_manual_records", kwargs={"session_id": session.pk}),
+            data=json.dumps({"studentId": self.student.pk, "reason": "camera_unavailable"}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(AttendanceRecord.objects.count(), 0)

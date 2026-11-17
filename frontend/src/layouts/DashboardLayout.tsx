@@ -14,6 +14,7 @@ import {
     Settings,
     Users,
     QrCode,
+    ScanFace,
     X,
 } from "lucide-react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
@@ -50,6 +51,7 @@ const navigation: Record<string, NavigationItem[]> = {
         { label: "Attendance", to: "/app/attendance", icon: ClipboardCheck },
         { label: "Scan QR Code", to: "/app/attendance/check-in", icon: QrCode },
         { label: "Attendance history", to: "/app/history", icon: CalendarDays },
+        { label: "Biometric settings", to: "/app/biometrics", icon: ScanFace },
         { label: "Profile", to: "/app/profile", icon: Settings },
     ],
 };
@@ -109,7 +111,7 @@ export function DashboardLayout() {
                 <div className="sidebar-bottom">
                     <div className="sidebar-help-card">
                         <span className="help-card-icon"><Activity size={17} /></span>
-                        <strong>RollNexa 0.9.1</strong>
+                        <strong>RollNexa 1.0.0</strong>
                         <p>Manage your academic workflows from one secure workspace.</p>
                     </div>
                     <button className="sidebar-logout" onClick={handleLogout}>

@@ -217,18 +217,18 @@ function getResourceConfig(resource: string, role: string): ResourceConfig {
             readOnly: true,
         },
         "attendance-sessions": {
-            resource, title: "Attendance sessions", description: "Schedule and manage sessions for your assigned course offerings. Display a rotating QR Code for the first verification stage; facial verification remains mandatory before attendance is recorded.", createLabel: "Schedule session",
-            columns: [{ key: "course_code", label: "Course" }, { key: "title", label: "Session title" }, { key: "programme_name", label: "Programme" }, { key: "starts_at", label: "Starts" }, { key: "ends_at", label: "Ends" }, { key: "status", label: "Status" }, { key: "registered_count", label: "Enrolled" }, { key: "qr_verified_count", label: "QR verified" }, { key: "attendance_count", label: "Present" }],
+            resource, title: "Attendance sessions", description: "Schedule and manage sessions for your assigned course offerings. Display a rotating QR Code, review dual-verification attendance and record lecturer-approved manual exceptions where required.", createLabel: "Schedule session",
+            columns: [{ key: "course_code", label: "Course" }, { key: "title", label: "Session title" }, { key: "programme_name", label: "Programme" }, { key: "starts_at", label: "Starts" }, { key: "ends_at", label: "Ends" }, { key: "status", label: "Status" }, { key: "registered_count", label: "Enrolled" }, { key: "qr_verified_count", label: "QR verified" }, { key: "attendance_count", label: "Present" }, { key: "manual_attendance_count", label: "Manual exceptions" }],
             fields: [{ name: "offering", label: "Assigned course offering", type: "select", optionKey: "offerings", required: true }, { name: "title", label: "Session title" }, { name: "starts_at", label: "Starts at", type: "datetime-local", required: true }, { name: "ends_at", label: "Ends at", type: "datetime-local", required: true }, { name: "notes", label: "Lecturer notes", type: "textarea" }],
         },
         "attendance-monitor": {
-            resource, title: "Attendance monitoring", description: "Review attendance session activity across the institution. Verified attendance records are only created after both identity checks succeed.",
-            columns: [{ key: "course_code", label: "Course" }, { key: "title", label: "Session" }, { key: "programme_name", label: "Programme" }, { key: "academic_session", label: "Academic session" }, { key: "starts_at", label: "Starts" }, { key: "status", label: "Status" }, { key: "registered_count", label: "Enrolled" }, { key: "qr_verified_count", label: "QR verified" }, { key: "attendance_count", label: "Present" }],
+            resource, title: "Attendance monitoring", description: "Review institution-wide attendance activity, distinguishing automated dual-verification records from lecturer-approved manual exceptions.",
+            columns: [{ key: "course_code", label: "Course" }, { key: "title", label: "Session" }, { key: "programme_name", label: "Programme" }, { key: "academic_session", label: "Academic session" }, { key: "starts_at", label: "Starts" }, { key: "status", label: "Status" }, { key: "registered_count", label: "Enrolled" }, { key: "qr_verified_count", label: "QR verified" }, { key: "attendance_count", label: "Present" }, { key: "manual_attendance_count", label: "Manual exceptions" }],
             readOnly: true,
         },
         "attendance-history": {
-            resource, title: "Attendance history", description: "Review attendance entries created only after successful QR Code and facial verification.",
-            columns: [{ key: "course_code", label: "Course" }, { key: "course_title", label: "Course title" }, { key: "session_title", label: "Session" }, { key: "academic_session", label: "Academic session" }, { key: "recorded_at", label: "Recorded at" }],
+            resource, title: "Attendance history", description: "Review your attendance history, including automated dual-verification records and clearly labelled lecturer-approved manual exceptions.",
+            columns: [{ key: "course_code", label: "Course" }, { key: "course_title", label: "Course title" }, { key: "session_title", label: "Session" }, { key: "academic_session", label: "Academic session" }, { key: "recorded_at", label: "Recorded at" }, { key: "recording_method", label: "Method" }, { key: "manual_reason", label: "Manual reason" }],
             readOnly: true,
         },
     };
@@ -238,6 +238,8 @@ function getResourceConfig(resource: string, role: string): ResourceConfig {
 }
 
 function formatCell(value: unknown, key: string): string {
+    if (key === "recording_method" && value === "dual_verified") return "QR + facial verification";
+    if (key === "recording_method" && value === "manual_exception") return "Manual exception";
     if (typeof value === "boolean") {
         if (key === "is_active") return value ? "Active" : "Inactive";
         if (key === "is_current") return value ? "Current" : "—";
@@ -825,6 +827,7 @@ function ResourceWorkspace({
             }
             if (item.status === "active") {
                 actions.push({ label: "Display QR", action: "qr" });
+                actions.push({ label: "Manual attendance", action: "manual" });
                 actions.push({ label: "Close", action: "close" });
             }
         }
@@ -846,6 +849,10 @@ function ResourceWorkspace({
             navigate(`/app/attendance/sessions/${Number(item.id)}/qr`);
             return;
         }
+        if (action === "manual") {
+            navigate(`/app/attendance/sessions/${Number(item.id)}/manual`);
+            return;
+        }
         const labels: Record<string, string> = {
             toggle: "change this record's active status",
             "set-current": "make this the current academic period",
@@ -855,6 +862,7 @@ function ResourceWorkspace({
             activate: "activate this attendance session",
             close: "close this attendance session",
             cancel: "cancel this attendance session",
+            manual: "record a lecturer-approved manual attendance exception",
         };
         if (!window.confirm(`Are you sure you want to ${labels[action] ?? action}?`)) return;
         await runAction(item, action);
@@ -1013,7 +1021,9 @@ function ReportsWorkspace() {
     const role = data?.role ?? "";
     const metrics = [
         { label: "Attendance sessions", value: data?.attendance.sessions ?? 0 },
-        { label: "Verified attendance records", value: data?.attendance.verifiedRecords ?? 0 },
+        { label: "Present records", value: data?.attendance.presentRecords ?? data?.attendance.verifiedRecords ?? 0 },
+        { label: "Automated dual-verification", value: data?.attendance.verifiedRecords ?? 0 },
+        { label: "Manual exceptions", value: data?.attendance.manualExceptions ?? 0 },
         { label: "Scheduled sessions", value: data?.attendance.scheduled ?? 0 },
         { label: "Closed sessions", value: data?.attendance.closed ?? 0 },
     ];
@@ -1024,7 +1034,7 @@ function ReportsWorkspace() {
                     <div className="workspace-metric-grid">{metrics.map((metric) => <article className="workspace-metric-card" key={metric.label}><span>{metric.label}</span><strong>{metric.value.toLocaleString()}</strong></article>)}</div>
                     {data?.academic && <section className="workspace-table-card workspace-report-card"><div className="workspace-table-heading"><div><strong>Academic overview</strong><span>Current platform records</span></div></div><div className="workspace-report-stats">{Object.entries(data.academic).map(([key, value]) => <div key={key}><strong>{value.toLocaleString()}</strong><span>{key.replace(/([A-Z])/g, " $1").replace(/^./, (letter) => letter.toUpperCase())}</span></div>)}</div></section>}
                     {data?.notice && <div className="workspace-alert workspace-alert-warning"><AlertCircle size={17} />{data.notice}</div>}
-                    <div className="workspace-table-card"><div className="workspace-table-heading"><div><strong>Recent attendance sessions</strong><span>Latest sessions in your authorised scope</span></div></div>{data?.recentSessions.length ? <div className="workspace-table-scroll"><table className="workspace-data-table"><thead><tr><th>Course</th><th>Session</th><th>Academic session</th><th>Starts</th><th>Status</th><th>Enrolled</th><th>Present</th></tr></thead><tbody>{data.recentSessions.map((item) => <tr key={String(item.id)}><td><strong>{String(item.course_code)}</strong><small className="workspace-cell-subtitle">{String(item.course_title)}</small></td><td>{String(item.title || "Attendance session")}</td><td>{String(item.academic_session)}</td><td>{formatCell(item.starts_at, "starts_at")}</td><td><span className="workspace-status">{String(item.status)}</span></td><td>{String(item.registered_count)}</td><td>{String(item.attendance_count)}</td></tr>)}</tbody></table></div> : <div className="workspace-empty"><ClipboardList size={24} /><strong>No attendance sessions yet</strong><p>Session activity will appear here as lecturers schedule classes.</p></div>}</div>
+                    <div className="workspace-table-card"><div className="workspace-table-heading"><div><strong>Recent attendance sessions</strong><span>Latest sessions in your authorised scope</span></div></div>{data?.recentSessions.length ? <div className="workspace-table-scroll"><table className="workspace-data-table"><thead><tr><th>Course</th><th>Session</th><th>Academic session</th><th>Starts</th><th>Status</th><th>Enrolled</th><th>Present</th><th>Manual</th></tr></thead><tbody>{data.recentSessions.map((item) => <tr key={String(item.id)}><td><strong>{String(item.course_code)}</strong><small className="workspace-cell-subtitle">{String(item.course_title)}</small></td><td>{String(item.title || "Attendance session")}</td><td>{String(item.academic_session)}</td><td>{formatCell(item.starts_at, "starts_at")}</td><td><span className="workspace-status">{String(item.status)}</span></td><td>{String(item.registered_count)}</td><td>{String(item.attendance_count)}</td><td>{String(item.manual_attendance_count ?? 0)}</td></tr>)}</tbody></table></div> : <div className="workspace-empty"><ClipboardList size={24} /><strong>No attendance sessions yet</strong><p>Session activity will appear here as lecturers schedule classes.</p></div>}</div>
                 </>
             )}
             <p className="workspace-report-footnote">{role === "admin" ? "Administrative report figures are derived from the current academic and attendance records." : "Report data is restricted to your active teaching assignments."}</p>
@@ -1115,7 +1125,7 @@ export function WorkspacePage() {
     const showTabs = section === "academic" || (section === "courses" && role === "admin");
     const pageTitle = section === "attendance" && role === "student" ? "Attendance check-in" : config.title;
     const pageDescription = section === "attendance" && role === "student"
-        ? "Scan your lecturer's current session QR Code. Facial verification remains mandatory before attendance is recorded."
+        ? "Scan your lecturer's current session QR Code, then complete server-side facial verification. If you cannot use biometrics, ask your lecturer about the manual attendance alternative."
         : config.description;
 
     if (section === "reports") {
@@ -1128,7 +1138,7 @@ export function WorkspacePage() {
         return <div className="dashboard-page workspace-page"><PageHeading title="Class rosters" description="Select an assigned course offering to view its currently registered students." /><RosterWorkspace /></div>;
     }
     if (section === "attendance" && role === "student") {
-        return <div className="dashboard-page workspace-page"><PageHeading title={pageTitle} description={pageDescription} /><div className="workspace-feature-notice"><span><ShieldCheck size={26} /></span><h2>Two-stage verification is required</h2><p>Scan the QR Code displayed by your lecturer to complete the first stage. Facial recognition must also succeed before RollNexa records attendance. QR verification alone never creates a present record.</p><Link className="button button-primary" to="/app/attendance/check-in">Scan QR Code <ArrowRight size={16} /></Link><span className="workspace-coming-soon">Facial verification will be introduced in the next release.</span></div></div>;
+        return <div className="dashboard-page workspace-page"><PageHeading title={pageTitle} description={pageDescription} /><div className="workspace-feature-notice"><span><ShieldCheck size={26} /></span><h2>Two-stage verification is required</h2><p>Scan the QR Code displayed by your lecturer, then complete server-side facial verification. QR verification alone never creates an automated present record. A lecturer-approved manual exception is available when biometric attendance cannot be used.</p><Link className="button button-primary" to="/app/attendance/check-in">Scan QR Code <ArrowRight size={16} /></Link><Link className="workspace-coming-soon" to="/app/biometrics">Manage biometric consent and facial enrolment</Link></div></div>;
     }
 
     return (
@@ -1168,5 +1178,5 @@ export function WorkspacePage() {
 }
 
 function PageHeading({ title, description }: { title: string; description: string }) {
-    return <div className="dashboard-page-heading workspace-page-heading"><div><span className="eyebrow">ROLLNEXA WORKSPACE</span><h1>{title}</h1><p>{description}</p></div><span className="release-chip"><span /> ROLLNEXA 0.9.1</span></div>;
+    return <div className="dashboard-page-heading workspace-page-heading"><div><span className="eyebrow">ROLLNEXA WORKSPACE</span><h1>{title}</h1><p>{description}</p></div><span className="release-chip"><span /> ROLLNEXA 1.0.0</span></div>;
 }

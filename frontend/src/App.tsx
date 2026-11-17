@@ -7,6 +7,8 @@ import { PublicLayout } from "./layouts/PublicLayout";
 import { DashboardHome, PasswordChangePage, ProtectedRoute } from "./pages/DashboardPages";
 import { WorkspacePage } from "./pages/WorkspacePage";
 import { AttendanceQRPage, AttendanceScanPage } from "./pages/AttendanceQRPages";
+import { AttendanceFaceCheckPage, BiometricSettingsPage } from "./pages/BiometricPages";
+import { ManualAttendancePage } from "./pages/ManualAttendancePage";
 import { LoginPage } from "./pages/LoginPage";
 import {
     AboutPage,
@@ -70,7 +72,10 @@ export default function App() {
                             <Route path="rosters" element={<WorkspacePage />} />
                             <Route path="attendance" element={<WorkspacePage />} />
                             <Route path="attendance/check-in" element={<AttendanceScanPage />} />
+                            <Route path="attendance/face-check/:verificationId" element={<AttendanceFaceCheckPage />} />
                             <Route path="attendance/sessions/:sessionId/qr" element={<AttendanceQRPage />} />
+                            <Route path="attendance/sessions/:sessionId/manual" element={<ManualAttendancePage />} />
+                            <Route path="biometrics" element={<BiometricSettingsPage />} />
                             <Route path="history" element={<WorkspacePage />} />
                             <Route path="reports" element={<WorkspacePage />} />
                             <Route path="settings" element={<WorkspacePage />} />

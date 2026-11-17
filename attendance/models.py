@@ -200,7 +200,27 @@ class AttendanceSession(models.Model):
 
 
 class AttendanceRecord(models.Model):
-    """A present record created only after both required checks succeed."""
+    METHOD_DUAL_VERIFIED = "dual_verified"
+    METHOD_MANUAL_EXCEPTION = "manual_exception"
+    METHOD_CHOICES = [
+        (METHOD_DUAL_VERIFIED, "QR and facial verification"),
+        (METHOD_MANUAL_EXCEPTION, "Lecturer-approved manual exception"),
+    ]
+
+    MANUAL_REASON_CONSENT_WITHDRAWN = "consent_withdrawn"
+    MANUAL_REASON_CAMERA_UNAVAILABLE = "camera_unavailable"
+    MANUAL_REASON_ACCESSIBILITY = "accessibility"
+    MANUAL_REASON_RECOGNITION_FAILED = "recognition_failed"
+    MANUAL_REASON_TECHNICAL_ISSUE = "technical_issue"
+    MANUAL_REASON_OTHER = "other"
+    MANUAL_REASON_CHOICES = [
+        (MANUAL_REASON_CONSENT_WITHDRAWN, "Biometric consent not given or withdrawn"),
+        (MANUAL_REASON_CAMERA_UNAVAILABLE, "Camera unavailable"),
+        (MANUAL_REASON_ACCESSIBILITY, "Accessibility accommodation"),
+        (MANUAL_REASON_RECOGNITION_FAILED, "Facial verification unsuccessful"),
+        (MANUAL_REASON_TECHNICAL_ISSUE, "Technical issue"),
+        (MANUAL_REASON_OTHER, "Other approved reason"),
+    ]
 
     session = models.ForeignKey(
         AttendanceSession,
@@ -212,8 +232,27 @@ class AttendanceRecord(models.Model):
         on_delete=models.PROTECT,
         related_name="attendance_records",
     )
-    qr_verified_at = models.DateTimeField()
-    face_verified_at = models.DateTimeField()
+    recording_method = models.CharField(
+        max_length=24,
+        choices=METHOD_CHOICES,
+        default=METHOD_DUAL_VERIFIED,
+        db_index=True,
+    )
+    qr_verified_at = models.DateTimeField(null=True, blank=True)
+    face_verified_at = models.DateTimeField(null=True, blank=True)
+    recorded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="manual_attendance_records",
+    )
+    manual_reason = models.CharField(
+        max_length=32,
+        choices=MANUAL_REASON_CHOICES,
+        blank=True,
+    )
+    manual_notes = models.TextField(blank=True)
     recorded_at = models.DateTimeField(default=timezone.now, db_index=True)
 
     class Meta:
@@ -224,15 +263,35 @@ class AttendanceRecord(models.Model):
                 name="uniq_attendance_record_per_student_session",
             ),
             models.CheckConstraint(
-                condition=Q(qr_verified_at__lte=F("recorded_at")),
+                condition=(
+                    Q(
+                        recording_method="dual_verified",
+                        qr_verified_at__isnull=False,
+                        face_verified_at__isnull=False,
+                        recorded_by__isnull=True,
+                        manual_reason="",
+                        manual_notes="",
+                    )
+                    | Q(
+                        recording_method="manual_exception",
+                        qr_verified_at__isnull=True,
+                        face_verified_at__isnull=True,
+                        recorded_by__isnull=False,
+                        manual_reason__in=[choice[0] for choice in MANUAL_REASON_CHOICES],
+                    )
+                ),
+                name="att_record_method_valid",
+            ),
+            models.CheckConstraint(
+                condition=Q(recording_method="manual_exception") | Q(qr_verified_at__lte=F("recorded_at")),
                 name="att_qr_before_recorded",
             ),
             models.CheckConstraint(
-                condition=Q(face_verified_at__lte=F("recorded_at")),
+                condition=Q(recording_method="manual_exception") | Q(face_verified_at__lte=F("recorded_at")),
                 name="att_face_before_recorded",
             ),
             models.CheckConstraint(
-                condition=Q(face_verified_at__gte=F("qr_verified_at")),
+                condition=Q(recording_method="manual_exception") | Q(face_verified_at__gte=F("qr_verified_at")),
                 name="att_face_after_qr",
             ),
         ]
@@ -242,11 +301,11 @@ class AttendanceRecord(models.Model):
 
     def clean(self):
         super().clean()
+        from accounts.models import UserProfile
+
         errors = {}
 
         if self.student_id:
-            from accounts.models import UserProfile
-
             if self.student.role != UserProfile.ROLE_STUDENT:
                 errors["student"] = "Only student accounts can have attendance records."
             elif not self.student.user.is_active:
@@ -257,14 +316,45 @@ class AttendanceRecord(models.Model):
                 errors["session"] = "Attendance can only be recorded for an active session."
             if self.recorded_at and not self.session.is_open_at(self.recorded_at):
                 errors["recorded_at"] = "The attendance record must fall within the active session window."
-            for field_name in ("qr_verified_at", "face_verified_at"):
-                verified_at = getattr(self, field_name)
-                if verified_at and not (self.session.starts_at <= verified_at < self.session.ends_at):
-                    errors[field_name] = "Verification must occur within the attendance session window."
-                if verified_at and self.recorded_at and verified_at > self.recorded_at:
-                    errors[field_name] = "Verification cannot occur after the attendance record is recorded."
-            if self.qr_verified_at and self.face_verified_at and self.face_verified_at < self.qr_verified_at:
-                errors["face_verified_at"] = "Facial verification must occur after QR Code verification."
+
+            if self.recording_method == self.METHOD_DUAL_VERIFIED:
+                if not self.qr_verified_at or not self.face_verified_at:
+                    errors["recording_method"] = "Both QR Code and facial verification timestamps are required."
+                if self.recorded_by_id or self.manual_reason or self.manual_notes:
+                    errors["recording_method"] = "Automated attendance cannot contain manual-exception details."
+                for field_name in ("qr_verified_at", "face_verified_at"):
+                    verified_at = getattr(self, field_name)
+                    if verified_at and not (self.session.starts_at <= verified_at < self.session.ends_at):
+                        errors[field_name] = "Verification must occur within the attendance session window."
+                    if verified_at and self.recorded_at and verified_at > self.recorded_at:
+                        errors[field_name] = "Verification cannot occur after the attendance record is recorded."
+                if self.qr_verified_at and self.face_verified_at and self.face_verified_at < self.qr_verified_at:
+                    errors["face_verified_at"] = "Facial verification must occur after QR Code verification."
+            elif self.recording_method == self.METHOD_MANUAL_EXCEPTION:
+                if self.qr_verified_at or self.face_verified_at:
+                    errors["recording_method"] = "Manual attendance exceptions must not claim automated verification timestamps."
+                if not self.recorded_by_id:
+                    errors["recorded_by"] = "A lecturer must approve a manual attendance exception."
+                if self.manual_reason not in dict(self.MANUAL_REASON_CHOICES):
+                    errors["manual_reason"] = "Select a valid reason for the manual attendance exception."
+                if self.manual_reason == self.MANUAL_REASON_OTHER and not self.manual_notes.strip():
+                    errors["manual_notes"] = "Provide a reason when selecting Other."
+                if self.recorded_by_id:
+                    from academics.models import CourseLecturerAssignment
+
+                    lecturer_profile = UserProfile.objects.filter(
+                        user_id=self.recorded_by_id,
+                        role=UserProfile.ROLE_LECTURER,
+                        user__is_active=True,
+                    ).first()
+                    if not lecturer_profile or not CourseLecturerAssignment.objects.filter(
+                        offering_id=self.session.offering_id,
+                        lecturer=lecturer_profile,
+                        is_active=True,
+                    ).exists():
+                        errors["recorded_by"] = "Only an active lecturer assigned to this course can approve the exception."
+            else:
+                errors["recording_method"] = "Select a valid attendance recording method."
 
             if self.student_id and not errors.get("student"):
                 from academics.models import CourseRegistration
@@ -285,7 +375,8 @@ class AttendanceRecord(models.Model):
             raise ValidationError(errors)
 
     def __str__(self):
-        return f"{self.student.user.get_username()} — {self.session}"
+        method = "manual exception" if self.recording_method == self.METHOD_MANUAL_EXCEPTION else "dual verified"
+        return f"{self.student.user.get_username()} — {self.session} ({method})"
 
 
 class AttendanceVerification(models.Model):

@@ -47,7 +47,9 @@ interface DashboardSummary {
         academicSession: string;
     }>;
     attendance?: {
+        presentRecords: number;
         verifiedRecords: number;
+        manualExceptions: number;
     };
 }
 
@@ -68,7 +70,7 @@ export function DashboardHome() {
                     <h1>Good day, {greetingName}.</h1>
                     <p>Here is an overview of the information available to your account.</p>
                 </div>
-                <span className="release-chip"><span /> ROLLNEXA 0.9.1</span>
+                <span className="release-chip"><span /> ROLLNEXA 1.0.0</span>
             </div>
 
             {summaryQuery.isLoading && <div className="dashboard-loading"><span className="loading-spinner" /> Loading your workspace summary…</div>}
@@ -152,7 +154,7 @@ export function DashboardHome() {
                     {summaryQuery.data.attendance && (
                         <section className="dashboard-panel student-attendance-panel">
                             <div className="student-attendance-icon"><CheckCircle2 size={23} /></div>
-                            <div><span className="eyebrow">ATTENDANCE RECORDS</span><h2>{summaryQuery.data.attendance.verifiedRecords} verified attendance records</h2><p>Your verified attendance entries appear in the Attendance History workspace.</p></div>
+                            <div><span className="eyebrow">ATTENDANCE RECORDS</span><h2>{summaryQuery.data.attendance.presentRecords} attendance entries</h2><p>{summaryQuery.data.attendance.verifiedRecords} automated dual-verification records and {summaryQuery.data.attendance.manualExceptions} lecturer-approved manual exceptions. Both appear separately in your attendance history.</p></div>
                         </section>
                     )}
                 </>

@@ -322,6 +322,12 @@ def _attendance_session_data(item):
             status="qr_verified", expires_at__gt=timezone.now()
         ).count(),
         "attendance_count": item.records.count(),
+        "automated_attendance_count": item.records.filter(
+            recording_method=AttendanceRecord.METHOD_DUAL_VERIFIED
+        ).count(),
+        "manual_attendance_count": item.records.filter(
+            recording_method=AttendanceRecord.METHOD_MANUAL_EXCEPTION
+        ).count(),
         "created_at": item.created_at.isoformat(),
         "notes": item.notes,
     }
@@ -355,8 +361,10 @@ def _record_data(item):
         "academic_session": item.session.offering.semester.session.name,
         "semester_name": item.session.offering.semester.get_name_display(),
         "recorded_at": item.recorded_at.isoformat(),
-        "qr_verified_at": item.qr_verified_at.isoformat(),
-        "face_verified_at": item.face_verified_at.isoformat(),
+        "qr_verified_at": item.qr_verified_at.isoformat() if item.qr_verified_at else None,
+        "face_verified_at": item.face_verified_at.isoformat() if item.face_verified_at else None,
+        "recording_method": item.recording_method,
+        "manual_reason": item.get_manual_reason_display() if item.manual_reason else "",
         "student_name": item.student.user.get_full_name() or item.student.user.username,
         "student_id": item.student.institutional_id,
     }
@@ -1355,11 +1363,19 @@ class ReportsView(NoCacheAPIView):
             _require_roles(request, UserProfile.ROLE_ADMIN)
             total_sessions = AttendanceSession.objects.count()
             records = AttendanceRecord.objects.count()
+            automated_records = AttendanceRecord.objects.filter(
+                recording_method=AttendanceRecord.METHOD_DUAL_VERIFIED
+            ).count()
+            manual_records = AttendanceRecord.objects.filter(
+                recording_method=AttendanceRecord.METHOD_MANUAL_EXCEPTION
+            ).count()
             return Response({
                 "role": role,
                 "attendance": {
                     "sessions": total_sessions,
-                    "verifiedRecords": records,
+                    "presentRecords": records,
+                    "verifiedRecords": automated_records,
+                    "manualExceptions": manual_records,
                     "scheduled": AttendanceSession.objects.filter(status=AttendanceSession.STATUS_SCHEDULED).count(),
                     "active": AttendanceSession.objects.filter(status=AttendanceSession.STATUS_ACTIVE).count(),
                     "closed": AttendanceSession.objects.filter(status=AttendanceSession.STATUS_CLOSED).count(),
@@ -1387,11 +1403,18 @@ class ReportsView(NoCacheAPIView):
                 offering__is_active=True,
             ).values_list("offering_id", flat=True)
             sessions = AttendanceSession.objects.filter(offering_id__in=offering_ids)
+            lecturer_records = AttendanceRecord.objects.filter(session__offering_id__in=offering_ids)
             return Response({
                 "role": role,
                 "attendance": {
                     "sessions": sessions.count(),
-                    "verifiedRecords": AttendanceRecord.objects.filter(session__offering_id__in=offering_ids).count(),
+                    "presentRecords": lecturer_records.count(),
+                    "verifiedRecords": lecturer_records.filter(
+                        recording_method=AttendanceRecord.METHOD_DUAL_VERIFIED
+                    ).count(),
+                    "manualExceptions": lecturer_records.filter(
+                        recording_method=AttendanceRecord.METHOD_MANUAL_EXCEPTION
+                    ).count(),
                     "scheduled": sessions.filter(status=AttendanceSession.STATUS_SCHEDULED).count(),
                     "active": sessions.filter(status=AttendanceSession.STATUS_ACTIVE).count(),
                     "closed": sessions.filter(status=AttendanceSession.STATUS_CLOSED).count(),
@@ -1402,6 +1425,6 @@ class ReportsView(NoCacheAPIView):
                         "offering__course", "offering__programme", "offering__semester__session"
                     ).order_by("-starts_at")[:10]
                 ],
-                "notice": "Attendance records remain empty until facial verification is implemented and both required checks are enabled.",
+                "notice": "Automated attendance requires both QR Code and facial verification. Lecturer-approved manual exceptions are labelled separately and retained in the attendance history.",
             })
         raise PermissionDenied("Reports are not available for this account role.")

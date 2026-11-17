@@ -21,3 +21,4 @@ face_data
 htmlcov
 .pytest_cache
 static/frontend
+biometrics/model_assets/*.onnx

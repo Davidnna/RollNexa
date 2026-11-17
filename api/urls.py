@@ -1,6 +1,7 @@
 from django.urls import path
 
 from . import attendance_views, views, workspace_views
+from biometrics import views as biometric_views
 
 urlpatterns = [
     path("csrf/", views.CsrfTokenView.as_view(), name="api_csrf"),
@@ -12,6 +13,12 @@ urlpatterns = [
     path("attendance/sessions/<int:session_id>/qr/", attendance_views.AttendanceQRView.as_view(), name="api_attendance_qr"),
     path("attendance/verify-qr/", attendance_views.VerifyAttendanceQRView.as_view(), name="api_attendance_verify_qr"),
     path("attendance/verifications/<uuid:verification_id>/", attendance_views.AttendanceVerificationStatusView.as_view(), name="api_attendance_verification_status"),
+    path("attendance/sessions/<int:session_id>/manual-records/", attendance_views.ManualAttendanceRecordsView.as_view(), name="api_attendance_manual_records"),
+    path("biometrics/status/", biometric_views.BiometricStatusView.as_view(), name="api_biometrics_status"),
+    path("biometrics/consent/", biometric_views.BiometricConsentView.as_view(), name="api_biometrics_consent"),
+    path("biometrics/enrolment/", biometric_views.FaceEnrollmentView.as_view(), name="api_biometrics_enrolment"),
+    path("biometrics/verifications/<uuid:verification_id>/challenge/", biometric_views.FaceChallengeView.as_view(), name="api_biometrics_challenge"),
+    path("biometrics/verifications/<uuid:verification_id>/verify/", biometric_views.FaceVerificationView.as_view(), name="api_biometrics_verify"),
     path("workspace/profile/", workspace_views.ProfileView.as_view(), name="api_workspace_profile"),
     path("workspace/reports/", workspace_views.ReportsView.as_view(), name="api_workspace_reports"),
     path("workspace/registration-control/", workspace_views.CourseRegistrationControlView.as_view(), name="api_workspace_registration_control"),

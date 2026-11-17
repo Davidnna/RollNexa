@@ -4225,3 +4225,240 @@ button:disabled {
     flex-basis: 100%;
     margin-left: 25px;
 }
+
+.biometric-page {
+    display: grid;
+    gap: 22px;
+}
+
+.biometric-status-card,
+.biometric-panel,
+.biometric-alternative-note {
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: #ffffff;
+    box-shadow: 0 10px 30px rgba(16, 27, 53, 0.045);
+}
+
+.biometric-status-card {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 22px;
+}
+
+.biometric-status-icon {
+    display: grid;
+    width: 52px;
+    height: 52px;
+    flex: 0 0 52px;
+    place-items: center;
+    border-radius: 14px;
+    color: #087f76;
+    background: #e8f7f5;
+}
+
+.biometric-status-copy {
+    min-width: 0;
+    flex: 1;
+}
+
+.biometric-status-copy h2,
+.biometric-panel h2 {
+    margin: 5px 0 7px;
+    color: var(--ink);
+    font-family: Manrope, sans-serif;
+    font-size: 21px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+}
+
+.biometric-status-copy p,
+.biometric-panel > p,
+.biometric-withdraw-row p,
+.biometric-capture-controls p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.7;
+}
+
+.biometric-panel {
+    display: grid;
+    gap: 16px;
+    padding: 26px;
+}
+
+.biometric-panel-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+}
+
+.biometric-policy-list {
+    display: grid;
+    gap: 9px;
+    margin: 0;
+    padding-left: 20px;
+    color: #53617a;
+    font-size: 13px;
+    line-height: 1.7;
+}
+
+.biometric-consent-check {
+    display: flex;
+    align-items: flex-start;
+    gap: 11px;
+    border: 1px solid #dfe8ee;
+    border-radius: 11px;
+    padding: 15px;
+    color: var(--ink-soft);
+    background: #f8fbfc;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.6;
+}
+
+.biometric-consent-check input {
+    width: 17px;
+    height: 17px;
+    flex: 0 0 17px;
+    margin-top: 2px;
+    accent-color: var(--teal);
+}
+
+.biometric-capture-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(250px, 0.85fr);
+    align-items: center;
+    gap: 24px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 18px;
+    background: #f8fafc;
+}
+
+.biometric-camera-frame {
+    overflow: hidden;
+    min-height: 260px;
+    border-radius: 12px;
+    background: #101b35;
+}
+
+.biometric-camera-frame video {
+    display: block;
+    width: 100%;
+    min-height: 260px;
+    max-height: 420px;
+    object-fit: cover;
+    transform: scaleX(-1);
+}
+
+.biometric-capture-controls {
+    display: grid;
+    align-content: center;
+    gap: 12px;
+}
+
+.biometric-capture-controls > strong {
+    color: var(--ink);
+    font-size: 15px;
+}
+
+.biometric-action-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 9px;
+}
+
+.biometric-withdraw-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    border-top: 1px solid var(--line);
+    padding-top: 19px;
+}
+
+.biometric-withdraw-row strong {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--ink);
+    font-size: 13px;
+}
+
+.biometric-alternative-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 17px 19px;
+    color: #087f76;
+    background: #f2fbfa;
+}
+
+.biometric-alternative-note p {
+    margin: 0;
+    color: #53617a;
+    font-size: 12px;
+    line-height: 1.7;
+}
+
+.biometric-alternative-note strong {
+    color: var(--ink);
+}
+
+.manual-attendance-form {
+    display: grid;
+    max-width: 700px;
+    gap: 16px;
+}
+
+.manual-attendance-form .workspace-form-field {
+    display: grid;
+    gap: 7px;
+}
+
+.manual-attendance-form .workspace-form-field > span {
+    color: var(--ink-soft);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.manual-attendance-form select,
+.manual-attendance-form textarea {
+    width: 100%;
+    border: 1px solid #dce4ec;
+    border-radius: 9px;
+    padding: 12px 13px;
+    color: var(--ink);
+    background: #ffffff;
+    font: inherit;
+    font-size: 13px;
+}
+
+.manual-attendance-form textarea {
+    resize: vertical;
+}
+
+.workspace-form-hint {
+    margin: 0;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+@media (max-width: 760px) {
+    .biometric-status-card,
+    .biometric-withdraw-row {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .biometric-capture-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .biometric-panel {
+        padding: 19px;
+    }
+}

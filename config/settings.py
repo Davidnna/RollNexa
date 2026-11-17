@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     "academics.apps.AcademicsConfig",
     "accounts.apps.AccountsConfig",
     "attendance.apps.AttendanceConfig",
+    "biometrics.apps.BiometricsConfig",
     "api.apps.ApiConfig",
 ]
 
@@ -139,6 +140,10 @@ REST_FRAMEWORK = {
         "login": "10/minute",
         "qr_issue": "5/minute",
         "qr_verify": "10/minute",
+        "biometric_consent": "5/hour",
+        "biometric_enrolment": "3/hour",
+        "biometric_challenge": "5/minute",
+        "biometric_verify": "5/minute",
     },
 }
 
@@ -162,3 +167,14 @@ ADMINS = []
 
 # One-time first-administrator setup token; configure only in Render environment settings.
 BOOTSTRAP_ADMIN_TOKEN = os.environ.get("BOOTSTRAP_ADMIN_TOKEN", "")
+
+
+# Biometric processing is fail-closed when the encryption key or model assets are unavailable.
+BIOMETRIC_ENCRYPTION_KEY = os.environ.get("BIOMETRIC_ENCRYPTION_KEY", "")
+BIOMETRIC_ENCRYPTION_KEY_VERSION = os.environ.get("BIOMETRIC_ENCRYPTION_KEY_VERSION", "v1")
+BIOMETRIC_CONSENT_POLICY_VERSION = os.environ.get("BIOMETRIC_CONSENT_POLICY_VERSION", "1.0")
+BIOMETRIC_FACE_MATCH_THRESHOLD = float(os.environ.get("BIOMETRIC_FACE_MATCH_THRESHOLD", "0.363"))
+BIOMETRIC_MODEL_DIR = Path(os.environ.get("BIOMETRIC_MODEL_DIR", str(BASE_DIR / "biometrics" / "model_assets")))
+
+# Biometric uploads are small and are processed in memory; do not spool camera frames to disk.
+FILE_UPLOAD_MAX_MEMORY_SIZE = 8 * 1024 * 1024
