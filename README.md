@@ -1,47 +1,41 @@
-# RollNexa 0.7.0
+# RollNexa 0.8.0
 
 **Attendance, connected.**
 
 RollNexa is an academic administration and smart attendance platform. It connects institutional structure, user accounts, academic sessions, course catalogues, course offerings, lecturer assignments, student registrations and attendance-session management. Its attendance policy requires both QR Code verification and facial identity verification to succeed, in that order, before a present record can be created.
 
-Version 0.7.0 introduces a React and TypeScript frontend, a Django REST API, session-based API authentication, a public website, role-aware dashboard workspaces and a Docker-based deployment build. Existing Django business logic, database records and legacy management screens are retained while the user interface is migrated in stages.
+Version 0.8.0 completes the first React migration of the role-based workspaces. The public website, authenticated React application and Django REST API are served from the same origin. Django remains the source of truth for authentication, authorisation, business rules, validation and database operations.
 
-## 1. Version 0.7.0 scope
+## 1. Version 0.8.0 scope
 
-### Implemented in the backend
+### Platform capabilities
 
-- User authentication and account profiles.
-- System administrator, lecturer and student roles.
-- Faculty, department and programme management.
-- Academic session and semester management.
-- Course catalogue and programme-specific course offerings.
-- Lecturer-course assignments and assignment history.
-- Student course registration and withdrawal.
-- Lecturer class rosters.
-- Attendance-session scheduling, activation, closure and cancellation.
-- Lecturer authorisation for attendance-session management.
-- Student course-registration eligibility checks.
-- An attendance-record model with one record per student per session.
-- A server-side attendance service that requires successful QR and facial verification outcomes, both verification timestamps, and QR verification before facial verification.
+- Public website for Home, About, Features, How It Works, Contact, Privacy and Terms.
+- React 19 and TypeScript authenticated application.
+- Role-specific workspaces for system administrators, lecturers and students.
+- Session-based authentication using existing Django user accounts and CSRF protection.
+- Administrator account management, including account creation, profile updates and account activation or deactivation.
+- Temporary passwords for administrator-created accounts, with mandatory password change at first sign-in.
+- Academic structure management for faculties, departments, programmes, academic sessions and semesters.
+- Current academic session and current semester selection.
+- Course catalogue management and course offering management.
+- Lecturer teaching assignments, revocation and retained assignment history.
+- Student course discovery, registration and withdrawal where registration is open.
+- Lecturer course workspace and registered-student class rosters.
+- Lecturer attendance-session scheduling, activation, closure and cancellation.
+- Administrator attendance-session monitoring.
+- Student verified attendance history.
+- Role-scoped academic and attendance summary reports.
+- Profile updates and password management.
+- Search, status filters, pagination, form validation feedback and responsive workspace layouts.
+- Docker multi-stage build for the React frontend and Django application.
+- Existing Django management views retained during migration as a fallback for workflows not yet represented in React.
 
-### Introduced in version 0.7.0
+### Attendance implementation status
 
-- React 19 and TypeScript frontend, built with Vite.
-- Public pages for Home, About, Features, How It Works, Contact, Privacy and Terms.
-- React sign-in page and role-aware authenticated application shell.
-- Administrator, lecturer and student dashboard navigation.
-- Authenticated dashboard summary endpoint using existing database records.
-- Session status, login, logout and password-change API endpoints.
-- CSRF-protected session authentication using Django's existing user accounts.
-- React Query for API state and React Router for navigation.
-- Docker multi-stage build for the React assets and Django application.
-- Render Blueprint configuration for the Docker runtime.
+The attendance session foundation and lifecycle management are implemented. The server-side verification service requires both successful QR Code and facial verification outcomes, both verification timestamps, and QR verification before facial verification.
 
-### Migration status
-
-Version 0.7.0 establishes the React application and dashboard foundation. Existing Django management screens remain available while their workflows are migrated. Some React workspace sections intentionally direct authorised users to the existing Django screens until the corresponding React modules are completed.
-
-The current release does not generate or scan QR Codes, enrol student faces, capture facial images, perform liveness detection or run a facial-recognition model. Attendance analytics, absence calculation, report exports and student attendance check-in are also not yet operational.
+Version 0.8.0 does **not** generate or scan QR Codes, enrol student faces, capture facial images, perform liveness detection or run a facial-recognition model. Student attendance check-in is therefore not operational. Attendance records are created only through the existing server-side verification service when both verification outcomes are supplied and all session, registration and integrity checks pass. No manual attendance-entry interface is provided.
 
 ## 2. Attendance verification policy
 
@@ -54,17 +48,17 @@ RollNexa uses **QR Code AND Facial Recognition**, not either method independentl
 5. Both verification timestamps must fall within the active session window.
 6. The server records attendance only when both checks succeed and all eligibility and integrity checks pass.
 
-If either verification fails or is missing, no present record is created. QR Code generation, face enrolment, liveness detection and recognition will be introduced in later releases. The 0.7.0 frontend must not imply that these planned verification capabilities are already operational.
+If either verification fails or is missing, no present record is created. QR Code generation, face enrolment, liveness detection and recognition will be introduced in later releases. The frontend must not imply that these planned verification capabilities are already operational.
 
-## 3. User roles
+## 3. User roles and permissions
 
-| Role | Responsibilities |
+| Role | React workspace capabilities |
 | --- | --- |
-| System administrator | Manage user accounts, institutional structure, academic sessions, semesters, course catalogue, course offerings and lecturer assignments; review administrative records. |
-| Lecturer | View assigned course offerings and registered student rosters; schedule, activate, close and cancel attendance sessions for assigned offerings. |
-| Student | View eligible course offerings and manage course registration or withdrawal where registration rules permit. Student attendance check-in is planned for a later release. |
+| System administrator | Manage user accounts, faculties, departments, programmes, academic sessions, semesters, course catalogue, course offerings, lecturer assignments; monitor attendance sessions; review platform reports. |
+| Lecturer | View assigned course offerings, review registered student rosters, schedule attendance sessions, activate or close sessions, review session activity and role-scoped reports. |
+| Student | View eligible course offerings, register or withdraw where registration is open, review verified attendance history and update personal contact details. |
 
-Permissions are enforced by Django views, API permissions and services. Hiding a link in React is not treated as an access-control mechanism.
+The administrator role is represented by Django superuser accounts. Lecturer and student roles are stored on `UserProfile`. Permissions are enforced by Django API views and services. Hiding a link or action in React is not treated as an access-control mechanism.
 
 ## 4. Technology stack
 
@@ -87,13 +81,13 @@ Permissions are enforced by Django views, API permissions and services. Hiding a
 
 ## 5. Application architecture
 
-The React application and Django API are served from the same origin. Django remains the source of truth for authentication, authorisation, validation, academic rules and database operations.
+The React application and Django API are served from the same origin. Django remains responsible for authentication, authorisation, validation, academic rules, attendance rules and database operations.
 
 ```text
 rollnexa/
     accounts/              Authentication, profiles, roles and user management
     academics/             Institutional structure, courses and registration
-    api/                   Versioned REST API and API tests
+    api/                   Versioned REST API, workspace endpoints and API tests
     attendance/            Attendance sessions, records and verification service
     config/                Django settings and URL configuration
     core/                  Health and shared application views
@@ -102,7 +96,7 @@ rollnexa/
             context/       Authentication context
             layouts/       Public and authenticated layouts
             lib/           API client and shared utilities
-            pages/         Public pages and dashboard pages
+            pages/         Public pages, dashboards and workspace modules
     static/                Existing static assets and downloadable datasets
     templates/             Existing Django templates retained during migration
     Dockerfile             Multi-stage frontend and backend image build
@@ -131,18 +125,18 @@ The Privacy and Terms pages are product-level drafts. The institution deploying 
 ### Authenticated application routes
 
 - `/app/` — Role-aware dashboard overview
-- `/app/users/` — Administrator user workspace
-- `/app/academic/` — Administrator academic structure workspace
-- `/app/courses/` — Course workspace
-- `/app/rosters/` — Lecturer roster workspace
-- `/app/attendance/` — Attendance workspace
-- `/app/history/` — Student attendance history workspace
-- `/app/reports/` — Reporting workspace
-- `/app/profile/` — Profile workspace
-- `/app/settings/` — Settings workspace
+- `/app/users/` — Administrator user management
+- `/app/academic/` — Faculties, departments, programmes, academic sessions and semesters
+- `/app/courses/` — Course catalogue, course offerings, teaching assignments, lecturer courses or student course registration according to role
+- `/app/rosters/` — Lecturer class rosters
+- `/app/attendance/` — Lecturer attendance sessions, administrator monitoring or student attendance feature status according to role
+- `/app/history/` — Student verified attendance history
+- `/app/reports/` — Role-scoped academic and attendance summaries
+- `/app/profile/` — Personal profile management
+- `/app/settings/` — Account settings and profile access
 - `/app/password-change/` — Authenticated password change
 
-The dashboard navigation is role-aware. A workspace that has not yet been migrated to React provides a link to its existing Django management screen where one exists.
+The navigation and accessible API resources are scoped to the signed-in role. A student cannot access administrative management endpoints; lecturers cannot access administrator management endpoints or another lecturer's class roster or attendance sessions.
 
 ### API routes
 
@@ -156,6 +150,37 @@ All API endpoints are under `/api/v1/`.
 | POST | `/api/v1/auth/logout/` | End the current Django session. |
 | POST | `/api/v1/auth/password-change/` | Validate and update the authenticated user's password. |
 | GET | `/api/v1/dashboard/summary/` | Return dashboard summary data scoped to the authenticated user's role. |
+| GET, PATCH | `/api/v1/workspace/profile/` | Read or update the authenticated user's permitted profile fields. |
+| GET | `/api/v1/workspace/reports/` | Return administrator or lecturer scoped report summaries. |
+| GET, POST | `/api/v1/workspace/users/` | List users or create a lecturer/student account; administrator only. |
+| GET, PATCH | `/api/v1/workspace/users/{id}/` | Read or update an account; administrator only. |
+| POST | `/api/v1/workspace/users/{id}/toggle/` | Activate or deactivate an account; administrator only. |
+| GET, POST | `/api/v1/workspace/{academic-resource}/` | List or create faculties, departments, programmes, sessions or semesters; administrator only. |
+| GET, PATCH | `/api/v1/workspace/{academic-resource}/{id}/` | Read or update an academic record; administrator only. |
+| POST | `/api/v1/workspace/{academic-resource}/{id}/toggle/` | Activate or deactivate an academic record; administrator only. |
+| POST | `/api/v1/workspace/{sessions-or-semesters}/{id}/set-current/` | Select the current academic session or semester; administrator only. |
+| GET, POST | `/api/v1/workspace/courses/` | List or create course catalogue entries; administrator only. |
+| GET, PATCH | `/api/v1/workspace/courses/{id}/` | Read or update a course; administrator only. |
+| POST | `/api/v1/workspace/courses/{id}/toggle/` | Activate or deactivate a course; administrator only. |
+| GET, POST | `/api/v1/workspace/offerings/` | List or create course offerings; administrator only. |
+| GET, PATCH | `/api/v1/workspace/offerings/{id}/` | Read or update an offering; administrator only. |
+| POST | `/api/v1/workspace/offerings/{id}/toggle/` | Activate or deactivate an offering; administrator only. |
+| POST | `/api/v1/workspace/offerings/{id}/assign/` | Assign a lecturer to an offering; administrator only. |
+| GET, POST | `/api/v1/workspace/assignments/` | List teaching assignments or create an assignment; administrator only. |
+| POST | `/api/v1/workspace/assignments/{id}/revoke/` | Revoke an active assignment and retain its history; administrator only. |
+| GET | `/api/v1/workspace/lecturer-courses/` | List active course offerings assigned to the lecturer. |
+| GET | `/api/v1/workspace/rosters/?offering={id}` | List registered students for an offering assigned to the lecturer. |
+| GET | `/api/v1/workspace/student-courses/` | List offerings matching the student's programme and level. |
+| POST | `/api/v1/workspace/student-courses/{offering-id}/register/` | Register the authenticated student where registration is open. |
+| POST | `/api/v1/workspace/student-courses/{offering-id}/withdraw/` | Withdraw the authenticated student where withdrawal is open. |
+| GET, POST | `/api/v1/workspace/attendance-sessions/` | List or schedule attendance sessions; lecturers can manage only assigned offerings. |
+| POST | `/api/v1/workspace/attendance-sessions/{id}/activate/` | Activate a scheduled attendance session. |
+| POST | `/api/v1/workspace/attendance-sessions/{id}/close/` | Close an active attendance session. |
+| POST | `/api/v1/workspace/attendance-sessions/{id}/cancel/` | Cancel a scheduled attendance session. |
+| GET | `/api/v1/workspace/attendance-monitor/` | Administrator read-only view of institution-wide attendance sessions. |
+| GET | `/api/v1/workspace/attendance-history/` | Return verified attendance records belonging to the authenticated student. |
+
+Workspace list endpoints support pagination using `page` and `page_size`. Applicable list endpoints support text search using `q` and status filtering using `status`. The API returns JSON validation errors for invalid forms and rejects requests from roles outside the resource's permitted scope.
 
 The API uses Django session authentication. Mutating requests must include the CSRF token in the `X-CSRFToken` header. Session cookies are HTTP-only and use `SameSite=Lax`; secure-cookie flags are enabled when `DEBUG` is false. No JWT is stored in browser local storage.
 
@@ -337,7 +362,7 @@ npm run typecheck
 npm run build
 ```
 
-Run these checks before committing a release. Also test login, logout, forced password change, role-based dashboard access and the legacy management routes in a browser.
+Run these checks before committing a release. Also test account creation and deactivation, academic record management, course offerings, lecturer assignments, student registration and withdrawal, class rosters, attendance session lifecycle actions, report scope, profile updates, login, logout and forced password change in a browser.
 
 ## 8. Docker development and deployment
 
@@ -346,20 +371,20 @@ Run these checks before committing a release. Also test login, logout, forced pa
 From the repository root:
 
 ```bash
-docker build -t rollnexa:0.7.0 .
+docker build -t rollnexa:0.8.0 .
 ```
 
 Run the container with the required environment variables configured. Use a local or development PostgreSQL database, not the production database, for local container tests.
 
 ```bash
-docker run --rm -p 8000:8000 --env-file .env rollnexa:0.7.0
+docker run --rm -p 8000:8000 --env-file .env rollnexa:0.8.0
 ```
 
 The container entrypoint applies Django migrations and then starts Gunicorn. If `DIRECT_DATABASE_URL` is configured, migrations use that connection; the running application continues to use `DATABASE_URL`.
 
 ### Render deployment
 
-The `render.yaml` Blueprint changes the existing RollNexa web service configuration to the Docker runtime. The Dockerfile:
+The `render.yaml` Blueprint configures the RollNexa web service to use the Docker runtime. The Dockerfile:
 
 1. Installs frontend dependencies in a Node.js 22 build stage.
 2. Builds the React application into `static/frontend/`.
@@ -368,7 +393,7 @@ The `render.yaml` Blueprint changes the existing RollNexa web service configurat
 5. Runs `collectstatic` during image construction.
 6. Applies database migrations at container startup and launches Gunicorn.
 
-Retain the existing Render service name, repository, branch, region, environment variables and Neon database connection values when synchronising the Blueprint. Confirm the Docker runtime and deployment settings in the Render Blueprint preview before applying the change. Do not create a replacement database, reset migrations or delete production records.
+Retain the existing Render service name, repository, branch, region, environment variables and Neon database connection values when synchronising the Blueprint. Review the Blueprint preview before applying deployment changes. Do not create a replacement database, reset migrations or delete production records.
 
 Required production environment variables:
 
@@ -380,7 +405,7 @@ Required production environment variables:
 
 Configure `ALLOWED_HOSTS` and `CSRF_TRUSTED_ORIGINS` if a custom domain is used. Render's service hostname is added to the trusted host and CSRF origin settings automatically.
 
-After deployment, verify `/healthz`, the public website, login, logout, each role's dashboard summary, password change, the Django administration site and the retained legacy management screens. Review deployment logs and confirm migrations completed successfully.
+After deployment, verify `/healthz`, the public website, sign-in and sign-out, each role's dashboard, user and academic management, course registration, lecturer rosters, attendance session lifecycle actions, reports, profile updates, the Django administration site and the retained legacy management routes. Review deployment logs and confirm migrations completed successfully.
 
 ## 9. Security and privacy requirements
 
@@ -390,9 +415,11 @@ After deployment, verify `/healthz`, the public website, login, logout, each rol
 - Keep session cookies HTTP-only and secure in production.
 - Apply rate limiting to API login attempts.
 - Keep secrets in environment variables and out of Git.
+- Temporary passwords for new accounts must be delivered only to the authorised administrator at account creation and must be changed at first sign-in.
 - Do not expose raw biometric data in URLs, logs or client-side storage.
 - Do not collect or store facial images or biometric templates until institutional privacy, retention, encryption, access-control and deletion requirements are approved and implemented.
 - Preserve academic and attendance history through protected relationships and controlled deactivation.
+- Do not manually create or alter verified attendance records through a dashboard action.
 
 ## 10. Release conventions
 
@@ -405,10 +432,10 @@ Every RollNexa update must follow these project rules:
 5. Extend the existing application. Do not replace working functionality or reset production data without explicit approval.
 6. Each release must include source validation and the relevant backend and frontend test results. Do not describe checks as passed if they were not executed.
 
-### Version 0.7.0 GitHub commit message
+### Version 0.8.0 GitHub commit message
 
 ```text
-Introduce React frontend and Django REST API for RollNexa 0.7.0
+Complete role-based React dashboards and workspace APIs for RollNexa 0.8.0
 ```
 
 ## 11. Development roadmap
@@ -416,8 +443,8 @@ Introduce React frontend and Django REST API for RollNexa 0.7.0
 | Release | Objective |
 | --- | --- |
 | 0.7.0 | React foundation, public website, session-authenticated API and dashboard shell. |
-| 0.8.0 | Complete administrator, lecturer and student dashboards and migrate existing management workflows to React. |
-| 0.9.0 | Secure dynamic QR Code generation, scanning, token expiry and server-side validation. |
-| 1.0.0 | Facial enrolment, facial recognition, liveness safeguards, integrated attendance verification and comprehensive testing. |
+| 0.8.0 | Complete administrator, lecturer and student dashboards and migrate core management workflows to React. |
+| 0.9.0 | Secure dynamic QR Code generation, scanning, token expiry, replay protection and server-side validation. |
+| 1.0.0 | Facial enrolment, facial recognition, liveness safeguards, integrated dual verification and comprehensive testing. |
 
 The roadmap is a development plan. A feature becomes operational only after implementation, testing and deployment in the corresponding release.

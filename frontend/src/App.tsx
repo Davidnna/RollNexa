@@ -4,7 +4,8 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { DashboardLayout } from "./layouts/DashboardLayout";
 import { PublicLayout } from "./layouts/PublicLayout";
-import { DashboardHome, PasswordChangePage, ProtectedRoute, WorkspacePage } from "./pages/DashboardPages";
+import { DashboardHome, PasswordChangePage, ProtectedRoute } from "./pages/DashboardPages";
+import { WorkspacePage } from "./pages/WorkspacePage";
 import { LoginPage } from "./pages/LoginPage";
 import {
     AboutPage,

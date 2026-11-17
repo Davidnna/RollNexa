@@ -219,9 +219,17 @@ def build_import_plan(rows):
                 errors.append(f"Programme {item['name']} conflicts with an existing programme name in {department.name}.")
 
     # Estimate create/update/unchanged counts for the preview.
-    counts = {"faculties_create": 0, "faculties_update": 0, "faculties_unchanged": 0,
-              "departments_create": 0, "departments_update": 0, "departments_unchanged": 0,
-              "programmes_create": 0, "programmes_update": 0, "programmes_unchanged": 0}
+    counts = {
+        "faculties_create": 0,
+        "faculties_update": 0,
+        "faculties_unchanged": 0,
+        "departments_create": 0,
+        "departments_update": 0,
+        "departments_unchanged": 0,
+        "programmes_create": 0,
+        "programmes_update": 0,
+        "programmes_unchanged": 0,
+    }
     for code, item in faculties.items():
         existing = Faculty.objects.filter(code=code).first()
         bucket = "create" if not existing else ("update" if existing.name != item["name"] else "unchanged")
@@ -252,9 +260,14 @@ def build_import_plan(rows):
 
 def apply_import_plan(plan):
     """Apply a validated import atomically. Existing records are updated by their scoped codes."""
-    result = {"faculties_created": 0, "faculties_updated": 0,
-              "departments_created": 0, "departments_updated": 0,
-              "programmes_created": 0, "programmes_updated": 0}
+    result = {
+        "faculties_created": 0,
+        "faculties_updated": 0,
+        "departments_created": 0,
+        "departments_updated": 0,
+        "programmes_created": 0,
+        "programmes_updated": 0,
+    }
     try:
         with transaction.atomic():
             for item in plan["faculties"]:

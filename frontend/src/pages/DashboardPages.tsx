@@ -68,7 +68,7 @@ export function DashboardHome() {
                     <h1>Good day, {greetingName}.</h1>
                     <p>Here is an overview of the information available to your account.</p>
                 </div>
-                <span className="release-chip"><span /> ROLLNEXA 0.7.0</span>
+                <span className="release-chip"><span /> ROLLNEXA 0.8.0</span>
             </div>
 
             {summaryQuery.isLoading && <div className="dashboard-loading"><span className="loading-spinner" /> Loading your workspace summary…</div>}
@@ -152,7 +152,7 @@ export function DashboardHome() {
                     {summaryQuery.data.attendance && (
                         <section className="dashboard-panel student-attendance-panel">
                             <div className="student-attendance-icon"><CheckCircle2 size={23} /></div>
-                            <div><span className="eyebrow">ATTENDANCE RECORDS</span><h2>{summaryQuery.data.attendance.verifiedRecords} verified attendance records</h2><p>Attendance history will be available in your student workspace as the reporting module is introduced.</p></div>
+                            <div><span className="eyebrow">ATTENDANCE RECORDS</span><h2>{summaryQuery.data.attendance.verifiedRecords} verified attendance records</h2><p>Your verified attendance entries appear in the Attendance History workspace.</p></div>
                         </section>
                     )}
                 </>
@@ -160,7 +160,7 @@ export function DashboardHome() {
 
             <section className="dashboard-release-note">
                 <div className="release-note-icon"><GraduationCap size={20} /></div>
-                <div><strong>Your RollNexa workspace is moving to React.</strong><p>The new interface is being introduced in stages. Existing academic management screens remain available while their workflows are migrated.</p></div>
+                <div><strong>Your RollNexa workspace is ready for daily academic operations.</strong><p>Manage academic records, course registration, class rosters and attendance sessions through your role-specific workspace.</p></div>
                 <Link to="/features">Release information <ArrowRight size={15} /></Link>
             </section>
         </div>
@@ -169,66 +169,6 @@ export function DashboardHome() {
 
 function formatLabel(value: string): string {
     return value.replace(/([A-Z])/g, " $1").replace(/^./, (character) => character.toUpperCase());
-}
-
-interface LegacyDestination {
-    title: string;
-    description: string;
-    legacyPath?: string;
-    legacyLabel?: string;
-}
-
-const workspaceDestinations: Record<string, Record<string, LegacyDestination>> = {
-    admin: {
-        users: { title: "User management", description: "Manage student and lecturer accounts, account status and institutional profiles.", legacyPath: "/management/users/", legacyLabel: "Open existing user management" },
-        academic: { title: "Academic structure", description: "Manage faculties, departments, programmes, academic sessions and semesters.", legacyPath: "/management/academic/", legacyLabel: "Open existing academic management" },
-        courses: { title: "Course management", description: "Manage the course catalogue, course offerings, lecturer assignments and registrations.", legacyPath: "/management/courses/", legacyLabel: "Open existing course management" },
-        attendance: { title: "Attendance oversight", description: "The React attendance administration workspace is scheduled for a later migration release." },
-        reports: { title: "Reports and analytics", description: "Institution-wide attendance reports and analytics will be introduced after the attendance verification workflow is operational." },
-        settings: { title: "System settings", description: "Account and platform settings will be migrated into the React workspace in a subsequent release." },
-    },
-    lecturer: {
-        courses: { title: "My courses", description: "Review your active teaching assignments and course offerings.", legacyPath: "/lecturer/courses/", legacyLabel: "Open existing lecturer courses" },
-        rosters: { title: "Class rosters", description: "Review the students registered for your assigned course offerings.", legacyPath: "/lecturer/courses/", legacyLabel: "Open existing class rosters" },
-        attendance: { title: "Attendance sessions", description: "Schedule, activate and manage attendance sessions for your assigned courses.", legacyPath: "/lecturer/attendance/", legacyLabel: "Open existing attendance sessions" },
-        reports: { title: "Attendance reports", description: "Attendance summaries and exports will be introduced after QR and facial verification are integrated." },
-        profile: { title: "My profile", description: "Profile management will be migrated into the React workspace in a subsequent release." },
-    },
-    student: {
-        courses: { title: "My courses", description: "View registered courses and manage course registration where registration is open.", legacyPath: "/student/courses/", legacyLabel: "Open existing student courses" },
-        attendance: { title: "Attendance check-in", description: "Student attendance check-in will be enabled after QR Code and facial verification have both been implemented and tested." },
-        history: { title: "Attendance history", description: "Verified attendance history and attendance summaries will be introduced in a later release." },
-        profile: { title: "My profile", description: "Profile management will be migrated into the React workspace in a subsequent release." },
-    },
-};
-
-export function WorkspacePage() {
-    const { user } = useAuth();
-    const location = useLocation();
-    const section = location.pathname.split("/")[2] ?? "overview";
-    const destination = workspaceDestinations[user?.role ?? "student"]?.[section] ?? {
-        title: "Workspace module",
-        description: "This module is part of the staged RollNexa interface migration.",
-    };
-
-    return (
-        <div className="dashboard-page">
-            <div className="dashboard-page-heading">
-                <div><span className="eyebrow">WORKSPACE MODULE</span><h1>{destination.title}</h1><p>{destination.description}</p></div>
-            </div>
-            <div className="migration-card">
-                <span className="migration-icon"><Activity size={23} /></span>
-                <span className="status-tag status-planned">React migration in progress</span>
-                <h2>This workspace is being introduced in stages.</h2>
-                <p>RollNexa 0.7.0 establishes the React application, secure authentication and dashboard foundation. Existing Django workflows remain available during the migration so that current institutional operations are not interrupted.</p>
-                {destination.legacyPath ? (
-                    <a className="button button-primary" href={destination.legacyPath}>{destination.legacyLabel} <ArrowRight size={16} /></a>
-                ) : (
-                    <Link className="button button-outline" to="/features">Review platform capabilities <ArrowRight size={16} /></Link>
-                )}
-            </div>
-        </div>
-    );
 }
 
 export function PasswordChangePage() {

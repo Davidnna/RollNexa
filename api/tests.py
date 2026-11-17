@@ -165,3 +165,125 @@ class SessionAuthenticationApiTests(TestCase):
 
         self.assertEqual(response.status_code, 403)
         self.assertIn("Change your temporary password", response.data["detail"])
+
+
+class WorkspaceApiPermissionTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.student = User.objects.create_user(
+            username="workspace.student",
+            password="Strong-Test-Password-2026!",
+            first_name="Ada",
+            last_name="Student",
+        )
+        self.student.profile.role = UserProfile.ROLE_STUDENT
+        self.student.profile.save(update_fields=["role", "updated_at"])
+
+        self.lecturer = User.objects.create_user(
+            username="workspace.lecturer",
+            password="Strong-Test-Password-2026!",
+            first_name="Grace",
+            last_name="Lecturer",
+        )
+        self.lecturer.profile.role = UserProfile.ROLE_LECTURER
+        self.lecturer.profile.save(update_fields=["role", "updated_at"])
+
+        self.admin = User.objects.create_superuser(
+            username="workspace.admin",
+            email="workspace.admin@example.test",
+            password="Strong-Test-Password-2026!",
+        )
+
+    def test_student_cannot_access_administrator_user_management(self):
+        self.client.force_authenticate(user=self.student)
+
+        response = self.client.get("/api/v1/workspace/users/")
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_administrator_can_list_users(self):
+        self.client.force_authenticate(user=self.admin)
+
+        response = self.client.get("/api/v1/workspace/users/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertGreaterEqual(response.data["count"], 2)
+        self.assertIn("workspace.student", [item["username"] for item in response.data["results"]])
+
+    def test_lecturer_can_access_lecturer_course_workspace(self):
+        self.client.force_authenticate(user=self.lecturer)
+
+        response = self.client.get("/api/v1/workspace/lecturer-courses/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 0)
+
+    def test_lecturer_cannot_access_administrator_user_management(self):
+        self.client.force_authenticate(user=self.lecturer)
+
+        response = self.client.get("/api/v1/workspace/users/")
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_student_course_workspace_reports_incomplete_academic_profile(self):
+        self.client.force_authenticate(user=self.student)
+
+        response = self.client.get("/api/v1/workspace/student-courses/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.data["profileComplete"])
+        self.assertEqual(response.data["count"], 0)
+
+    def test_profile_endpoint_returns_only_authenticated_user_profile(self):
+        self.client.force_authenticate(user=self.student)
+
+        response = self.client.get("/api/v1/workspace/profile/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["item"]["username"], "workspace.student")
+        self.assertNotIn("password", response.data["item"])
+
+    def test_reports_are_available_to_administrators(self):
+        self.client.force_authenticate(user=self.admin)
+
+        response = self.client.get("/api/v1/workspace/reports/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["role"], UserProfile.ROLE_ADMIN)
+        self.assertIn("attendance", response.data)
+
+    def test_student_cannot_access_administrator_reports(self):
+        self.client.force_authenticate(user=self.student)
+
+        response = self.client.get("/api/v1/workspace/reports/")
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_lecturer_cannot_access_institution_wide_attendance_monitor(self):
+        self.client.force_authenticate(user=self.lecturer)
+
+        response = self.client.get("/api/v1/workspace/attendance-monitor/")
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_administrator_can_list_academic_resources(self):
+        self.client.force_authenticate(user=self.admin)
+
+        response = self.client.get("/api/v1/workspace/faculties/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 0)
+
+    def test_student_cannot_access_lecturer_course_workspace(self):
+        self.client.force_authenticate(user=self.student)
+
+        response = self.client.get("/api/v1/workspace/lecturer-courses/")
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_lecturer_cannot_access_student_course_workspace(self):
+        self.client.force_authenticate(user=self.lecturer)
+
+        response = self.client.get("/api/v1/workspace/student-courses/")
+
+        self.assertEqual(response.status_code, 403)
