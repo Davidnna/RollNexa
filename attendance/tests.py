@@ -40,6 +40,20 @@ User = get_user_model()
 
 
 class AttendanceManagementTests(TestCase):
+    def test_manual_attendance_reason_choices_match_database_constraint(self):
+        constraint = next(
+            item
+            for item in AttendanceRecord._meta.constraints
+            if item.name == "att_record_method_valid"
+        )
+        manual_branch = constraint.condition.children[1]
+        constraint_values = dict(manual_branch.children)["manual_reason__in"]
+        choice_values = {
+            value for value, _label in AttendanceRecord.MANUAL_REASON_CHOICES
+        }
+
+        self.assertEqual(set(constraint_values), choice_values)
+
     def setUp(self):
         self.now = timezone.now().replace(second=0, microsecond=0)
         self.admin = User.objects.create_superuser(

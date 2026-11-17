@@ -7,6 +7,22 @@ from django.db.models import F, Q
 from django.utils import timezone
 
 
+MANUAL_ATTENDANCE_REASON_CONSENT_WITHDRAWN = "consent_withdrawn"
+MANUAL_ATTENDANCE_REASON_CAMERA_UNAVAILABLE = "camera_unavailable"
+MANUAL_ATTENDANCE_REASON_ACCESSIBILITY = "accessibility"
+MANUAL_ATTENDANCE_REASON_RECOGNITION_FAILED = "recognition_failed"
+MANUAL_ATTENDANCE_REASON_TECHNICAL_ISSUE = "technical_issue"
+MANUAL_ATTENDANCE_REASON_OTHER = "other"
+MANUAL_ATTENDANCE_REASON_CHOICES = [
+    (MANUAL_ATTENDANCE_REASON_CONSENT_WITHDRAWN, "Biometric consent not given or withdrawn"),
+    (MANUAL_ATTENDANCE_REASON_CAMERA_UNAVAILABLE, "Camera unavailable"),
+    (MANUAL_ATTENDANCE_REASON_ACCESSIBILITY, "Accessibility accommodation"),
+    (MANUAL_ATTENDANCE_REASON_RECOGNITION_FAILED, "Facial verification unsuccessful"),
+    (MANUAL_ATTENDANCE_REASON_TECHNICAL_ISSUE, "Technical issue"),
+    (MANUAL_ATTENDANCE_REASON_OTHER, "Other approved reason"),
+]
+
+
 class AttendanceSession(models.Model):
     STATUS_SCHEDULED = "scheduled"
     STATUS_ACTIVE = "active"
@@ -207,20 +223,13 @@ class AttendanceRecord(models.Model):
         (METHOD_MANUAL_EXCEPTION, "Lecturer-approved manual exception"),
     ]
 
-    MANUAL_REASON_CONSENT_WITHDRAWN = "consent_withdrawn"
-    MANUAL_REASON_CAMERA_UNAVAILABLE = "camera_unavailable"
-    MANUAL_REASON_ACCESSIBILITY = "accessibility"
-    MANUAL_REASON_RECOGNITION_FAILED = "recognition_failed"
-    MANUAL_REASON_TECHNICAL_ISSUE = "technical_issue"
-    MANUAL_REASON_OTHER = "other"
-    MANUAL_REASON_CHOICES = [
-        (MANUAL_REASON_CONSENT_WITHDRAWN, "Biometric consent not given or withdrawn"),
-        (MANUAL_REASON_CAMERA_UNAVAILABLE, "Camera unavailable"),
-        (MANUAL_REASON_ACCESSIBILITY, "Accessibility accommodation"),
-        (MANUAL_REASON_RECOGNITION_FAILED, "Facial verification unsuccessful"),
-        (MANUAL_REASON_TECHNICAL_ISSUE, "Technical issue"),
-        (MANUAL_REASON_OTHER, "Other approved reason"),
-    ]
+    MANUAL_REASON_CONSENT_WITHDRAWN = MANUAL_ATTENDANCE_REASON_CONSENT_WITHDRAWN
+    MANUAL_REASON_CAMERA_UNAVAILABLE = MANUAL_ATTENDANCE_REASON_CAMERA_UNAVAILABLE
+    MANUAL_REASON_ACCESSIBILITY = MANUAL_ATTENDANCE_REASON_ACCESSIBILITY
+    MANUAL_REASON_RECOGNITION_FAILED = MANUAL_ATTENDANCE_REASON_RECOGNITION_FAILED
+    MANUAL_REASON_TECHNICAL_ISSUE = MANUAL_ATTENDANCE_REASON_TECHNICAL_ISSUE
+    MANUAL_REASON_OTHER = MANUAL_ATTENDANCE_REASON_OTHER
+    MANUAL_REASON_CHOICES = MANUAL_ATTENDANCE_REASON_CHOICES
 
     session = models.ForeignKey(
         AttendanceSession,
@@ -277,7 +286,7 @@ class AttendanceRecord(models.Model):
                         qr_verified_at__isnull=True,
                         face_verified_at__isnull=True,
                         recorded_by__isnull=False,
-                        manual_reason__in=[choice[0] for choice in MANUAL_REASON_CHOICES],
+                        manual_reason__in=[choice[0] for choice in MANUAL_ATTENDANCE_REASON_CHOICES],
                     )
                 ),
                 name="att_record_method_valid",

@@ -1,6 +1,8 @@
-# RollNexa 1.0.0
+# RollNexa 1.0.1
 
 **Academic management and dual-verification attendance.**
+
+Version 1.0.1 is a deployment hotfix for the 1.0.0 release. It fixes the manual-attendance reason choices used by the attendance model constraint. It does not change database fields, migration history, attendance rules or stored records.
 
 RollNexa is a web-based academic administration and smart attendance platform. It manages institutional structure, user accounts, academic sessions, courses, course offerings, lecturer assignments and student registrations. Its automated attendance workflow combines a rotating QR Code with server-side facial recognition. An automated present record is created only when both verification stages succeed.
 
@@ -359,14 +361,14 @@ The Dockerfile builds the React application, installs Python dependencies, downl
 Build locally:
 
 ```bash
-docker build -t rollnexa:1.0.0 .
+docker build -t rollnexa:1.0.1 .
 ```
 
 Before deploying to Render:
 
 1. Review the Render Blueprint changes and confirm the service uses the Docker runtime.
 2. Ensure `DATABASE_URL`, `DIRECT_DATABASE_URL` where required, `SECRET_KEY` and other existing production settings are configured.
-3. Generate a Fernet key using the command in section 9.2 and set it as the secret environment variable `BIOMETRIC_ENCRYPTION_KEY` in Render. Do not commit the value.
+3. Set `BIOMETRIC_ENCRYPTION_KEY` in Render. The Blueprint uses `generateValue: true`, which asks Render to create a Base64-encoded 256-bit secret compatible with Fernet. For a manually configured service, use Render's **Generate Random Value** option. For local development, generate a Fernet key with the command in section 9.2. Do not commit the value.
 4. Set `BIOMETRIC_ENCRYPTION_KEY_VERSION=v1`, `BIOMETRIC_CONSENT_POLICY_VERSION=1.0` and `BIOMETRIC_FACE_MATCH_THRESHOLD=0.363`.
 5. Deploy and verify `/healthz`, authentication, database migrations and the biometric status endpoint.
 6. Complete controlled enrolment and verification tests before enabling student biometric enrolment institution-wide.
