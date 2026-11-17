@@ -195,7 +195,7 @@ export function BiometricSettingsPage() {
                     <h1>Biometric settings</h1>
                     <p>Manage your biometric consent and facial enrolment for attendance verification.</p>
                 </div>
-                <span className="release-chip"><span /> ROLLNEXA 1.0.1</span>
+                <span className="release-chip"><span /> ROLLNEXA 1.0.2</span>
             </div>
             <Link to="/app/attendance" className="attendance-back-link"><ArrowLeft size={16} /> Back to attendance</Link>
 
@@ -377,7 +377,7 @@ export function AttendanceFaceCheckPage() {
         <div className="dashboard-page biometric-page">
             <div className="dashboard-page-heading workspace-page-heading">
                 <div><span className="eyebrow">STUDENT WORKSPACE</span><h1>Facial attendance verification</h1><p>Complete the second verification stage for your QR-verified attendance session.</p></div>
-                <span className="release-chip"><span /> ROLLNEXA 1.0.1</span>
+                <span className="release-chip"><span /> ROLLNEXA 1.0.2</span>
             </div>
             <Link to="/app/attendance/check-in" className="attendance-back-link"><ArrowLeft size={16} /> Back to QR scanning</Link>
             {pageError && <div className="workspace-alert workspace-alert-error"><AlertCircle size={17} />{pageError}</div>}

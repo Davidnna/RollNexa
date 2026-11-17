@@ -1178,5 +1178,5 @@ export function WorkspacePage() {
 }
 
 function PageHeading({ title, description }: { title: string; description: string }) {
-    return <div className="dashboard-page-heading workspace-page-heading"><div><span className="eyebrow">ROLLNEXA WORKSPACE</span><h1>{title}</h1><p>{description}</p></div><span className="release-chip"><span /> ROLLNEXA 1.0.1</span></div>;
+    return <div className="dashboard-page-heading workspace-page-heading"><div><span className="eyebrow">ROLLNEXA WORKSPACE</span><h1>{title}</h1><p>{description}</p></div><span className="release-chip"><span /> ROLLNEXA 1.0.2</span></div>;
 }

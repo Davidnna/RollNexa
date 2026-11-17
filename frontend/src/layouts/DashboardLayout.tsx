@@ -111,7 +111,7 @@ export function DashboardLayout() {
                 <div className="sidebar-bottom">
                     <div className="sidebar-help-card">
                         <span className="help-card-icon"><Activity size={17} /></span>
-                        <strong>RollNexa 1.0.1</strong>
+                        <strong>RollNexa 1.0.2</strong>
                         <p>Manage your academic workflows from one secure workspace.</p>
                     </div>
                     <button className="sidebar-logout" onClick={handleLogout}>

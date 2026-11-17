@@ -5,7 +5,7 @@ export default defineConfig(({ command }) => ({
     plugins: [react()],
     base: command === "serve" ? "/" : "/static/frontend/",
     build: {
-        outDir: "../static/frontend",
+        outDir: "../backend/static/frontend",
         emptyOutDir: true,
         assetsDir: "assets",
         sourcemap: false,

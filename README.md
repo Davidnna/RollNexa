@@ -1,8 +1,8 @@
-# RollNexa 1.0.1
+# RollNexa 1.0.2
 
 **Academic management and dual-verification attendance.**
 
-Version 1.0.1 is a deployment hotfix for the 1.0.0 release. It fixes the manual-attendance reason choices used by the attendance model constraint. It does not change database fields, migration history, attendance rules or stored records.
+Version 1.0.2 reorganises the repository into separate `backend/` and `frontend/` application directories, standardises editor indentation to four spaces, removes verified dead files and unused imports, and updates Docker and local-development paths. It does not change database models, migration history, attendance rules or stored records.
 
 RollNexa is a web-based academic administration and smart attendance platform. It manages institutional structure, user accounts, academic sessions, courses, course offerings, lecturer assignments and student registrations. Its automated attendance workflow combines a rotating QR Code with server-side facial recognition. An automated present record is created only when both verification stages succeed.
 
@@ -89,7 +89,7 @@ The implementation uses:
 - NumPy for feature-vector normalisation and cosine similarity calculations.
 - Fernet authenticated encryption from `cryptography` for stored facial templates.
 
-The model assets are downloaded during the Docker image build by `biometrics/download_models.py`. The downloader checks each model's SHA-256 digest and validates that OpenCV can load both models. The ONNX model binaries are not committed to the application repository. Their upstream license notices are downloaded beside the models in the image.
+The model assets are downloaded during the Docker image build by `backend/biometrics/download_models.py`. The downloader checks each model's SHA-256 digest and validates that OpenCV can load both models. The ONNX model binaries are not committed to the application repository. Their upstream license notices are downloaded beside the models in the image.
 
 ### Enrolment
 
@@ -160,31 +160,38 @@ The administrator role is represented by Django superuser accounts. Lecturer and
 
 ```text
 rollnexa/
-    accounts/              Authentication, profiles, roles and account management
-    academics/             Institutional structure, courses, assignments and registration
-    api/                   Versioned REST API, workspace endpoints and API tests
-    attendance/            Attendance sessions, records, QR and manual exception services
-    biometrics/            Consent, enrolment, face processing, challenges and audit records
-        migrations/        Biometric database migrations
-        model_assets/      Downloaded ONNX model assets and model licence notices
-    config/                Django settings and URL configuration
-    core/                  Health and shared application views
-    frontend/              React, TypeScript, Vite and styles
+    backend/                       Django application and all backend resources
+        accounts/                  Authentication, profiles, roles and account management
+        academics/                 Institutional structure, courses, assignments and registration
+        api/                       Versioned REST API, workspace endpoints and API tests
+        attendance/                Attendance sessions, records, QR and manual exception services
+        biometrics/                Consent, enrolment, face processing and verification
+            migrations/            Biometric database migrations
+            model_assets/           Downloaded ONNX models and licence notices (not committed)
+        config/                    Django settings, ASGI, WSGI and URL configuration
+        core/                      Shared health, error and React-serving views
+        static/                    Django static assets and built React application
+        templates/                 Legacy Django templates still used by backend views
+        manage.py                  Django management entry point
+        requirements.txt           Python dependencies
+        docker-entrypoint.sh       Database migration and Gunicorn startup
+        .env.example               Local environment-variable reference
+    frontend/                      Complete React application
         src/
-            context/       Authentication context
-            layouts/       Public and authenticated layouts
-            lib/           API client and shared utilities
-            pages/         Public pages, dashboards and workspace modules
-    static/                Static assets and built React application
-    templates/             Legacy Django templates retained during migration
-    Dockerfile             Multi-stage React and Django image build
-    docker-entrypoint.sh   Database migration and Gunicorn startup
-    manage.py              Django management entry point
-    requirements.txt       Python dependencies
-    render.yaml            Render Blueprint configuration
-    build.sh               Local build helper
-    VERSION                Current release version
-    README.md              Software description and local setup guide
+            context/               Authentication context
+            layouts/               Public and authenticated layouts
+            lib/                   API client and shared utilities
+            pages/                 Public pages, dashboards and workspace modules
+        package.json               Frontend dependencies and scripts
+        vite.config.ts             Vite build and development proxy configuration
+    Dockerfile                     Multi-stage React and Django image build
+    render.yaml                    Render Blueprint configuration
+    build.sh                       Local build helper
+    .dockerignore                  Docker build exclusions
+    .gitignore                     Git exclusions
+    .editorconfig                  Four-space editor and whitespace conventions
+    VERSION                        Current release version
+    README.md                      Software description and local setup guide
 ```
 
 ## 7. API routes
@@ -254,12 +261,12 @@ Install backend dependencies:
 
 ```bash
 python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+python -m pip install -r backend/requirements.txt
 ```
 
 ### 9.2 Configure environment variables
 
-The Django settings read environment variables directly; a `.env` file is not loaded automatically. Set the variables in the terminal or your IDE run configuration.
+The backend environment-variable reference is `backend/.env.example`. Django settings read environment variables directly; a `.env` file is not loaded automatically. Set the variables in the terminal or your IDE run configuration.
 
 Linux or macOS example:
 
@@ -294,29 +301,44 @@ Use a dedicated local database. Do not use production database credentials for l
 ### 9.3 Install the face model assets
 
 ```bash
-python biometrics/download_models.py
+python backend/biometrics/download_models.py
 ```
 
 The script downloads the YuNet and SFace ONNX files, verifies their SHA-256 digests and checks that OpenCV can load them. It also downloads the upstream model licence notices. The models are not committed to Git.
 
 ### 9.4 Apply database migrations
 
+Run Django management commands from the `backend/` directory:
+
 ```bash
-python manage.py check
-python manage.py migrate
+(
+    cd backend
+    python manage.py check
+    python manage.py migrate
+)
 ```
 
-The 1.0.0 migrations add biometric consent, encrypted face enrolment, verification challenges and audit records. They also extend the existing attendance record to distinguish automated dual verification from lecturer-approved manual exceptions. Existing automated attendance rows are migrated as `dual_verified`; the database is not reset.
+The existing migrations add biometric consent, encrypted face enrolment, verification challenges and audit records. They also extend the attendance record to distinguish automated dual verification from lecturer-approved manual exceptions. Existing automated attendance rows are migrated as `dual_verified`; the database is not reset.
 
 Create a local administrator if the database does not already have one:
 
 ```bash
-python manage.py createsuperuser
+(
+    cd backend
+    python manage.py createsuperuser
+)
 ```
 
 ### 9.5 Install and run the React frontend
 
-In a second terminal:
+In the first terminal, from the repository root, start Django from `backend/`:
+
+```bash
+cd backend
+python manage.py runserver 127.0.0.1:8000
+```
+
+In a second terminal, from the repository root, install and start React:
 
 ```bash
 npm --prefix frontend install
@@ -325,26 +347,26 @@ npm --prefix frontend run dev
 
 Open the Vite development URL printed by the command, normally `http://localhost:5173`. Vite proxies API requests to Django on `http://127.0.0.1:8000`.
 
-In the first terminal, start Django:
-
-```bash
-python manage.py runserver 127.0.0.1:8000
-```
-
-For a production-style local build:
+For a production-style local build, run these commands from the repository root:
 
 ```bash
 npm --prefix frontend run build
-python manage.py collectstatic --noinput
-python manage.py runserver 127.0.0.1:8000
+(
+    cd backend
+    python manage.py collectstatic --noinput
+    python manage.py runserver 127.0.0.1:8000
+)
 ```
 
 ### 9.6 Run tests
 
 ```bash
-python manage.py check
-python manage.py makemigrations --check --dry-run
-python manage.py test
+(
+    cd backend
+    python manage.py check
+    python manage.py makemigrations --check --dry-run
+    python manage.py test
+)
 ```
 
 Frontend checks:
@@ -361,7 +383,7 @@ The Dockerfile builds the React application, installs Python dependencies, downl
 Build locally:
 
 ```bash
-docker build -t rollnexa:1.0.1 .
+docker build -t rollnexa:1.0.2 .
 ```
 
 Before deploying to Render:
@@ -391,12 +413,16 @@ The service can start without a biometric key, but biometric enrolment and match
 
 - **YuNet face detector** — OpenCV Zoo `face_detection_yunet_2023mar.onnx`; MIT License. Model file SHA-256: `8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4`.
 - **SFace face recogniser** — OpenCV Zoo `face_recognition_sface_2021dec.onnx`; Apache License 2.0. Model file SHA-256: `0ba9fbfa01b5270c96627c4ef784da859931e02f04419c829e83484087c34e79`.
-- **OpenCV** — Python headless distribution, version pinned in `requirements.txt`.
+- **OpenCV** — Python headless distribution, version pinned in `backend/requirements.txt`.
 - **NumPy** and **cryptography** — dependencies pinned by the backend requirements.
 
 The model downloader stores the corresponding upstream `LICENSE` texts beside the downloaded model files. Model references: [YuNet model and MIT notice](https://github.com/opencv/opencv_zoo/tree/main/models/face_detection_yunet), [SFace model and Apache 2.0 notice](https://github.com/opencv/opencv_zoo/tree/main/models/face_recognition_sface), and [OpenCV DNN face detection and recognition documentation](https://docs.opencv.org/4.x/d0/dd4/tutorial_dnn_face.html).
 
-## 13. Release conventions
+## 13. Repository structure and release conventions
+
+The repository separates application source by responsibility: all Django code, templates, static assets and Python dependencies live in `backend/`; all React, TypeScript, Vite and frontend dependencies live in `frontend/`. Root-level files are limited to repository documentation, version metadata, editor settings and deployment/build orchestration.
+
+`.editorconfig` defines four spaces per indentation level (`indent_size=4`, `tab_width=4`) and LF line endings. Use spaces rather than literal tab characters so formatting remains consistent across Python, TypeScript, TSX, CSS, HTML, JSON and YAML.
 
 Every RollNexa update must:
 

@@ -1,4 +1,4 @@
-# Python
+# Python bytecode and caches
 __pycache__/
 *.py[cod]
 *.pyo
@@ -9,22 +9,20 @@ __pycache__/
 venv/
 env/
 
-# Secrets
+# Secrets and local environment files
 .env
 .env.*
-!.env.example
+!backend/.env.example
 
-# Django
-*.log
-db.sqlite3
-staticfiles/
-
-# User uploads and sensitive data
-media/
-uploads/
-private_uploads/
-biometric_data/
-face_data/
+# Django runtime artefacts
+backend/*.log
+backend/db.sqlite3
+backend/staticfiles/
+backend/media/
+backend/uploads/
+backend/private_uploads/
+backend/biometric_data/
+backend/face_data/
 
 # Editors and operating systems
 .vscode/
@@ -37,11 +35,11 @@ Thumbs.db
 htmlcov/
 .pytest_cache/
 
-# React frontend
+# React frontend dependencies and build artefacts
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
-static/frontend/
+backend/static/frontend/
 
 # Downloaded third-party ONNX model assets
-biometrics/model_assets/*.onnx
+backend/biometrics/model_assets/*.onnx

@@ -1,11 +1,16 @@
 #!/usr/bin/env sh
 set -eu
 
+ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+cd "$ROOT_DIR"
+
 npm --prefix frontend install --no-audit --no-fund
 npm --prefix frontend run build
 
 python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+python -m pip install -r backend/requirements.txt
+
+cd backend
 python manage.py check
 python manage.py collectstatic --clear --noinput
 
