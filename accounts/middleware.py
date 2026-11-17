@@ -24,6 +24,19 @@ class ForcePasswordChangeMiddleware:
         ):
             request.session.pop("rollnexa_new_user_credentials", None)
 
+        frontend_paths = {
+            "/",
+            "/about/",
+            "/features/",
+            "/how-it-works/",
+            "/contact/",
+            "/privacy/",
+            "/terms/",
+            "/login/",
+        }
+        if request.path.startswith("/api/") or request.path == "/app" or request.path.startswith("/app/") or request.path in frontend_paths:
+            return None
+
         user = getattr(request, "user", None)
         if not user or not user.is_authenticated or user.is_superuser:
             return None

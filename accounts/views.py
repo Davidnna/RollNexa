@@ -44,7 +44,6 @@ def dashboard(request):
         return redirect("student_dashboard")
     return render(request, "accounts/access_denied.html", status=403)
 
-
 @system_admin_required
 def admin_dashboard(request):
     context = {
