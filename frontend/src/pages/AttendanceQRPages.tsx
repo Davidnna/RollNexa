@@ -105,7 +105,7 @@ export function AttendanceQRPage() {
                     <h1>Live attendance QR Code</h1>
                     <p>Display this rotating code for students registered in the selected course offering.</p>
                 </div>
-                <span className="release-chip"><span /> ROLLNEXA 0.9.0</span>
+                <span className="release-chip"><span /> ROLLNEXA 0.9.1</span>
             </div>
 
             <Link to="/app/attendance" className="attendance-back-link"><ArrowLeft size={16} /> Back to attendance sessions</Link>
@@ -313,7 +313,7 @@ export function AttendanceScanPage() {
                     <h1>Scan attendance QR Code</h1>
                     <p>Scan the current code displayed by your lecturer to complete the first verification stage.</p>
                 </div>
-                <span className="release-chip"><span /> ROLLNEXA 0.9.0</span>
+                <span className="release-chip"><span /> ROLLNEXA 0.9.1</span>
             </div>
             <Link to="/app/attendance" className="attendance-back-link"><ArrowLeft size={16} /> Back to attendance</Link>
 

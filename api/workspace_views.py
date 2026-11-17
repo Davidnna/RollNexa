@@ -103,8 +103,22 @@ def _form_errors(form):
 
 def _invalid_form(form):
     return Response(
-        {"detail": "Please correct the highlighted fields.", "errors": _form_errors(form)},
+        {"detail": "Some fields need attention. Review the field errors shown below.", "errors": _form_errors(form)},
         status=status.HTTP_400_BAD_REQUEST,
+    )
+
+
+def _active_course_offerings():
+    return CourseOffering.objects.filter(
+        is_active=True,
+        course__is_active=True,
+        course__department__is_active=True,
+        course__department__faculty__is_active=True,
+        programme__is_active=True,
+        programme__department__is_active=True,
+        programme__department__faculty__is_active=True,
+        semester__is_active=True,
+        semester__session__is_active=True,
     )
 
 
@@ -579,15 +593,6 @@ def _options(resource, request):
             {"value": item.pk, "label": f"{item.get_name_display()} — {item.session.name}"}
             for item in Semester.objects.filter(is_active=True, session__is_active=True).select_related("session").order_by("-session__name", "name")
         ]
-    elif resource == "assignments":
-        options["offerings"] = [
-            {"value": item.pk, "label": f"{item.course.code} — {item.course.title} · {item.programme.name} · {item.semester.session.name}"}
-            for item in CourseOffering.objects.filter(is_active=True, course__is_active=True, programme__is_active=True, semester__is_active=True, semester__session__is_active=True).select_related("course", "programme", "semester__session").order_by("course__code")
-        ]
-        options["lecturers"] = [
-            {"value": item.pk, "label": f"{item.user.get_full_name() or item.user.username} — {item.department.name if item.department_id else 'No department'}"}
-            for item in UserProfile.objects.filter(role=UserProfile.ROLE_LECTURER, user__is_active=True).select_related("user", "department").order_by("user__last_name", "user__first_name")
-        ]
     elif resource == "attendance-sessions":
         profile = getattr(request.user, "profile", None)
         if profile and profile.role == UserProfile.ROLE_LECTURER:
@@ -605,6 +610,244 @@ def _options(resource, request):
                 for item in offerings
             ]
     return options
+
+
+class CourseRegistrationControlView(NoCacheAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        _require_roles(request, UserProfile.ROLE_ADMIN)
+        action = str(request.data.get("action", "")).strip().lower()
+        if action not in {"open", "close"}:
+            return Response(
+                {"detail": "Choose either open or close for the global registration action."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        should_open = action == "open"
+        with transaction.atomic():
+            offering_ids = list(
+                _active_course_offerings()
+                .select_for_update()
+                .values_list("pk", flat=True)
+            )
+            updated_count = CourseOffering.objects.filter(pk__in=offering_ids).update(
+                registration_open=should_open,
+                updated_at=timezone.now(),
+            )
+
+        state = "open" if should_open else "closed"
+        return Response({
+            "state": state,
+            "updated_count": updated_count,
+            "detail": (
+                f"Registration opened for {updated_count} active course offering(s)."
+                if should_open
+                else f"Registration closed for {updated_count} active course offering(s)."
+            ),
+        })
+
+
+class AssignmentOptionsView(NoCacheAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        _require_roles(request, UserProfile.ROLE_ADMIN)
+
+        courses = Course.objects.filter(
+            is_active=True,
+            department__is_active=True,
+            department__faculty__is_active=True,
+        ).select_related("department").order_by("code", "department__name")
+        semesters = Semester.objects.filter(
+            is_active=True,
+            session__is_active=True,
+        ).select_related("session").order_by("-session__name", "name")
+        lecturers = UserProfile.objects.filter(
+            role=UserProfile.ROLE_LECTURER,
+            user__is_active=True,
+        ).select_related("user", "department").order_by(
+            "user__last_name", "user__first_name", "user__username"
+        )
+
+        options = {
+            "courses": [
+                {
+                    "value": item.pk,
+                    "label": f"{item.code} — {item.title} · {item.department.name}",
+                }
+                for item in courses
+            ],
+            "semesters": [
+                {
+                    "value": item.pk,
+                    "label": f"{item.get_name_display()} · {item.session.name}",
+                }
+                for item in semesters
+            ],
+            "lecturers": [
+                {
+                    "value": item.pk,
+                    "label": (
+                        f"{item.user.get_full_name() or item.user.username} · "
+                        f"{item.department.name if item.department_id else 'No home department'}"
+                    ),
+                }
+                for item in lecturers
+            ],
+            "levels": [
+                {"value": value, "label": label}
+                for value, label in CourseOffering.LEVEL_CHOICES
+            ],
+            "offerings": [],
+        }
+
+        course_id = request.query_params.get("course", "").strip()
+        semester_id = request.query_params.get("semester", "").strip()
+        level = request.query_params.get("level", "").strip()
+        lecturer_id = request.query_params.get("lecturer", "").strip()
+        if all((course_id, semester_id, level, lecturer_id)):
+            try:
+                course_id = int(course_id)
+                semester_id = int(semester_id)
+                lecturer_id = int(lecturer_id)
+            except (TypeError, ValueError):
+                return Response(
+                    {"detail": "Select a valid course, semester, level and lecturer."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            lecturer = get_object_or_404(lecturers, pk=lecturer_id)
+            assigned_offering_ids = set(
+                CourseLecturerAssignment.objects.filter(
+                    lecturer=lecturer,
+                    is_active=True,
+                ).values_list("offering_id", flat=True)
+            )
+            matching_offerings = _active_course_offerings().filter(
+                course_id=course_id,
+                semester_id=semester_id,
+                level=level,
+            ).select_related(
+                "course", "programme", "programme__department", "semester__session"
+            ).order_by("programme__department__name", "programme__name")
+            options["offerings"] = [
+                {
+                    "value": item.pk,
+                    "label": (
+                        f"{item.programme.name} · {item.programme.department.name}"
+                    ),
+                    "programme_name": item.programme.name,
+                    "department_name": item.programme.department.name,
+                    "level": item.get_level_display(),
+                    "already_assigned": item.pk in assigned_offering_ids,
+                }
+                for item in matching_offerings
+            ]
+
+        return Response(options)
+
+
+class BulkTeachingAssignmentView(NoCacheAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        _require_roles(request, UserProfile.ROLE_ADMIN)
+
+        lecturer_id = request.data.get("lecturer")
+        offering_ids = request.data.get("offering_ids")
+        if not isinstance(offering_ids, list) or not offering_ids or len(offering_ids) > 100:
+            return Response(
+                {"detail": "Select between 1 and 100 course offerings."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            lecturer_id = int(lecturer_id)
+            selected_ids = [int(value) for value in offering_ids]
+        except (TypeError, ValueError):
+            return Response(
+                {"detail": "Select a valid lecturer and course offerings."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if len(set(selected_ids)) != len(selected_ids):
+            return Response(
+                {"detail": "The same course offering cannot be selected more than once."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        lecturer = get_object_or_404(
+            UserProfile.objects.select_related("user", "department"),
+            pk=lecturer_id,
+            role=UserProfile.ROLE_LECTURER,
+            user__is_active=True,
+        )
+
+        try:
+            with transaction.atomic():
+                offerings = list(
+                    _active_course_offerings()
+                    .filter(pk__in=selected_ids)
+                    .select_for_update()
+                    .select_related("course", "programme", "semester__session")
+                )
+                if len(offerings) != len(selected_ids):
+                    return Response(
+                        {"detail": "One or more selected course offerings are no longer active or available."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                offering_groups = {
+                    (item.course_id, item.semester_id, item.level)
+                    for item in offerings
+                }
+                if len(offering_groups) != 1:
+                    return Response(
+                        {"detail": "A bulk assignment must cover the same course, semester and level."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                existing_ids = set(
+                    CourseLecturerAssignment.objects.filter(
+                        lecturer=lecturer,
+                        offering_id__in=selected_ids,
+                        is_active=True,
+                    ).values_list("offering_id", flat=True)
+                )
+                assignments = []
+                for offering in offerings:
+                    if offering.pk in existing_ids:
+                        continue
+                    assignment = CourseLecturerAssignment(
+                        offering=offering,
+                        lecturer=lecturer,
+                        assigned_by=request.user,
+                    )
+                    assignment.full_clean()
+                    assignment.save()
+                    assignments.append(assignment)
+        except ValidationError as exc:
+            return Response(
+                {"detail": "One or more teaching assignments are invalid.", "errors": {"__all__": exc.messages}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except IntegrityError:
+            return Response(
+                {"detail": "An assignment changed while this operation was being processed. Refresh and try again."},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        return Response({
+            "created_count": len(assignments),
+            "already_assigned_count": len(existing_ids),
+            "assignments": [_assignment_data(item) for item in assignments],
+            "detail": (
+                f"Assigned the lecturer to {len(assignments)} course offering(s). "
+                f"{len(existing_ids)} existing assignment(s) were left unchanged."
+            ) if assignments else (
+                f"No new assignments were created. The lecturer is already assigned to all "
+                f"{len(existing_ids)} selected course offering(s)."
+            ),
+        }, status=status.HTTP_201_CREATED if assignments else status.HTTP_200_OK)
 
 
 class WorkspaceCollectionView(NoCacheAPIView):
@@ -625,6 +868,16 @@ class WorkspaceCollectionView(NoCacheAPIView):
             queryset = queryset.order_by("-pk") if resource in {"users", "offerings"} else queryset
         payload = _paginate(queryset, request, lambda item: _serialize(resource, item))
         payload["options"] = _options(resource, request)
+        if resource == "offerings":
+            active_offerings = _active_course_offerings()
+            active_count = active_offerings.count()
+            open_count = active_offerings.filter(registration_open=True).count()
+            payload["registrationSummary"] = {
+                "activeOfferings": active_count,
+                "openOfferings": open_count,
+                "closedOfferings": active_count - open_count,
+                "state": "closed" if open_count == 0 else "open" if open_count == active_count else "partial",
+            }
         if resource == "student-courses":
             payload["profileComplete"] = bool(request.user.profile.programme_id and request.user.profile.current_level)
         return Response(payload)

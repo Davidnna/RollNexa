@@ -1,12 +1,14 @@
-# RollNexa 0.9.0
+# RollNexa 0.9.1
 
 **Attendance, connected.**
 
 RollNexa is an academic administration and smart attendance platform. It connects institutional structure, user accounts, academic sessions, course catalogues, course offerings, lecturer assignments, student registrations and attendance-session management. Its attendance policy requires both QR Code verification and facial identity verification to succeed, in that order, before a present record can be created.
 
-Version 0.9.0 adds secure QR Code session verification to the React-based role workspaces. The public website, authenticated React application and Django REST API are served from the same origin. Django remains the source of truth for authentication, authorisation, business rules, validation and database operations.
+Version 0.9.1 improves the academic workflows in the React-based role workspaces. Administrators can open or close registration across all active course offerings, assign one lecturer to multiple programme offerings of the same course delivery group, review field-specific validation errors and receive a prominent one-time temporary-password dialog after account creation. The public website, authenticated React application and Django REST API are served from the same origin. Django remains the source of truth for authentication, authorisation, business rules, validation and database operations.
 
-## 1. Version 0.9.0 scope
+This release adds API operations and React interface changes without introducing a database schema migration. Global registration actions update the existing `CourseOffering.registration_open` flags for all currently active and academically eligible offerings. Individual offerings can still be closed separately after a global opening action.
+
+## 1. Version 0.9.1 scope
 
 ### Platform capabilities
 
@@ -19,7 +21,8 @@ Version 0.9.0 adds secure QR Code session verification to the React-based role w
 - Academic structure management for faculties, departments, programmes, academic sessions and semesters.
 - Current academic session and current semester selection.
 - Course catalogue management and course offering management.
-- Lecturer teaching assignments, revocation and retained assignment history.
+- Lecturer teaching assignments, bulk assignment across programme offerings of the same course, semester and level, revocation and retained assignment history.
+- Global opening and closing of registration for all active course offerings, with individual offering controls retained.
 - Student course discovery, registration and withdrawal where registration is open.
 - Lecturer course workspace and registered-student class rosters.
 - Lecturer attendance-session scheduling, activation, closure and cancellation.
@@ -32,6 +35,8 @@ Version 0.9.0 adds secure QR Code session verification to the React-based role w
 - Role-scoped academic and attendance summary reports.
 - Profile updates and password management.
 - Search, status filters, pagination, form validation feedback and responsive workspace layouts.
+- Field-level validation messages with visible error highlighting in React forms.
+- Prominent one-time temporary-password dialog with copy action after successful administrator account creation.
 - Docker multi-stage build for the React frontend and Django application.
 - Existing Django management views retained during migration as a fallback for workflows not yet represented in React.
 
@@ -186,7 +191,10 @@ All API endpoints are under `/api/v1/`.
 | POST | `/api/v1/workspace/offerings/{id}/toggle/` | Activate or deactivate an offering; administrator only. |
 | POST | `/api/v1/workspace/offerings/{id}/assign/` | Assign a lecturer to an offering; administrator only. |
 | GET, POST | `/api/v1/workspace/assignments/` | List teaching assignments or create an assignment; administrator only. |
+| GET | `/api/v1/workspace/assignment-options/` | Return lecturers, courses, semesters, levels and matching programme offerings for bulk assignment; administrator only. |
+| POST | `/api/v1/workspace/assignments/bulk/` | Assign one lecturer to multiple programme offerings for the same course, semester and level; administrator only. |
 | POST | `/api/v1/workspace/assignments/{id}/revoke/` | Revoke an active assignment and retain its history; administrator only. |
+| POST | `/api/v1/workspace/registration-control/` | Open or close registration for all active course offerings; administrator only. |
 | GET | `/api/v1/workspace/lecturer-courses/` | List active course offerings assigned to the lecturer. |
 | GET | `/api/v1/workspace/rosters/?offering={id}` | List registered students for an offering assigned to the lecturer. |
 | GET | `/api/v1/workspace/student-courses/` | List offerings matching the student's programme and level. |
@@ -381,7 +389,7 @@ npm run typecheck
 npm run build
 ```
 
-Run these checks before committing a release. Also test account creation and deactivation, academic record management, course offerings, lecturer assignments, student registration and withdrawal, class rosters, attendance session lifecycle actions, QR display and 30-second rotation, student camera scanning, token expiry, unregistered-student rejection, duplicate-scan handling, closed-session rejection, report scope, profile updates, login, logout and forced password change in a browser.
+Run these checks before committing a release. Also test account creation and deactivation, temporary-password dialog and copy action, field-level validation highlighting, academic record management, global registration open/close actions, individual offering registration settings, bulk lecturer assignment across programme offerings, assignment history and revocation, student registration and withdrawal, class rosters, attendance session lifecycle actions, QR display and 30-second rotation, student camera scanning, token expiry, unregistered-student rejection, duplicate-scan handling, closed-session rejection, report scope, profile updates, login, logout and forced password change in a browser.
 
 ## 8. Docker development and deployment
 
@@ -390,13 +398,13 @@ Run these checks before committing a release. Also test account creation and dea
 From the repository root:
 
 ```bash
-docker build -t rollnexa:0.9.0 .
+docker build -t rollnexa:0.9.1 .
 ```
 
 Run the container with the required environment variables configured. Use a local or development PostgreSQL database, not the production database, for local container tests.
 
 ```bash
-docker run --rm -p 8000:8000 --env-file .env rollnexa:0.9.0
+docker run --rm -p 8000:8000 --env-file .env rollnexa:0.9.1
 ```
 
 The container entrypoint applies Django migrations and then starts Gunicorn. If `DIRECT_DATABASE_URL` is configured, migrations use that connection; the running application continues to use `DATABASE_URL`.
@@ -451,10 +459,10 @@ Every RollNexa update must follow these project rules:
 5. Extend the existing application. Do not replace working functionality or reset production data without explicit approval.
 6. Each release must include source validation and the relevant backend and frontend test results. Do not describe checks as passed if they were not executed.
 
-### Version 0.9.0 GitHub commit message
+### Version 0.9.1 GitHub commit message
 
 ```text
-Add secure rotating QR Code attendance verification to RollNexa 0.9.0
+Improve global course registration, bulk lecturer assignments and account creation UX in RollNexa 0.9.1
 ```
 
 ## 11. Development roadmap
@@ -464,6 +472,7 @@ Add secure rotating QR Code attendance verification to RollNexa 0.9.0
 | 0.7.0 | React foundation, public website, session-authenticated API and dashboard shell. |
 | 0.8.0 | Complete administrator, lecturer and student dashboards and migrate core management workflows to React. |
 | 0.9.0 | Secure dynamic QR Code generation, scanning, short-lived signed tokens, pending verification records and server-side validation. |
+| 0.9.1 | Global registration controls, bulk lecturer assignment across programme offerings, field-level validation feedback and prominent temporary-password dialog. |
 | 1.0.0 | Facial enrolment, facial recognition, liveness safeguards, integrated dual verification and comprehensive testing. |
 
 The roadmap is a development plan. A feature becomes operational only after implementation, testing and deployment in the corresponding release.

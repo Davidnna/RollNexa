@@ -3830,3 +3830,398 @@ button:disabled {
         width: 100%;
     }
 }
+
+/* 0.9.1 academic workflow improvements */
+.workspace-field.has-error input,
+.workspace-field.has-error select,
+.workspace-field.has-error textarea {
+    border-color: #d64b4b;
+    background: #fffafa;
+    box-shadow: 0 0 0 2px rgba(214, 75, 75, 0.08);
+}
+
+.workspace-field.has-error input:focus,
+.workspace-field.has-error select:focus,
+.workspace-field.has-error textarea:focus {
+    border-color: #c83d3d;
+    box-shadow: 0 0 0 3px rgba(200, 61, 61, 0.12);
+}
+
+.workspace-field-error {
+    display: block;
+    color: #b33b3b !important;
+    font-size: 10px !important;
+    font-weight: 600 !important;
+    line-height: 1.5;
+}
+
+.workspace-checkbox-field.has-error {
+    border-color: #d64b4b;
+    background: #fffafa;
+}
+
+.workspace-form-error-summary {
+    border: 1px solid #efcaca;
+    border-radius: 9px;
+    padding: 12px 14px;
+    color: #963a3a;
+    background: #fff6f6;
+    font-size: 11px;
+    line-height: 1.6;
+}
+
+.workspace-form-error-summary ul {
+    margin: 6px 0 0;
+    padding-left: 18px;
+}
+
+.workspace-registration-control {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 22px;
+    margin-bottom: 16px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 18px 20px;
+    background: #ffffff;
+    box-shadow: 0 7px 22px rgba(15, 31, 56, 0.035);
+}
+
+.workspace-registration-copy {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 7px;
+}
+
+.workspace-registration-copy > strong {
+    color: var(--ink);
+    font-family: Manrope, sans-serif;
+    font-size: 15px;
+    font-weight: 800;
+}
+
+.workspace-registration-copy p {
+    max-width: 650px;
+    margin: 0;
+    color: #78869a;
+    font-size: 11px;
+    line-height: 1.7;
+}
+
+.workspace-registration-state {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 999px;
+    padding: 5px 9px;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.35px;
+    text-transform: uppercase;
+}
+
+.workspace-registration-state.is-open {
+    color: #087e66;
+    background: #eaf8f2;
+}
+
+.workspace-registration-state.is-closed {
+    color: #9a4b4b;
+    background: #fff0f0;
+}
+
+.workspace-registration-state.is-partial {
+    color: #946719;
+    background: #fff7e6;
+}
+
+.workspace-registration-actions {
+    display: flex;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.workspace-registration-actions .button {
+    min-height: 38px;
+    font-size: 10px;
+}
+
+.workspace-password-backdrop {
+    z-index: 130;
+}
+
+.workspace-password-dialog {
+    width: min(490px, 100%);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    border-radius: 18px;
+    padding: 30px;
+    background: #ffffff;
+    box-shadow: 0 28px 90px rgba(8, 18, 38, 0.32);
+}
+
+.workspace-password-icon {
+    display: grid;
+    width: 54px;
+    height: 54px;
+    place-items: center;
+    margin-bottom: 19px;
+    border-radius: 15px;
+    color: #087e75;
+    background: #e9f8f4;
+}
+
+.workspace-password-dialog > .eyebrow {
+    color: #078b7d;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 1px;
+}
+
+.workspace-password-dialog h2 {
+    margin: 9px 0 8px;
+    color: var(--ink);
+    font-family: Manrope, sans-serif;
+    font-size: 23px;
+    font-weight: 800;
+    letter-spacing: -0.7px;
+}
+
+.workspace-password-dialog > p {
+    margin: 0 0 22px;
+    color: #78869a;
+    font-size: 11px;
+    line-height: 1.75;
+}
+
+.workspace-password-label {
+    display: block;
+    margin-bottom: 7px;
+    color: #46556d;
+    font-size: 10px;
+    font-weight: 800;
+}
+
+.workspace-password-value {
+    width: 100%;
+    min-height: 54px;
+    border: 2px solid #68c7b8;
+    border-radius: 10px;
+    padding: 12px 14px;
+    color: #064f4a;
+    background: #f3fbf8;
+    font-family: "SFMono-Regular", Consolas, monospace;
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 0.2px;
+}
+
+.workspace-password-value:focus {
+    outline: 3px solid rgba(13, 169, 154, 0.14);
+}
+
+.workspace-password-warning {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    margin-top: 16px;
+    border: 1px solid #f0dfb7;
+    border-radius: 9px;
+    padding: 11px 12px;
+    color: #805d1c;
+    background: #fffaf0;
+    font-size: 10px;
+    line-height: 1.65;
+}
+
+.workspace-password-warning svg {
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+.workspace-password-copied,
+.workspace-password-copy-error {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.workspace-password-copied {
+    color: #087e66;
+}
+
+.workspace-password-copy-error {
+    color: #a33b3b;
+}
+
+.workspace-password-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 9px;
+    margin-top: 22px;
+}
+
+.workspace-assignment-modal {
+    width: min(820px, 100%);
+}
+
+.workspace-assignment-intro {
+    margin: 0;
+    color: #75839a;
+    font-size: 11px;
+    line-height: 1.7;
+}
+
+.workspace-assignment-offerings {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 13px;
+}
+
+.workspace-assignment-offerings-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.workspace-assignment-offerings-heading > div {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.workspace-assignment-offerings-heading strong {
+    color: var(--ink);
+    font-size: 11px;
+}
+
+.workspace-assignment-offerings-heading span {
+    color: #8a96a8;
+    font-size: 9px;
+}
+
+.workspace-assignment-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    max-height: 245px;
+    overflow-y: auto;
+}
+
+.workspace-assignment-option {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 9px;
+    border: 1px solid #e2e8ef;
+    border-radius: 8px;
+    padding: 10px;
+    color: #4d5c73;
+    background: #ffffff;
+    cursor: pointer;
+}
+
+.workspace-assignment-option:has(input:checked) {
+    border-color: #78c9bb;
+    background: #f2fbf8;
+}
+
+.workspace-assignment-option input {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    accent-color: var(--teal);
+}
+
+.workspace-assignment-option > span {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.workspace-assignment-option strong {
+    overflow: hidden;
+    color: var(--ink);
+    font-size: 10px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.workspace-assignment-option small {
+    color: #8793a5;
+    font-size: 9px;
+    font-weight: 500;
+}
+
+.workspace-assignment-option em {
+    flex-shrink: 0;
+    color: #8b6b2d;
+    font-size: 8px;
+    font-style: normal;
+    font-weight: 800;
+}
+
+.workspace-assignment-option.is-assigned {
+    background: #f7f8fa;
+    cursor: not-allowed;
+}
+
+.workspace-assignment-empty {
+    padding: 18px 12px;
+}
+
+.workspace-assignment-selected-count {
+    margin-right: auto;
+    color: #65748a;
+    font-size: 10px;
+    font-weight: 700;
+}
+
+@media (max-width: 700px) {
+    .workspace-registration-control {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .workspace-registration-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .workspace-assignment-list {
+        grid-template-columns: 1fr;
+    }
+
+    .workspace-password-dialog {
+        padding: 23px;
+    }
+
+    .workspace-password-actions {
+        flex-direction: column-reverse;
+    }
+
+    .workspace-password-actions .button {
+        width: 100%;
+    }
+}
+
+.workspace-checkbox-field.has-error {
+    flex-wrap: wrap;
+}
+
+.workspace-checkbox-field .workspace-field-error {
+    flex-basis: 100%;
+    margin-left: 25px;
+}
