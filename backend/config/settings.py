@@ -174,7 +174,7 @@ BOOTSTRAP_ADMIN_TOKEN = os.environ.get("BOOTSTRAP_ADMIN_TOKEN", "")
 
 
 # Biometric processing is fail-closed when the encryption key or model assets are unavailable.
-BIOMETRIC_ENCRYPTION_KEY = os.environ.get("BIOMETRIC_ENCRYPTION_KEY", "")
+BIOMETRIC_ENCRYPTION_KEY = os.environ.get("BIOMETRIC_ENCRYPTION_KEY", "").strip()
 BIOMETRIC_ENCRYPTION_KEY_VERSION = os.environ.get("BIOMETRIC_ENCRYPTION_KEY_VERSION", "v1")
 BIOMETRIC_CONSENT_POLICY_VERSION = os.environ.get("BIOMETRIC_CONSENT_POLICY_VERSION", "1.1")
 BIOMETRIC_FACE_MATCH_THRESHOLD = float(os.environ.get("BIOMETRIC_FACE_MATCH_THRESHOLD", "0.363"))

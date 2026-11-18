@@ -41,18 +41,53 @@ class FaceSample:
 
 def _fernet():
     key = getattr(settings, "BIOMETRIC_ENCRYPTION_KEY", "")
-    if not key:
+    if isinstance(key, bytes):
+        key_bytes = key.strip()
+    elif isinstance(key, str):
+        key = key.strip()
+        if not key:
+            raise BiometricServiceUnavailable(
+                "encryption_key_missing",
+                "Biometric verification is not configured. Contact the system administrator.",
+            )
+        try:
+            key_bytes = key.encode("ascii")
+        except UnicodeEncodeError as exc:
+            raise BiometricServiceUnavailable(
+                "encryption_key_invalid",
+                "The biometric encryption key is invalid. Contact the system administrator.",
+            ) from exc
+    else:
+        key_bytes = b""
+
+    if not key_bytes:
         raise BiometricServiceUnavailable(
             "encryption_key_missing",
             "Biometric verification is not configured. Contact the system administrator.",
         )
+
+    # Accept an omitted Base64 padding character while retaining Fernet's
+    # required 32-byte decoded key length. Never derive or silently replace keys.
+    key_bytes += b"=" * (-len(key_bytes) % 4)
     try:
-        return Fernet(key.encode("ascii"))
-    except (ValueError, UnicodeEncodeError) as exc:
+        return Fernet(key_bytes)
+    except (TypeError, ValueError) as exc:
         raise BiometricServiceUnavailable(
             "encryption_key_invalid",
             "The biometric encryption key is invalid. Contact the system administrator.",
         ) from exc
+
+
+def biometric_encryption_key_status():
+    """Return non-secret key configuration status for the student settings UI."""
+    key = getattr(settings, "BIOMETRIC_ENCRYPTION_KEY", "")
+    if not key or (isinstance(key, str) and not key.strip()):
+        return "missing"
+    try:
+        _fernet()
+    except BiometricServiceUnavailable as exc:
+        return "invalid" if exc.code == "encryption_key_invalid" else "missing"
+    return "valid"
 
 
 def encrypt_template(embedding):

@@ -127,7 +127,7 @@ export function ManualAttendancePage() {
         <div className="dashboard-page biometric-page manual-attendance-page">
             <div className="dashboard-page-heading workspace-page-heading">
                 <div><span className="eyebrow">LECTURER WORKSPACE</span><h1>Manual attendance exception</h1><p>Record an approved alternative when a student cannot complete biometric verification.</p></div>
-                <span className="release-chip"><span /> ROLLNEXA 1.0.3</span>
+                <span className="release-chip"><span /> ROLLNEXA 1.0.5</span>
             </div>
             <Link to="/app/attendance" className="attendance-back-link"><ArrowLeft size={16} /> Back to attendance sessions</Link>
 

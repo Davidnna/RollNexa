@@ -1,8 +1,8 @@
-# RollNexa 1.0.4
+# RollNexa 1.0.5
 
 **Academic management and dual-verification attendance.**
 
-Version 1.0.4 resolves the frontend production-build failure by upgrading Vite to 8.3.8 and the React Vite plugin to 6.3.0. Vite 8 uses Rolldown instead of the previous Rollup production bundler. The frontend builder uses the Node 22 slim image to provide a glibc-based environment for native bundler packages. This release does not change database models, migration history, attendance rules, biometric templates or stored records.
+Version 1.0.5 validates the Fernet encryption key before enrolment, reports missing and invalid key configuration separately, trims surrounding whitespace, and improves the mobile facial-enrolment camera layout. Camera frames are cropped to match the visible camera viewport before server-side detection. No database schema changes or migrations are introduced.
 
 RollNexa is a web-based academic administration and smart attendance platform. It manages institutional structure, user accounts, academic sessions, courses, course offerings, lecturer assignments and student registrations. Its automated attendance workflow combines a rotating QR Code with server-side facial recognition. An automated present record is created only when both verification stages succeed.
 
@@ -390,14 +390,14 @@ The Dockerfile builds the React application, installs Python dependencies, downl
 Build locally:
 
 ```bash
-docker build -t rollnexa:1.0.4 .
+docker build -t rollnexa:1.0.5 .
 ```
 
 Before deploying to Render:
 
 1. Review the Render Blueprint changes and confirm the service uses the Docker runtime.
 2. Ensure `DATABASE_URL`, `DIRECT_DATABASE_URL` where required, `SECRET_KEY` and other existing production settings are configured.
-3. Set `BIOMETRIC_ENCRYPTION_KEY` in Render. The Blueprint uses `generateValue: true`, which asks Render to create a Base64-encoded 256-bit secret compatible with Fernet. For a manually configured service, use Render's **Generate Random Value** option. For local development, generate a Fernet key with the command in section 9.2. Do not commit the value.
+3. Set `BIOMETRIC_ENCRYPTION_KEY` in Render. The Blueprint uses `generateValue: true`, which asks Render to create a Base64-encoded 256-bit secret compatible with Fernet. Render generates this value only when the variable does not already exist; syncing the Blueprint does not replace an existing value. If the application reports an invalid key and no facial templates have ever been successfully enrolled, replace the existing value using Render's **Generate Random Value** option and redeploy. If any templates have been enrolled, do not replace the key; use a controlled key migration. For local development, generate a Fernet key with the command in section 9.2. Do not commit the value.
 4. Set `BIOMETRIC_ENCRYPTION_KEY_VERSION=v1`, `BIOMETRIC_CONSENT_POLICY_VERSION=1.1`, `BIOMETRIC_FACE_MATCH_THRESHOLD=0.363` and `BIOMETRIC_FACE_DETECTION_THRESHOLD=0.75`.
 5. Deploy and verify `/healthz`, authentication, database migrations and the biometric status endpoint.
 6. Complete controlled enrolment and verification tests before enabling student biometric enrolment institution-wide.

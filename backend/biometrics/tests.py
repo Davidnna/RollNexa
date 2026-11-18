@@ -38,7 +38,12 @@ from .models import (
     BiometricVerificationAttempt,
     FaceEnrollment,
 )
-from .services import BiometricServiceError
+from .services import (
+    BiometricServiceError,
+    biometric_encryption_key_status,
+    decrypt_template,
+    encrypt_template,
+)
 from .workflows import create_or_replace_face_enrollment, update_biometric_consent
 
 User = get_user_model()
@@ -246,6 +251,56 @@ class BiometricWorkflowTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["consentStatus"], "not_given")
         self.assertFalse(response.data["isEnrolled"])
+        self.assertEqual(response.data["encryptionStatus"], "valid")
+        self.assertTrue(response.data["encryptionConfigured"])
+
+    @override_settings(BIOMETRIC_ENCRYPTION_KEY="")
+    def test_biometric_key_status_reports_missing_key(self):
+        self.assertEqual(biometric_encryption_key_status(), "missing")
+
+    @override_settings(BIOMETRIC_ENCRYPTION_KEY="not-a-fernet-key")
+    def test_biometric_key_status_reports_invalid_key(self):
+        self.assertEqual(biometric_encryption_key_status(), "invalid")
+
+    @override_settings(BIOMETRIC_ENCRYPTION_KEY="")
+    def test_student_status_api_reports_missing_encryption_key(self):
+        self.client.force_authenticate(user=self.student_user)
+        response = self.client.get(reverse("api_biometrics_status"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["encryptionStatus"], "missing")
+        self.assertFalse(response.data["encryptionConfigured"])
+
+    @override_settings(BIOMETRIC_ENCRYPTION_KEY="not-a-fernet-key")
+    def test_student_status_api_reports_invalid_encryption_key_without_exposing_it(self):
+        self.client.force_authenticate(user=self.student_user)
+        response = self.client.get(reverse("api_biometrics_status"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["encryptionStatus"], "invalid")
+        self.assertFalse(response.data["encryptionConfigured"])
+        self.assertNotIn("not-a-fernet-key", str(response.data))
+
+    @override_settings(BIOMETRIC_ENCRYPTION_KEY="not-a-fernet-key")
+    def test_enrolment_api_rejects_invalid_key_before_face_processing(self):
+        self.grant_consent()
+        self.client.force_authenticate(user=self.student_user)
+        frame = SimpleUploadedFile("frame.jpg", b"placeholder", content_type="image/jpeg")
+        with patch("biometrics.views.create_or_replace_face_enrollment") as create_enrollment:
+            response = self.client.post(
+                reverse("api_biometrics_enrolment"),
+                {"frames": [frame]},
+                format="multipart",
+            )
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.data["code"], "encryption_key_invalid")
+        create_enrollment.assert_not_called()
+
+    @override_settings(BIOMETRIC_ENCRYPTION_KEY=f"  {TEST_FERNET_KEY}\n")
+    def test_biometric_key_status_accepts_surrounding_whitespace(self):
+        self.assertEqual(biometric_encryption_key_status(), "valid")
+        vector = np.ones(128, dtype=np.float32)
+        encrypted = encrypt_template(vector)
+        decrypted = decrypt_template(encrypted)
+        self.assertEqual(decrypted.shape, (128,))
 
     def test_non_student_cannot_access_biometric_status(self):
         self.client.force_authenticate(user=self.lecturer_user)

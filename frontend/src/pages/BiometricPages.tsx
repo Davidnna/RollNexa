@@ -17,6 +17,7 @@ interface BiometricStatus {
     modelVersion: string | null;
     modelsAvailable: boolean;
     encryptionConfigured: boolean;
+    encryptionStatus: "missing" | "invalid" | "valid";
 }
 
 interface FaceChallenge {
@@ -60,12 +61,14 @@ function useCamera(enabled: boolean) {
                 if (!navigator.mediaDevices?.getUserMedia) {
                     throw new Error("Camera access requires a supported browser and a secure HTTPS connection.");
                 }
+                const isMobileViewport = window.matchMedia("(max-width: 760px)").matches;
                 const stream = await navigator.mediaDevices.getUserMedia({
                     audio: false,
                     video: {
-                        facingMode: "user",
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 },
+                        facingMode: { ideal: "user" },
+                        width: { ideal: isMobileViewport ? 720 : 1280 },
+                        height: { ideal: isMobileViewport ? 1280 : 720 },
+                        aspectRatio: { ideal: isMobileViewport ? 0.8 : 16 / 9 },
                     },
                 });
                 if (disposed) {
@@ -99,15 +102,46 @@ function useCamera(enabled: boolean) {
         if (!video || !video.videoWidth || !video.videoHeight) {
             throw new Error("The camera is not ready. Wait for the video preview and try again.");
         }
-        const scale = Math.min(1, maxWidth / video.videoWidth);
+
+        const displayRect = video.getBoundingClientRect();
+        const targetAspect = displayRect.width > 0 && displayRect.height > 0
+            ? displayRect.width / displayRect.height
+            : video.videoWidth / video.videoHeight;
+        const sourceAspect = video.videoWidth / video.videoHeight;
+        let sourceX = 0;
+        let sourceY = 0;
+        let sourceWidth = video.videoWidth;
+        let sourceHeight = video.videoHeight;
+
+        // Crop the source to the exact visible camera viewport. This keeps the
+        // image sent to Django consistent with what the student sees on mobile.
+        if (sourceAspect > targetAspect) {
+            sourceWidth = video.videoHeight * targetAspect;
+            sourceX = (video.videoWidth - sourceWidth) / 2;
+        } else if (sourceAspect < targetAspect) {
+            sourceHeight = video.videoWidth / targetAspect;
+            sourceY = (video.videoHeight - sourceHeight) / 2;
+        }
+
+        const scale = Math.min(1, maxWidth / sourceWidth);
         const canvas = document.createElement("canvas");
-        canvas.width = Math.max(320, Math.round(video.videoWidth * scale));
-        canvas.height = Math.max(240, Math.round(video.videoHeight * (canvas.width / video.videoWidth)));
+        canvas.width = Math.max(320, Math.round(sourceWidth * scale));
+        canvas.height = Math.max(240, Math.round(sourceHeight * (canvas.width / sourceWidth)));
         const context = canvas.getContext("2d");
         if (!context) throw new Error("The camera frame could not be prepared.");
         context.translate(canvas.width, 0);
         context.scale(-1, 1);
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        context.drawImage(
+            video,
+            sourceX,
+            sourceY,
+            sourceWidth,
+            sourceHeight,
+            0,
+            0,
+            canvas.width,
+            canvas.height,
+        );
         return new Promise((resolve, reject) => {
             canvas.toBlob((blob) => {
                 if (blob) resolve(blob);
@@ -353,7 +387,7 @@ export function BiometricSettingsPage() {
                     <h1>Biometric settings</h1>
                     <p>Manage your biometric consent and facial enrolment for attendance verification.</p>
                 </div>
-                <span className="release-chip"><span /> ROLLNEXA 1.0.3</span>
+                <span className="release-chip"><span /> ROLLNEXA 1.0.5</span>
             </div>
             <Link to="/app/attendance" className="attendance-back-link"><ArrowLeft size={16} /> Back to attendance</Link>
 
@@ -405,9 +439,10 @@ export function BiometricSettingsPage() {
                             </div>
                             <p>Keep your face inside the guide. RollNexa detects it continuously, gives positioning feedback and captures each frame automatically when your face is stable. The server validates all three frames before creating your encrypted facial template.</p>
                             {!status.modelsAvailable && <div className="workspace-alert workspace-alert-warning"><AlertCircle size={17} />Facial recognition model files are not available on this server yet. Enrolment will become available after the deployment installs the model assets.</div>}
-                            {!status.encryptionConfigured && <div className="workspace-alert workspace-alert-warning"><AlertCircle size={17} />The biometric encryption key is not configured on this server. The administrator must configure BIOMETRIC_ENCRYPTION_KEY before enrolment.</div>}
+                            {status.encryptionStatus === "missing" && <div className="workspace-alert workspace-alert-warning"><AlertCircle size={17} />Biometric enrolment is temporarily unavailable because the encryption service is not configured. Contact the system administrator.</div>}
+                            {status.encryptionStatus === "invalid" && <div className="workspace-alert workspace-alert-error"><AlertCircle size={17} />Biometric enrolment is temporarily unavailable because the server encryption configuration is invalid. The administrator must correct the Fernet key before enrolment can continue.</div>}
                             {!status.isEnrolled && !cameraEnabled && (
-                                <button className="button button-primary" type="button" disabled={!status.modelsAvailable || !status.encryptionConfigured} onClick={startEnrollmentCamera}><Camera size={16} /> Start facial enrolment</button>
+                                <button className="button button-primary" type="button" disabled={!status.modelsAvailable || status.encryptionStatus !== "valid"} onClick={startEnrollmentCamera}><Camera size={16} /> Start facial enrolment</button>
                             )}
                             {cameraEnabled && (
                                 <div className="biometric-capture-layout biometric-live-capture">
@@ -427,8 +462,9 @@ export function BiometricSettingsPage() {
                                         )}
                                     </div>
                                     <div className="biometric-capture-controls">
-                                        <strong>{frames.length === 0 ? "1. Look directly at the camera" : frames.length === 1 ? "2. Turn your head slightly to your left" : "3. Turn your head slightly to your right"}</strong>
-                                        <p>{frames.length} of 3 frames captured. RollNexa checks your position continuously and captures each frame when ready.</p>
+                                        <span className="biometric-stage-label">STEP {Math.min(frames.length + 1, 3)} OF 3</span>
+                                        <strong>{frames.length === 0 ? "Look directly at the camera" : frames.length === 1 ? "Turn your head slightly to your left" : "Turn your head slightly to your right"}</strong>
+                                        <p>{frames.length} of 3 frames captured. Keep your face inside the guide. RollNexa captures each frame automatically when your position is stable.</p>
                                         <div className={`biometric-live-status ${livePreview.ready ? "is-ready" : ""}`} role="status" aria-live="polite">
                                             <span className="biometric-live-indicator" />
                                             <span>{camera.cameraReady ? livePreview.message : camera.cameraError || "Waiting for camera permission…"}</span>
@@ -564,7 +600,7 @@ export function AttendanceFaceCheckPage() {
         <div className="dashboard-page biometric-page">
             <div className="dashboard-page-heading workspace-page-heading">
                 <div><span className="eyebrow">STUDENT WORKSPACE</span><h1>Facial attendance verification</h1><p>Complete the second verification stage for your QR-verified attendance session.</p></div>
-                <span className="release-chip"><span /> ROLLNEXA 1.0.3</span>
+                <span className="release-chip"><span /> ROLLNEXA 1.0.5</span>
             </div>
             <Link to="/app/attendance/check-in" className="attendance-back-link"><ArrowLeft size={16} /> Back to QR scanning</Link>
             {pageError && <div className="workspace-alert workspace-alert-error"><AlertCircle size={17} />{pageError}</div>}

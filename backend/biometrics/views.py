@@ -28,6 +28,7 @@ from .services import (
     BiometricServiceError,
     BiometricServiceUnavailable,
     MODEL_VERSION,
+    biometric_encryption_key_status,
     biometric_models_available,
     inspect_face_frame,
     verify_face_challenge,
@@ -61,6 +62,7 @@ def _current_consent(student):
 def _consent_data(student):
     consent = _current_consent(student)
     enrollment = FaceEnrollment.objects.filter(student=student, is_active=True).first()
+    encryption_status = biometric_encryption_key_status()
     return {
         "consentStatus": (
             "consent_update_required"
@@ -75,7 +77,8 @@ def _consent_data(student):
         "enrolledAt": enrollment.enrolled_at.isoformat() if enrollment else None,
         "modelVersion": enrollment.model_version if enrollment else None,
         "modelsAvailable": biometric_models_available(),
-        "encryptionConfigured": bool(getattr(settings, "BIOMETRIC_ENCRYPTION_KEY", "")),
+        "encryptionStatus": encryption_status,
+        "encryptionConfigured": encryption_status == "valid",
     }
 
 
@@ -168,6 +171,15 @@ class FaceEnrollmentView(NoCacheAPIView):
         consent = _current_consent(student)
         if not consent or not consent.is_granted or consent.policy_version != getattr(settings, "BIOMETRIC_CONSENT_POLICY_VERSION", "1.1"):
             return Response({"detail": "Current biometric consent is required before facial enrolment."}, status=403)
+        encryption_status = biometric_encryption_key_status()
+        if encryption_status != "valid":
+            code = "encryption_key_missing" if encryption_status == "missing" else "encryption_key_invalid"
+            detail = (
+                "Biometric encryption is not configured on this server. Contact the system administrator."
+                if encryption_status == "missing"
+                else "The biometric encryption key is invalid. Contact the system administrator."
+            )
+            return Response({"detail": detail, "code": code}, status=503)
         try:
             enrollment = create_or_replace_face_enrollment(student=student, frames=frames)
         except BiometricServiceUnavailable as exc:
@@ -218,8 +230,15 @@ class FaceChallengeView(NoCacheAPIView):
             return Response({"detail": "The biometric encryption key version has changed. Re-enrolment or controlled key migration is required."}, status=503)
         if not biometric_models_available():
             return Response({"detail": "Facial recognition models are not installed on this server."}, status=503)
-        if not getattr(settings, "BIOMETRIC_ENCRYPTION_KEY", ""):
-            return Response({"detail": "Biometric encryption is not configured on this server."}, status=503)
+        encryption_status = biometric_encryption_key_status()
+        if encryption_status != "valid":
+            code = "encryption_key_missing" if encryption_status == "missing" else "encryption_key_invalid"
+            detail = (
+                "Biometric encryption is not configured on this server."
+                if encryption_status == "missing"
+                else "The biometric encryption key is invalid. Contact the system administrator."
+            )
+            return Response({"detail": detail, "code": code}, status=503)
         if verification.status != AttendanceVerification.STATUS_QR_VERIFIED:
             return Response({"detail": "This QR verification is no longer awaiting facial verification."}, status=409)
         if verification.expires_at <= now or verification.session.status != AttendanceSession.STATUS_ACTIVE or not verification.session.is_open_at(now):
@@ -255,6 +274,15 @@ class FaceVerificationView(NoCacheAPIView):
 
     def post(self, request, verification_id):
         student = _student_profile(request)
+        encryption_status = biometric_encryption_key_status()
+        if encryption_status != "valid":
+            code = "encryption_key_missing" if encryption_status == "missing" else "encryption_key_invalid"
+            detail = (
+                "Biometric encryption is not configured on this server."
+                if encryption_status == "missing"
+                else "The biometric encryption key is invalid. Contact the system administrator."
+            )
+            return Response({"detail": detail, "code": code}, status=503)
         challenge_id = request.data.get("challengeId", "")
         baseline_frame = request.FILES.get("baselineFrame")
         challenge_frame = request.FILES.get("challengeFrame")

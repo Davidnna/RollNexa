@@ -70,7 +70,7 @@ export function DashboardHome() {
                     <h1>Good day, {greetingName}.</h1>
                     <p>Here is an overview of the information available to your account.</p>
                 </div>
-                <span className="release-chip"><span /> ROLLNEXA 1.0.3</span>
+                <span className="release-chip"><span /> ROLLNEXA 1.0.5</span>
             </div>
 
             {summaryQuery.isLoading && <div className="dashboard-loading"><span className="loading-spinner" /> Loading your workspace summary…</div>}
