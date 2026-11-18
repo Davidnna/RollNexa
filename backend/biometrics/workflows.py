@@ -12,7 +12,7 @@ from .services import MODEL_VERSION, build_enrollment_template, encrypt_template
 
 @transaction.atomic
 def update_biometric_consent(*, student, action, policy_version):
-    expected_version = getattr(settings, "BIOMETRIC_CONSENT_POLICY_VERSION", "1.0")
+    expected_version = getattr(settings, "BIOMETRIC_CONSENT_POLICY_VERSION", "1.1")
     if action not in {BiometricConsentEvent.ACTION_GRANTED, BiometricConsentEvent.ACTION_WITHDRAWN}:
         raise ValidationError("Choose whether to grant or withdraw biometric consent.")
     if action == BiometricConsentEvent.ACTION_GRANTED and policy_version != expected_version:
@@ -61,7 +61,7 @@ def create_or_replace_face_enrollment(*, student, frames):
     consent = BiometricConsent.objects.select_for_update().filter(
         student=student,
         status=BiometricConsent.STATUS_GRANTED,
-        policy_version=getattr(settings, "BIOMETRIC_CONSENT_POLICY_VERSION", "1.0"),
+        policy_version=getattr(settings, "BIOMETRIC_CONSENT_POLICY_VERSION", "1.1"),
     ).first()
     if not consent:
         raise ValidationError("Grant current biometric consent before enrolling your face.")

@@ -253,6 +253,54 @@ class BiometricWorkflowTests(TestCase):
         self.assertEqual(response.status_code, 403)
 
     @patch("biometrics.views.biometric_models_available", return_value=True)
+    @patch(
+        "biometrics.views.inspect_face_frame",
+        return_value={
+            "status": "face_ready",
+            "ready": True,
+            "faceCount": 1,
+            "message": "Face detected. Hold this position.",
+            "boundingBox": {"x": 0.3, "y": 0.1, "width": 0.4, "height": 0.7},
+            "poseRatio": 0.5,
+        },
+    )
+    def test_student_can_receive_live_face_preview_after_granting_consent(self, _inspect_face, _models_available):
+        self.grant_consent()
+        self.client.force_authenticate(user=self.student_user)
+        frame = SimpleUploadedFile("preview.jpg", b"preview-frame", content_type="image/jpeg")
+        response = self.client.post(
+            reverse("api_biometrics_face_preview"),
+            {"frame": frame},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["ready"])
+        self.assertEqual(response.data["faceCount"], 1)
+        self.assertAlmostEqual(response.data["poseRatio"], 0.5)
+
+    @patch("biometrics.views.inspect_face_frame")
+    def test_live_face_preview_requires_current_biometric_consent(self, inspect_face):
+        self.client.force_authenticate(user=self.student_user)
+        frame = SimpleUploadedFile("preview.jpg", b"preview-frame", content_type="image/jpeg")
+        response = self.client.post(
+            reverse("api_biometrics_face_preview"),
+            {"frame": frame},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 403)
+        inspect_face.assert_not_called()
+
+    def test_non_student_cannot_use_live_face_preview(self):
+        self.client.force_authenticate(user=self.lecturer_user)
+        frame = SimpleUploadedFile("preview.jpg", b"preview-frame", content_type="image/jpeg")
+        response = self.client.post(
+            reverse("api_biometrics_face_preview"),
+            {"frame": frame},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 403)
+
+    @patch("biometrics.views.biometric_models_available", return_value=True)
     def test_student_can_request_randomised_face_challenge_after_qr_verification(self, _models_available):
         self.create_enrollment()
         verification = self.create_pending_verification()
@@ -341,6 +389,52 @@ class BiometricWorkflowTests(TestCase):
 
 
 class BiometricProcessingUnitTests(TestCase):
+    def test_live_face_inspection_returns_position_and_pose_feedback(self):
+        from .services import inspect_face_frame
+
+        class FakeDetector:
+            def setInputSize(self, size):
+                self.input_size = size
+
+            def detect(self, image):
+                face = np.array(
+                    [[230, 70, 180, 220, 285, 150, 355, 150, 320, 185, 292, 235, 348, 235, 0.96]],
+                    dtype=np.float32,
+                )
+                return 1, face
+
+        image = np.zeros((360, 640, 3), dtype=np.uint8)
+        with patch("biometrics.services._decode_image", return_value=image), patch(
+            "biometrics.services._load_models", return_value=(FakeDetector(), object())
+        ):
+            result = inspect_face_frame(object())
+
+        self.assertTrue(result["ready"])
+        self.assertEqual(result["status"], "face_ready")
+        self.assertEqual(result["faceCount"], 1)
+        self.assertAlmostEqual(result["poseRatio"], 0.5)
+        self.assertAlmostEqual(result["boundingBox"]["width"], 180 / 640)
+
+    def test_live_face_inspection_returns_guidance_when_no_face_is_detected(self):
+        from .services import inspect_face_frame
+
+        class FakeDetector:
+            def setInputSize(self, size):
+                self.input_size = size
+
+            def detect(self, image):
+                return 1, None
+
+        image = np.zeros((360, 640, 3), dtype=np.uint8)
+        with patch("biometrics.services._decode_image", return_value=image), patch(
+            "biometrics.services._load_models", return_value=(FakeDetector(), object())
+        ):
+            result = inspect_face_frame(object())
+
+        self.assertFalse(result["ready"])
+        self.assertEqual(result["status"], "no_face")
+        self.assertEqual(result["faceCount"], 0)
+
     def test_enrolment_requires_neutral_left_and_right_pose_samples(self):
         from .services import FaceSample, build_enrollment_template
 

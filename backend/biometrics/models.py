@@ -108,7 +108,7 @@ class FaceEnrollment(models.Model):
                 consent = self.student.biometric_consent
             except BiometricConsent.DoesNotExist:
                 consent = None
-        current_policy = getattr(settings, "BIOMETRIC_CONSENT_POLICY_VERSION", "1.0")
+        current_policy = getattr(settings, "BIOMETRIC_CONSENT_POLICY_VERSION", "1.1")
         if self.is_active and (
             not consent
             or not consent.is_granted

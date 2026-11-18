@@ -34,6 +34,15 @@ interface FaceVerificationResponse {
     recordedAt: string;
 }
 
+interface FacePreviewResponse {
+    status: string;
+    ready: boolean;
+    faceCount: number;
+    message: string;
+    boundingBox: { x: number; y: number; width: number; height: number } | null;
+    poseRatio: number | null;
+}
+
 function useCamera(enabled: boolean) {
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const streamRef = useRef<MediaStream | null>(null);
@@ -85,14 +94,15 @@ function useCamera(enabled: boolean) {
         };
     }, [enabled]);
 
-    async function captureFrame(): Promise<Blob> {
+    async function captureFrame(maxWidth = 640, quality = 0.78): Promise<Blob> {
         const video = videoRef.current;
         if (!video || !video.videoWidth || !video.videoHeight) {
             throw new Error("The camera is not ready. Wait for the video preview and try again.");
         }
+        const scale = Math.min(1, maxWidth / video.videoWidth);
         const canvas = document.createElement("canvas");
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
+        canvas.width = Math.max(320, Math.round(video.videoWidth * scale));
+        canvas.height = Math.max(240, Math.round(video.videoHeight * (canvas.width / video.videoWidth)));
         const context = canvas.getContext("2d");
         if (!context) throw new Error("The camera frame could not be prepared.");
         context.translate(canvas.width, 0);
@@ -102,11 +112,17 @@ function useCamera(enabled: boolean) {
             canvas.toBlob((blob) => {
                 if (blob) resolve(blob);
                 else reject(new Error("The camera frame could not be captured."));
-            }, "image/jpeg", 0.88);
+            }, "image/jpeg", quality);
         });
     }
 
-    return { videoRef, cameraError, cameraReady, captureFrame };
+    return {
+        videoRef,
+        cameraError,
+        cameraReady,
+        captureFrame: () => captureFrame(1280, 0.88),
+        capturePreviewFrame: () => captureFrame(640, 0.72),
+    };
 }
 
 export function BiometricSettingsPage() {
@@ -116,7 +132,19 @@ export function BiometricSettingsPage() {
     const [cameraEnabled, setCameraEnabled] = useState(false);
     const [frames, setFrames] = useState<Blob[]>([]);
     const [pageError, setPageError] = useState("");
+    const [livePreview, setLivePreview] = useState<FacePreviewResponse>({
+        status: "waiting",
+        ready: false,
+        faceCount: 0,
+        message: "Starting the live face guide…",
+        boundingBox: null,
+        poseRatio: null,
+    });
     const camera = useCamera(cameraEnabled);
+    const previewInFlightRef = useRef(false);
+    const stableFramesRef = useRef(0);
+    const baselinePoseRef = useRef<number | null>(null);
+    const framesRef = useRef<Blob[]>([]);
 
     const statusQuery = useQuery({
         queryKey: ["biometrics", "status"],
@@ -136,6 +164,9 @@ export function BiometricSettingsPage() {
             setAcknowledged(false);
             setCameraEnabled(false);
             setFrames([]);
+            framesRef.current = [];
+            stableFramesRef.current = 0;
+            baselinePoseRef.current = null;
             await queryClient.invalidateQueries({ queryKey: ["biometrics"] });
         },
         onError: (error) => setPageError(error instanceof Error ? error.message : "The consent preference could not be updated."),
@@ -153,6 +184,9 @@ export function BiometricSettingsPage() {
         onSuccess: async () => {
             setCameraEnabled(false);
             setFrames([]);
+            framesRef.current = [];
+            stableFramesRef.current = 0;
+            baselinePoseRef.current = null;
             setPageError("");
             await queryClient.invalidateQueries({ queryKey: ["biometrics"] });
         },
@@ -168,18 +202,142 @@ export function BiometricSettingsPage() {
         onError: (error) => setPageError(error instanceof Error ? error.message : "The facial template could not be deleted."),
     });
 
-    if (user?.role !== "student") return <Navigate to="/app" replace />;
     const status = statusQuery.data;
     const consentGranted = status?.consentStatus === "granted";
 
-    async function captureEnrollmentFrame() {
-        setPageError("");
-        try {
-            const frame = await camera.captureFrame();
-            setFrames((current) => [...current, frame].slice(0, 3));
-        } catch (error) {
-            setPageError(error instanceof Error ? error.message : "The frame could not be captured.");
+    useEffect(() => {
+        if (!cameraEnabled || !camera.cameraReady || frames.length >= 3 || enrollmentMutation.isPending) {
+            return;
         }
+
+        let disposed = false;
+
+        async function inspectLiveFrame() {
+            if (previewInFlightRef.current || disposed) return;
+            previewInFlightRef.current = true;
+            try {
+                const frame = await camera.capturePreviewFrame();
+                const formData = new FormData();
+                formData.append("frame", frame, "live-face-preview.jpg");
+                const result = await apiRequest<FacePreviewResponse>("/api/v1/biometrics/face-preview/", {
+                    method: "POST",
+                    body: formData,
+                });
+                if (disposed) return;
+
+                const stage = framesRef.current.length;
+                setLivePreview(result);
+                if (!result.ready || result.poseRatio === null) {
+                    stableFramesRef.current = 0;
+                    return;
+                }
+
+                const baseline = baselinePoseRef.current;
+                const poseReady = stage === 0
+                    ? Math.abs(result.poseRatio - 0.5) <= 0.10
+                    : stage === 1
+                        ? baseline !== null && result.poseRatio <= baseline - 0.08
+                        : baseline !== null && result.poseRatio >= baseline + 0.08;
+
+                if (!poseReady) {
+                    stableFramesRef.current = 0;
+                    setLivePreview({
+                        ...result,
+                        message: stage === 0
+                            ? "Face detected. Look straight at the camera."
+                            : stage === 1
+                                ? "Face detected. Turn your head slightly to your left."
+                                : "Face detected. Turn your head slightly to your right.",
+                    });
+                    return;
+                }
+
+                stableFramesRef.current += 1;
+                setLivePreview({ ...result, message: "Good position. Hold still while the frame is captured…" });
+                if (stableFramesRef.current < 2) return;
+
+                const nextFrames = [...framesRef.current, frame].slice(0, 3);
+                framesRef.current = nextFrames;
+                setFrames(nextFrames);
+                if (stage === 0) baselinePoseRef.current = result.poseRatio;
+                stableFramesRef.current = 0;
+
+                if (nextFrames.length === 3) {
+                    setCameraEnabled(false);
+                    setLivePreview({
+                        status: "captured",
+                        ready: true,
+                        faceCount: 1,
+                        message: "All three frames passed the live face checks. Submit to complete enrolment.",
+                        boundingBox: null,
+                        poseRatio: null,
+                    });
+                } else {
+                    setLivePreview({
+                        ...result,
+                        status: "captured",
+                        ready: true,
+                        message: `${nextFrames.length} of 3 frames captured. Follow the next instruction.`,
+                    });
+                }
+            } catch (error) {
+                if (!disposed) {
+                    stableFramesRef.current = 0;
+                    setLivePreview({
+                        status: "unavailable",
+                        ready: false,
+                        faceCount: 0,
+                        message: error instanceof Error ? error.message : "Live face detection is temporarily unavailable.",
+                        boundingBox: null,
+                        poseRatio: null,
+                    });
+                }
+            } finally {
+                previewInFlightRef.current = false;
+            }
+        }
+
+        const timer = window.setInterval(() => void inspectLiveFrame(), 900);
+        void inspectLiveFrame();
+        return () => {
+            disposed = true;
+            window.clearInterval(timer);
+        };
+    }, [cameraEnabled, camera.cameraReady, frames.length, enrollmentMutation.isPending]);
+
+    if (user?.role !== "student") return <Navigate to="/app" replace />;
+
+    function startEnrollmentCamera() {
+        framesRef.current = [];
+        stableFramesRef.current = 0;
+        baselinePoseRef.current = null;
+        setFrames([]);
+        setPageError("");
+        setLivePreview({
+            status: "waiting",
+            ready: false,
+            faceCount: 0,
+            message: "Starting the live face guide…",
+            boundingBox: null,
+            poseRatio: null,
+        });
+        setCameraEnabled(true);
+    }
+
+    function resetEnrollmentCapture() {
+        setCameraEnabled(false);
+        framesRef.current = [];
+        stableFramesRef.current = 0;
+        baselinePoseRef.current = null;
+        setFrames([]);
+        setLivePreview({
+            status: "waiting",
+            ready: false,
+            faceCount: 0,
+            message: "Start the camera when you are ready.",
+            boundingBox: null,
+            poseRatio: null,
+        });
     }
 
     function submitEnrollment() {
@@ -195,7 +353,7 @@ export function BiometricSettingsPage() {
                     <h1>Biometric settings</h1>
                     <p>Manage your biometric consent and facial enrolment for attendance verification.</p>
                 </div>
-                <span className="release-chip"><span /> ROLLNEXA 1.0.2</span>
+                <span className="release-chip"><span /> ROLLNEXA 1.0.3</span>
             </div>
             <Link to="/app/attendance" className="attendance-back-link"><ArrowLeft size={16} /> Back to attendance</Link>
 
@@ -219,7 +377,7 @@ export function BiometricSettingsPage() {
                         <section className="biometric-panel">
                             <span className="eyebrow">INFORMED CHOICE</span>
                             <h2>Biometric consent</h2>
-                            <p>RollNexa will process camera frames on the server to create and compare a facial feature template for attendance identity verification. The system stores an encrypted facial template, not the camera photographs used during enrolment or attendance checks.</p>
+                            <p>During enrolment, RollNexa sends small camera preview frames securely to its server for live face detection and positioning guidance. When enrolment is submitted, the server extracts and encrypts your facial feature template. Camera frames are processed in memory and are not saved as photographs.</p>
                             <ul className="biometric-policy-list">
                                 <li>Facial enrolment is optional.</li>
                                 <li>You can withdraw consent and request deletion of your stored facial template at any time.</li>
@@ -245,24 +403,53 @@ export function BiometricSettingsPage() {
                                 <div><span className="eyebrow">ENROLMENT</span><h2>Facial template</h2></div>
                                 <span className="workspace-status is-positive">Consent granted</span>
                             </div>
-                            <p>Capture three clear images of your face. Keep your face centred, then make small head turns as prompted. The server checks that the captures represent the same person and stores an encrypted feature template.</p>
+                            <p>Keep your face inside the guide. RollNexa detects it continuously, gives positioning feedback and captures each frame automatically when your face is stable. The server validates all three frames before creating your encrypted facial template.</p>
                             {!status.modelsAvailable && <div className="workspace-alert workspace-alert-warning"><AlertCircle size={17} />Facial recognition model files are not available on this server yet. Enrolment will become available after the deployment installs the model assets.</div>}
                             {!status.encryptionConfigured && <div className="workspace-alert workspace-alert-warning"><AlertCircle size={17} />The biometric encryption key is not configured on this server. The administrator must configure BIOMETRIC_ENCRYPTION_KEY before enrolment.</div>}
                             {!status.isEnrolled && !cameraEnabled && (
-                                <button className="button button-primary" type="button" disabled={!status.modelsAvailable || !status.encryptionConfigured} onClick={() => { setFrames([]); setPageError(""); setCameraEnabled(true); }}><Camera size={16} /> Start facial enrolment</button>
+                                <button className="button button-primary" type="button" disabled={!status.modelsAvailable || !status.encryptionConfigured} onClick={startEnrollmentCamera}><Camera size={16} /> Start facial enrolment</button>
                             )}
                             {cameraEnabled && (
-                                <div className="biometric-capture-layout">
-                                    <div className="biometric-camera-frame"><video ref={camera.videoRef} autoPlay playsInline muted /></div>
+                                <div className="biometric-capture-layout biometric-live-capture">
+                                    <div className="biometric-camera-frame">
+                                        <video ref={camera.videoRef} autoPlay playsInline muted />
+                                        <div className="biometric-face-guide" aria-hidden="true" />
+                                        {livePreview.boundingBox && (
+                                            <div
+                                                className="biometric-face-box"
+                                                style={{
+                                                    left: `${livePreview.boundingBox.x * 100}%`,
+                                                    top: `${livePreview.boundingBox.y * 100}%`,
+                                                    width: `${livePreview.boundingBox.width * 100}%`,
+                                                    height: `${livePreview.boundingBox.height * 100}%`,
+                                                }}
+                                            />
+                                        )}
+                                    </div>
                                     <div className="biometric-capture-controls">
-                                        <strong>{frames.length === 0 ? "1. Look directly at the camera" : frames.length === 1 ? "2. Turn your head slightly to your left" : frames.length === 2 ? "3. Turn your head slightly to your right" : "All three frames captured"}</strong>
-                                        <p>{frames.length} of 3 enrolment frames captured.</p>
-                                        {camera.cameraError && <div className="workspace-alert workspace-alert-error">{camera.cameraError}</div>}
-                                        <div className="biometric-action-row">
-                                            <button className="button button-outline" type="button" disabled={!camera.cameraReady || frames.length >= 3} onClick={() => void captureEnrollmentFrame()}><Camera size={15} /> Capture frame</button>
-                                            <button className="button button-primary" type="button" disabled={frames.length !== 3 || enrollmentMutation.isPending} onClick={submitEnrollment}>{enrollmentMutation.isPending ? <LoaderCircle size={15} className="workspace-spin" /> : <ScanFace size={15} />} Submit enrolment</button>
-                                            <button className="button button-outline" type="button" onClick={() => { setCameraEnabled(false); setFrames([]); }}>Cancel</button>
+                                        <strong>{frames.length === 0 ? "1. Look directly at the camera" : frames.length === 1 ? "2. Turn your head slightly to your left" : "3. Turn your head slightly to your right"}</strong>
+                                        <p>{frames.length} of 3 frames captured. RollNexa checks your position continuously and captures each frame when ready.</p>
+                                        <div className={`biometric-live-status ${livePreview.ready ? "is-ready" : ""}`} role="status" aria-live="polite">
+                                            <span className="biometric-live-indicator" />
+                                            <span>{camera.cameraReady ? livePreview.message : camera.cameraError || "Waiting for camera permission…"}</span>
                                         </div>
+                                        {camera.cameraError && <div className="workspace-alert workspace-alert-error">{camera.cameraError}</div>}
+                                        <div className="biometric-frame-progress" aria-label={`${frames.length} of 3 frames captured`}>
+                                            {[0, 1, 2].map((index) => <span key={index} className={index < frames.length ? "is-complete" : ""} />)}
+                                        </div>
+                                        <div className="biometric-action-row">
+                                            <button className="button button-outline" type="button" onClick={resetEnrollmentCapture}>Cancel capture</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                            {frames.length === 3 && !cameraEnabled && (
+                                <div className="biometric-enrollment-ready">
+                                    <CheckCircle2 size={20} />
+                                    <div><strong>All three frames passed the live checks.</strong><p>Review the capture status, then submit to create your encrypted facial template.</p></div>
+                                    <div className="biometric-action-row">
+                                        <button className="button button-primary" type="button" disabled={enrollmentMutation.isPending} onClick={submitEnrollment}>{enrollmentMutation.isPending ? <LoaderCircle size={15} className="workspace-spin" /> : <ScanFace size={15} />} Submit enrolment</button>
+                                        <button className="button button-outline" type="button" onClick={resetEnrollmentCapture}>Retake frames</button>
                                     </div>
                                 </div>
                             )}
@@ -377,7 +564,7 @@ export function AttendanceFaceCheckPage() {
         <div className="dashboard-page biometric-page">
             <div className="dashboard-page-heading workspace-page-heading">
                 <div><span className="eyebrow">STUDENT WORKSPACE</span><h1>Facial attendance verification</h1><p>Complete the second verification stage for your QR-verified attendance session.</p></div>
-                <span className="release-chip"><span /> ROLLNEXA 1.0.2</span>
+                <span className="release-chip"><span /> ROLLNEXA 1.0.3</span>
             </div>
             <Link to="/app/attendance/check-in" className="attendance-back-link"><ArrowLeft size={16} /> Back to QR scanning</Link>
             {pageError && <div className="workspace-alert workspace-alert-error"><AlertCircle size={17} />{pageError}</div>}

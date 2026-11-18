@@ -1,8 +1,8 @@
-# RollNexa 1.0.2
+# RollNexa 1.0.3
 
 **Academic management and dual-verification attendance.**
 
-Version 1.0.2 reorganises the repository into separate `backend/` and `frontend/` application directories, standardises editor indentation to four spaces, removes verified dead files and unused imports, and updates Docker and local-development paths. It does not change database models, migration history, attendance rules or stored records.
+Version 1.0.3 adds a server-assisted live face-enrolment guide, per-frame face-position feedback, automatic capture after stable detection, and a configurable YuNet detection threshold. It builds on the 1.0.2 backend/frontend structure and does not change database models, migration history, attendance rules or stored records.
 
 RollNexa is a web-based academic administration and smart attendance platform. It manages institutional structure, user accounts, academic sessions, courses, course offerings, lecturer assignments and student registrations. Its automated attendance workflow combines a rotating QR Code with server-side facial recognition. An automated present record is created only when both verification stages succeed.
 
@@ -93,8 +93,10 @@ The model assets are downloaded during the Docker image build by `backend/biomet
 
 ### Enrolment
 
-- The student must review the biometric notice and explicitly grant consent before enrolment.
-- Enrolment captures three frames in order: neutral, slight left turn and slight right turn. The server checks the requested pose changes and that the captures represent a consistent identity.
+- The student must review the current biometric notice and explicitly grant consent before enrolment. This release increments the consent policy to version `1.1` because it introduces repeated live-preview frame processing; students with version `1.0` consent must review and accept the updated notice before continuing.
+- During enrolment, the browser sends a compressed camera preview frame to the same-origin Django API approximately every 900 milliseconds. The server runs YuNet detection and returns a face count, positioning box, and transient pose ratio for live guidance.
+- The guide reports when no face is visible, multiple faces are present, the face is too small or large, the face is off-centre, or the requested head position has been reached.
+- The interface automatically captures three stable frames in order: neutral, slight left turn and slight right turn. Each preview frame is processed in memory and is not stored. The final enrolment request rechecks the three frames, verifies pose changes and identity consistency, then creates the encrypted feature template.
 - The server creates a normalised facial feature vector and encrypts it before storage.
 - The application stores the encrypted feature template, model/version metadata and enrolment timestamps. It does not persist the captured enrolment images.
 - Only one active face template is retained for each student profile.
@@ -105,7 +107,7 @@ The model assets are downloaded during the Docker image build by `backend/biomet
 - Images must be valid, at least 320 by 240 pixels, no more than four million pixels and no larger than 2 MB per frame.
 - Both the neutral and challenge frames must match the enrolled template and one another above the configured cosine threshold.
 - A randomised left/right head-turn instruction is checked using the change in the detected nose-to-eye landmark ratio.
-- Captured attendance frames are processed in memory and are not written as image files by the application.
+- Captured attendance frames and live enrolment preview frames are processed in memory and are not written as image files by the application.
 - The audit record stores the outcome, failure code, liveness-check outcome and model version, not the captured images or similarity score.
 
 **Liveness limitation:** The current head-turn check is a basic challenge-response pose heuristic. It is not a certified presentation-attack-detection (PAD) system and must not be described as proof against sophisticated photo, screen replay, deepfake or camera-injection attacks. A production institution requiring stronger anti-spoofing assurance should independently evaluate and integrate a dedicated PAD model or supervised capture procedure.
@@ -113,6 +115,8 @@ The model assets are downloaded during the Docker image build by `backend/biomet
 ### Matching threshold
 
 The default cosine similarity threshold is `0.363`, configurable through `BIOMETRIC_FACE_MATCH_THRESHOLD`. OpenCV documents this value for its SFace/LFW benchmark, while its published thresholds differ across other evaluation datasets. It is an initial engineering default, not a validated threshold for every student population, camera, lighting condition or demographic group. The institution must conduct a representative calibration and false-accept/false-reject evaluation before relying on the system for consequential attendance decisions.
+
+The YuNet detector confidence threshold is separately configurable through `BIOMETRIC_FACE_DETECTION_THRESHOLD` and defaults to `0.75` in this release. This is a detection setting, not an identity-match threshold. A lower detector threshold can reduce missed detections but may admit weaker candidate boxes; the server still requires one face, minimum image/face dimensions, valid landmarks, SFace consistency and final identity checks. Calibrate this value using representative camera samples before institutional use.
 
 ### Consent, withdrawal and alternative access
 
@@ -220,12 +224,13 @@ All API endpoints use the `/api/v1/` prefix and the same-origin Django session. 
 
 - `GET /api/v1/biometrics/status/` — return the student's consent and enrolment state and server model availability.
 - `POST /api/v1/biometrics/consent/` — grant or withdraw versioned biometric consent.
-- `POST /api/v1/biometrics/enrolment/` — multipart submission of exactly three enrolment frames.
+- `POST /api/v1/biometrics/face-preview/` — process one transient camera frame and return live face-count, position, size and pose guidance; requires current student consent and is rate-limited.
+- `POST /api/v1/biometrics/enrolment/` — multipart submission of exactly three enrolment frames after live guidance.
 - `DELETE /api/v1/biometrics/enrolment/` — delete the student's stored facial template.
 - `POST /api/v1/biometrics/verifications/{verification_id}/challenge/` — issue a single-use randomised head-turn challenge for a pending QR verification.
 - `POST /api/v1/biometrics/verifications/{verification_id}/verify/` — multipart submission of the neutral and challenge frames; server-side matching and liveness checks run before the attendance service can record a present entry.
 
-The biometric verification API does not accept a browser-supplied success flag. A successful attendance record is created by the backend service only after the server-side face verification operation succeeds.
+The biometric verification API does not accept a browser-supplied success flag. A successful attendance record is created by the backend service only after the server-side face verification operation succeeds. The live preview endpoint does not create templates or attendance records; it returns transient positioning feedback and does not persist preview images.
 
 ## 8. Requirements
 
@@ -275,8 +280,9 @@ export DEBUG=True
 export SECRET_KEY='replace-with-a-long-local-development-secret'
 export DATABASE_URL='postgresql://USER:PASSWORD@HOST:5432/DATABASE'
 export ALLOWED_HOSTS='localhost,127.0.0.1'
-export BIOMETRIC_CONSENT_POLICY_VERSION='1.0'
+export BIOMETRIC_CONSENT_POLICY_VERSION='1.1'
 export BIOMETRIC_FACE_MATCH_THRESHOLD='0.363'
+export BIOMETRIC_FACE_DETECTION_THRESHOLD='0.75'
 export BIOMETRIC_ENCRYPTION_KEY="$(python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')"
 export BIOMETRIC_ENCRYPTION_KEY_VERSION='v1'
 ```
@@ -288,8 +294,9 @@ $env:DEBUG = "True"
 $env:SECRET_KEY = "replace-with-a-long-local-development-secret"
 $env:DATABASE_URL = "postgresql://USER:PASSWORD@HOST:5432/DATABASE"
 $env:ALLOWED_HOSTS = "localhost,127.0.0.1"
-$env:BIOMETRIC_CONSENT_POLICY_VERSION = "1.0"
+$env:BIOMETRIC_CONSENT_POLICY_VERSION = "1.1"
 $env:BIOMETRIC_FACE_MATCH_THRESHOLD = "0.363"
+$env:BIOMETRIC_FACE_DETECTION_THRESHOLD = "0.75"
 $env:BIOMETRIC_ENCRYPTION_KEY = python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 $env:BIOMETRIC_ENCRYPTION_KEY_VERSION = "v1"
 ```
@@ -383,7 +390,7 @@ The Dockerfile builds the React application, installs Python dependencies, downl
 Build locally:
 
 ```bash
-docker build -t rollnexa:1.0.2 .
+docker build -t rollnexa:1.0.3 .
 ```
 
 Before deploying to Render:
@@ -391,7 +398,7 @@ Before deploying to Render:
 1. Review the Render Blueprint changes and confirm the service uses the Docker runtime.
 2. Ensure `DATABASE_URL`, `DIRECT_DATABASE_URL` where required, `SECRET_KEY` and other existing production settings are configured.
 3. Set `BIOMETRIC_ENCRYPTION_KEY` in Render. The Blueprint uses `generateValue: true`, which asks Render to create a Base64-encoded 256-bit secret compatible with Fernet. For a manually configured service, use Render's **Generate Random Value** option. For local development, generate a Fernet key with the command in section 9.2. Do not commit the value.
-4. Set `BIOMETRIC_ENCRYPTION_KEY_VERSION=v1`, `BIOMETRIC_CONSENT_POLICY_VERSION=1.0` and `BIOMETRIC_FACE_MATCH_THRESHOLD=0.363`.
+4. Set `BIOMETRIC_ENCRYPTION_KEY_VERSION=v1`, `BIOMETRIC_CONSENT_POLICY_VERSION=1.1`, `BIOMETRIC_FACE_MATCH_THRESHOLD=0.363` and `BIOMETRIC_FACE_DETECTION_THRESHOLD=0.75`.
 5. Deploy and verify `/healthz`, authentication, database migrations and the biometric status endpoint.
 6. Complete controlled enrolment and verification tests before enabling student biometric enrolment institution-wide.
 

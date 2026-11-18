@@ -15,7 +15,7 @@ MAX_IMAGE_PIXELS = 4_000_000
 MIN_IMAGE_WIDTH = 320
 MIN_IMAGE_HEIGHT = 240
 MIN_FACE_EDGE = 80
-FACE_DETECTION_THRESHOLD = 0.90
+DEFAULT_FACE_DETECTION_THRESHOLD = 0.75
 MIN_YAW_CHANGE = 0.08
 
 _INFERENCE_LOCK = threading.Lock()
@@ -87,8 +87,8 @@ def _normalise_embedding(embedding):
     return vector / norm
 
 
-@lru_cache(maxsize=1)
-def _load_models(model_directory):
+@lru_cache(maxsize=2)
+def _load_models(model_directory, score_threshold):
     model_dir = Path(model_directory)
     detector_path = model_dir / "face_detection_yunet_2023mar.onnx"
     recognizer_path = model_dir / "face_recognition_sface_2021dec.onnx"
@@ -102,7 +102,7 @@ def _load_models(model_directory):
             str(detector_path),
             "",
             (320, 320),
-            FACE_DETECTION_THRESHOLD,
+            score_threshold,
             0.3,
             5000,
         )
@@ -140,33 +140,161 @@ def _decode_image(uploaded_file):
     return image
 
 
+def _face_detection_threshold():
+    return float(getattr(settings, "BIOMETRIC_FACE_DETECTION_THRESHOLD", DEFAULT_FACE_DETECTION_THRESHOLD))
+
+
+def _face_yaw_ratio(face):
+    eye_one_x = float(face[4])
+    eye_two_x = float(face[6])
+    nose_x = float(face[8])
+    eye_distance = abs(eye_two_x - eye_one_x)
+    if eye_distance < 20:
+        raise BiometricServiceError("face_pose_invalid", "Keep both eyes visible and face the camera.")
+    return (nose_x - min(eye_one_x, eye_two_x)) / eye_distance
+
+
+def inspect_face_frame(uploaded_file):
+    """Inspect one transient camera frame and return safe live-position feedback."""
+    image = _decode_image(uploaded_file)
+    height, width = image.shape[:2]
+    threshold = _face_detection_threshold()
+    try:
+        with _INFERENCE_LOCK:
+            detector, _ = _load_models(str(getattr(settings, "BIOMETRIC_MODEL_DIR")), threshold)
+            detector.setInputSize((width, height))
+            _, faces = detector.detect(image)
+    except cv2.error as exc:
+        raise BiometricServiceUnavailable(
+            "model_inference_failed",
+            "Live face detection could not process this camera frame. Restart the camera or try again.",
+        ) from exc
+
+    if faces is None or len(faces) == 0:
+        return {
+            "status": "no_face",
+            "ready": False,
+            "faceCount": 0,
+            "message": "No face detected yet. Move into the frame and face the camera.",
+            "boundingBox": None,
+            "poseRatio": None,
+        }
+    if len(faces) != 1:
+        return {
+            "status": "multiple_faces",
+            "ready": False,
+            "faceCount": int(len(faces)),
+            "message": "Only one person should be visible. Ask others to move out of the camera view.",
+            "boundingBox": None,
+            "poseRatio": None,
+        }
+
+    face = faces[0]
+    x, y, face_width, face_height = (float(face[index]) for index in range(4))
+    if float(face[14]) < threshold:
+        return {
+            "status": "unclear_face",
+            "ready": False,
+            "faceCount": 1,
+            "message": "The face is not clear enough yet. Improve the light in front of you and hold still.",
+            "boundingBox": None,
+            "poseRatio": None,
+        }
+    if face_width < MIN_FACE_EDGE or face_height < MIN_FACE_EDGE:
+        return {
+            "status": "move_closer",
+            "ready": False,
+            "faceCount": 1,
+            "message": "Move a little closer so your face is larger in the frame.",
+            "boundingBox": None,
+            "poseRatio": None,
+        }
+
+    normalized_width = face_width / width
+    normalized_height = face_height / height
+    center_x = (x + face_width / 2) / width
+    center_y = (y + face_height / 2) / height
+    bounding_box = {
+        "x": max(0.0, min(1.0, x / width)),
+        "y": max(0.0, min(1.0, y / height)),
+        "width": max(0.0, min(1.0, face_width / width)),
+        "height": max(0.0, min(1.0, face_height / height)),
+    }
+
+    if normalized_width > 0.72 or normalized_height > 0.86:
+        return {
+            "status": "move_back",
+            "ready": False,
+            "faceCount": 1,
+            "message": "Move slightly farther from the camera so your full face fits inside the guide.",
+            "boundingBox": bounding_box,
+            "poseRatio": None,
+        }
+    if normalized_width < 0.16 or normalized_height < 0.24:
+        return {
+            "status": "move_closer",
+            "ready": False,
+            "faceCount": 1,
+            "message": "Move a little closer so your face is larger in the frame.",
+            "boundingBox": bounding_box,
+            "poseRatio": None,
+        }
+    if not (0.30 <= center_x <= 0.70 and 0.18 <= center_y <= 0.82):
+        return {
+            "status": "centre_face",
+            "ready": False,
+            "faceCount": 1,
+            "message": "Move your face into the centre of the guide.",
+            "boundingBox": bounding_box,
+            "poseRatio": None,
+        }
+
+    try:
+        pose_ratio = _face_yaw_ratio(face)
+    except BiometricServiceError:
+        return {
+            "status": "face_pose_invalid",
+            "ready": False,
+            "faceCount": 1,
+            "message": "Keep both eyes visible and face the camera.",
+            "boundingBox": bounding_box,
+            "poseRatio": None,
+        }
+
+    return {
+        "status": "face_ready",
+        "ready": True,
+        "faceCount": 1,
+        "message": "Face detected. Hold this position.",
+        "boundingBox": bounding_box,
+        "poseRatio": float(pose_ratio),
+    }
+
+
 def _extract_face_sample(uploaded_file):
     image = _decode_image(uploaded_file)
     height, width = image.shape[:2]
+    threshold = _face_detection_threshold()
     try:
         with _INFERENCE_LOCK:
-            detector, recognizer = _load_models(str(getattr(settings, "BIOMETRIC_MODEL_DIR")))
+            detector, recognizer = _load_models(str(getattr(settings, "BIOMETRIC_MODEL_DIR")), threshold)
             detector.setInputSize((width, height))
             _, faces = detector.detect(image)
             if faces is None or len(faces) == 0:
-                raise BiometricServiceError("face_not_found", "No face was detected. Improve the lighting and position your face inside the frame.")
+                raise BiometricServiceError(
+                    "face_not_found",
+                    "No face was detected in this capture. Use the live guide to position your face, then try again.",
+                )
             if len(faces) != 1:
                 raise BiometricServiceError("multiple_faces", "Only one face may appear in the camera frame.")
 
             face = faces[0]
-            if float(face[14]) < FACE_DETECTION_THRESHOLD:
-                raise BiometricServiceError("face_quality_low", "The face image is unclear. Move closer and capture it again.")
+            if float(face[14]) < threshold:
+                raise BiometricServiceError("face_quality_low", "The face image is unclear. Improve the light and hold still.")
             if float(face[2]) < MIN_FACE_EDGE or float(face[3]) < MIN_FACE_EDGE:
                 raise BiometricServiceError("face_too_small", "Move closer to the camera so your face is clearly visible.")
 
-            eye_one_x = float(face[4])
-            eye_two_x = float(face[6])
-            nose_x = float(face[8])
-            eye_distance = abs(eye_two_x - eye_one_x)
-            if eye_distance < 20:
-                raise BiometricServiceError("face_pose_invalid", "Keep both eyes visible and face the camera.")
-            yaw_ratio = (nose_x - min(eye_one_x, eye_two_x)) / eye_distance
-
+            yaw_ratio = _face_yaw_ratio(face)
             aligned = recognizer.alignCrop(image, face)
             feature = recognizer.feature(aligned)
             embedding = _normalise_embedding(feature)

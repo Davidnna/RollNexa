@@ -29,6 +29,7 @@ from .services import (
     BiometricServiceUnavailable,
     MODEL_VERSION,
     biometric_models_available,
+    inspect_face_frame,
     verify_face_challenge,
 )
 from .workflows import create_or_replace_face_enrollment, update_biometric_consent
@@ -63,11 +64,11 @@ def _consent_data(student):
     return {
         "consentStatus": (
             "consent_update_required"
-            if consent and consent.is_granted and consent.policy_version != getattr(settings, "BIOMETRIC_CONSENT_POLICY_VERSION", "1.0")
+            if consent and consent.is_granted and consent.policy_version != getattr(settings, "BIOMETRIC_CONSENT_POLICY_VERSION", "1.1")
             else consent.status if consent else "not_given"
         ),
         "consentPolicyVersion": consent.policy_version if consent else None,
-        "currentPolicyVersion": getattr(settings, "BIOMETRIC_CONSENT_POLICY_VERSION", "1.0"),
+        "currentPolicyVersion": getattr(settings, "BIOMETRIC_CONSENT_POLICY_VERSION", "1.1"),
         "consentGrantedAt": consent.granted_at.isoformat() if consent and consent.granted_at else None,
         "consentWithdrawnAt": consent.withdrawn_at.isoformat() if consent and consent.withdrawn_at else None,
         "isEnrolled": enrollment is not None,
@@ -122,6 +123,39 @@ class BiometricConsentView(NoCacheAPIView):
         return Response({"detail": "Biometric consent updated.", **_consent_data(student)})
 
 
+class FacePreviewView(NoCacheAPIView):
+    """Return transient server-side face detection feedback for the live camera guide."""
+
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "biometric_preview"
+
+    def post(self, request):
+        student = _student_profile(request)
+        frame = request.FILES.get("frame")
+        if frame is None:
+            return Response({"detail": "A live camera frame is required."}, status=400)
+
+        consent = _current_consent(student)
+        if (
+            not consent
+            or not consent.is_granted
+            or consent.policy_version != getattr(settings, "BIOMETRIC_CONSENT_POLICY_VERSION", "1.1")
+        ):
+            return Response({"detail": "Current biometric consent is required for live face detection."}, status=403)
+        if not biometric_models_available():
+            return Response({"detail": "Facial detection models are not available on this server."}, status=503)
+
+        try:
+            result = inspect_face_frame(frame)
+        except BiometricServiceUnavailable as exc:
+            return Response({"detail": exc.message, "code": exc.code}, status=503)
+        except BiometricServiceError as exc:
+            return Response({"detail": exc.message, "code": exc.code}, status=400)
+        return Response(result)
+
+
 class FaceEnrollmentView(NoCacheAPIView):
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser]
@@ -132,7 +166,7 @@ class FaceEnrollmentView(NoCacheAPIView):
         student = _student_profile(request)
         frames = request.FILES.getlist("frames")
         consent = _current_consent(student)
-        if not consent or not consent.is_granted or consent.policy_version != getattr(settings, "BIOMETRIC_CONSENT_POLICY_VERSION", "1.0"):
+        if not consent or not consent.is_granted or consent.policy_version != getattr(settings, "BIOMETRIC_CONSENT_POLICY_VERSION", "1.1"):
             return Response({"detail": "Current biometric consent is required before facial enrolment."}, status=403)
         try:
             enrollment = create_or_replace_face_enrollment(student=student, frames=frames)
@@ -176,7 +210,7 @@ class FaceChallengeView(NoCacheAPIView):
         now = timezone.now()
         consent = _current_consent(student)
         enrollment = FaceEnrollment.objects.filter(student=student, is_active=True).first()
-        if not consent or not consent.is_granted or consent.policy_version != getattr(settings, "BIOMETRIC_CONSENT_POLICY_VERSION", "1.0"):
+        if not consent or not consent.is_granted or consent.policy_version != getattr(settings, "BIOMETRIC_CONSENT_POLICY_VERSION", "1.1"):
             return Response({"detail": "Grant current biometric consent before facial verification."}, status=403)
         if not enrollment:
             return Response({"detail": "Complete facial enrolment before checking in."}, status=409)
@@ -262,7 +296,7 @@ class FaceVerificationView(NoCacheAPIView):
         if (
             not consent
             or not consent.is_granted
-            or consent.policy_version != getattr(settings, "BIOMETRIC_CONSENT_POLICY_VERSION", "1.0")
+            or consent.policy_version != getattr(settings, "BIOMETRIC_CONSENT_POLICY_VERSION", "1.1")
             or not enrollment
         ):
             return Response({"detail": "Current biometric consent and an active facial enrolment are required."}, status=403)
@@ -312,7 +346,7 @@ class FaceVerificationView(NoCacheAPIView):
                 locked_consent = BiometricConsent.objects.select_for_update().filter(
                     student=student,
                     status=BiometricConsent.STATUS_GRANTED,
-                    policy_version=getattr(settings, "BIOMETRIC_CONSENT_POLICY_VERSION", "1.0"),
+                    policy_version=getattr(settings, "BIOMETRIC_CONSENT_POLICY_VERSION", "1.1"),
                 ).first()
                 locked_enrollment = FaceEnrollment.objects.select_for_update().filter(
                     pk=enrollment.pk,

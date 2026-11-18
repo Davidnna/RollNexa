@@ -33,7 +33,10 @@ services:
                 value: v1
             -
                 key: BIOMETRIC_CONSENT_POLICY_VERSION
-                value: "1.0"
+                value: "1.1"
             -
                 key: BIOMETRIC_FACE_MATCH_THRESHOLD
                 value: "0.363"
+            -
+                key: BIOMETRIC_FACE_DETECTION_THRESHOLD
+                value: "0.75"

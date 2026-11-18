@@ -17,6 +17,7 @@ urlpatterns = [
     path("biometrics/status/", biometric_views.BiometricStatusView.as_view(), name="api_biometrics_status"),
     path("biometrics/consent/", biometric_views.BiometricConsentView.as_view(), name="api_biometrics_consent"),
     path("biometrics/enrolment/", biometric_views.FaceEnrollmentView.as_view(), name="api_biometrics_enrolment"),
+    path("biometrics/face-preview/", biometric_views.FacePreviewView.as_view(), name="api_biometrics_face_preview"),
     path("biometrics/verifications/<uuid:verification_id>/challenge/", biometric_views.FaceChallengeView.as_view(), name="api_biometrics_challenge"),
     path("biometrics/verifications/<uuid:verification_id>/verify/", biometric_views.FaceVerificationView.as_view(), name="api_biometrics_verify"),
     path("workspace/profile/", workspace_views.ProfileView.as_view(), name="api_workspace_profile"),

@@ -142,6 +142,7 @@ REST_FRAMEWORK = {
         "qr_verify": "10/minute",
         "biometric_consent": "5/hour",
         "biometric_enrolment": "3/hour",
+        "biometric_preview": "90/minute",
         "biometric_challenge": "5/minute",
         "biometric_verify": "5/minute",
     },
@@ -175,8 +176,9 @@ BOOTSTRAP_ADMIN_TOKEN = os.environ.get("BOOTSTRAP_ADMIN_TOKEN", "")
 # Biometric processing is fail-closed when the encryption key or model assets are unavailable.
 BIOMETRIC_ENCRYPTION_KEY = os.environ.get("BIOMETRIC_ENCRYPTION_KEY", "")
 BIOMETRIC_ENCRYPTION_KEY_VERSION = os.environ.get("BIOMETRIC_ENCRYPTION_KEY_VERSION", "v1")
-BIOMETRIC_CONSENT_POLICY_VERSION = os.environ.get("BIOMETRIC_CONSENT_POLICY_VERSION", "1.0")
+BIOMETRIC_CONSENT_POLICY_VERSION = os.environ.get("BIOMETRIC_CONSENT_POLICY_VERSION", "1.1")
 BIOMETRIC_FACE_MATCH_THRESHOLD = float(os.environ.get("BIOMETRIC_FACE_MATCH_THRESHOLD", "0.363"))
+BIOMETRIC_FACE_DETECTION_THRESHOLD = float(os.environ.get("BIOMETRIC_FACE_DETECTION_THRESHOLD", "0.75"))
 BIOMETRIC_MODEL_DIR = Path(
     os.environ.get(
         "BIOMETRIC_MODEL_DIR",

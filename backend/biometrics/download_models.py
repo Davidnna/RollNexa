@@ -117,7 +117,7 @@ def download_license(filename, details):
 def validate_models():
     detector_path = str(MODEL_DIR / "face_detection_yunet_2023mar.onnx")
     recognizer_path = str(MODEL_DIR / "face_recognition_sface_2021dec.onnx")
-    detector = cv2.FaceDetectorYN.create(detector_path, "", (320, 320), 0.9, 0.3, 5000)
+    detector = cv2.FaceDetectorYN.create(detector_path, "", (320, 320), 0.75, 0.3, 5000)
     recognizer = cv2.FaceRecognizerSF.create(recognizer_path, "")
     if detector is None or recognizer is None:
         raise RuntimeError("OpenCV could not initialise the facial recognition models.")
