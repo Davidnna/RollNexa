@@ -1,8 +1,8 @@
-# RollNexa 1.0.3
+# RollNexa 1.0.4
 
 **Academic management and dual-verification attendance.**
 
-Version 1.0.3 adds a server-assisted live face-enrolment guide, per-frame face-position feedback, automatic capture after stable detection, and a configurable YuNet detection threshold. It builds on the 1.0.2 backend/frontend structure and does not change database models, migration history, attendance rules or stored records.
+Version 1.0.4 resolves the frontend production-build failure by upgrading Vite to 8.3.8 and the React Vite plugin to 6.3.0. Vite 8 uses Rolldown instead of the previous Rollup production bundler. The frontend builder uses the Node 22 slim image to provide a glibc-based environment for native bundler packages. This release does not change database models, migration history, attendance rules, biometric templates or stored records.
 
 RollNexa is a web-based academic administration and smart attendance platform. It manages institutional structure, user accounts, academic sessions, courses, course offerings, lecturer assignments and student registrations. Its automated attendance workflow combines a rotating QR Code with server-side facial recognition. An automated present record is created only when both verification stages succeed.
 
@@ -235,7 +235,7 @@ The biometric verification API does not accept a browser-supplied success flag. 
 ## 8. Requirements
 
 - Python 3.12.
-- Node.js 22 and npm.
+- Node.js 22.12 or later and npm.
 - PostgreSQL 14 or later.
 - Docker for container builds and production-style local testing.
 - A webcam or phone camera for biometric enrolment and attendance verification.
@@ -390,7 +390,7 @@ The Dockerfile builds the React application, installs Python dependencies, downl
 Build locally:
 
 ```bash
-docker build -t rollnexa:1.0.3 .
+docker build -t rollnexa:1.0.4 .
 ```
 
 Before deploying to Render:
