@@ -1,6 +1,5 @@
 import { useState } from "react";
 import {
-    Activity,
     BookOpen,
     Building2,
     CalendarDays,
@@ -49,17 +48,17 @@ const navigation: Record<string, NavigationItem[]> = {
         { label: "Overview", to: "/app", icon: LayoutDashboard },
         { label: "My courses", to: "/app/courses", icon: BookOpen },
         { label: "Attendance", to: "/app/attendance", icon: ClipboardCheck },
-        { label: "Scan QR Code", to: "/app/attendance/check-in", icon: QrCode },
+        { label: "Check in", to: "/app/attendance/check-in", icon: QrCode },
         { label: "Attendance history", to: "/app/history", icon: CalendarDays },
-        { label: "Biometric settings", to: "/app/biometrics", icon: ScanFace },
+        { label: "Face settings", to: "/app/biometrics", icon: ScanFace },
         { label: "Profile", to: "/app/profile", icon: Settings },
     ],
 };
 
 const roleLabels: Record<string, string> = {
-    admin: "System administrator",
-    lecturer: "Lecturer workspace",
-    student: "Student workspace",
+    admin: "Administrator",
+    lecturer: "Lecturer",
+    student: "Student",
 };
 
 export function DashboardLayout() {
@@ -86,7 +85,7 @@ export function DashboardLayout() {
                         <X size={20} />
                     </button>
                 </div>
-                <div className="workspace-label">WORKSPACE</div>
+                <div className="workspace-label">YOUR SPACE</div>
                 <div className="workspace-role">
                     <span className="workspace-role-icon"><GraduationCap size={17} /></span>
                     <span>{roleLabels[user?.role ?? "student"]}</span>
@@ -110,9 +109,8 @@ export function DashboardLayout() {
                 </nav>
                 <div className="sidebar-bottom">
                     <div className="sidebar-help-card">
-                        <span className="help-card-icon"><Activity size={17} /></span>
-                        <strong>RollNexa 1.0.5</strong>
-                        <p>Manage your academic workflows from one secure workspace.</p>
+                        <strong>Need help?</strong>
+                        <p>Contact your institution's RollNexa administrator.</p>
                     </div>
                     <button className="sidebar-logout" onClick={handleLogout}>
                         <LogOut size={17} />
@@ -127,7 +125,7 @@ export function DashboardLayout() {
                         <Menu size={21} />
                     </button>
                     <div className="topbar-context">
-                        <span className="topbar-eyebrow">ROLLNEXA WORKSPACE</span>
+                        <span className="topbar-eyebrow">ROLLNEXA</span>
                         <span className="topbar-title">{roleLabels[user?.role ?? "student"]}</span>
                     </div>
                     <div className="topbar-actions">
@@ -136,7 +134,7 @@ export function DashboardLayout() {
                                 <span className="avatar-circle">{user?.fullName?.slice(0, 1).toUpperCase() ?? "U"}</span>
                                 <span className="profile-trigger-copy">
                                     <strong>{user?.fullName ?? "RollNexa user"}</strong>
-                                    <small>{user?.role ?? "Account"}</small>
+                                    <small>{roleLabels[user?.role ?? ""] ?? "Account"}</small>
                                 </span>
                                 <ChevronDown size={16} />
                             </button>

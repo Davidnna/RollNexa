@@ -5,7 +5,6 @@ import {
     Building2,
     CalendarDays,
     CheckCircle2,
-    Clock3,
     FileBarChart,
     Fingerprint,
     GraduationCap,
@@ -38,7 +37,7 @@ export function HomePage() {
                         <div className="eyebrow"><span className="eyebrow-dot" /> ACADEMIC MANAGEMENT · SMART ATTENDANCE</div>
                         <h1>Attendance, <span>connected.</span></h1>
                         <p className="hero-lead">
-                            Bring academic administration, course coordination and a verification-first attendance model into one clear institutional workflow.
+                            Manage academic records, coordinate courses and record attendance in one place.
                         </p>
                         <div className="hero-actions">
                             <Link className="button button-primary button-large" to="/login">
@@ -48,7 +47,7 @@ export function HomePage() {
                         </div>
                         <div className="hero-assurance">
                             <ShieldCheck size={17} />
-                            <span>Role-based access. Structured records. A verification-first attendance model.</span>
+                            <span>One platform for administrators, lecturers and students.</span>
                         </div>
                     </div>
                     <div className="hero-visual" aria-label="Illustration of the RollNexa attendance workflow">
@@ -68,23 +67,23 @@ export function HomePage() {
                             </div>
                             <div className="verification-step">
                                 <span className="verification-icon qr-icon"><QrCode size={22} /></span>
-                                <span className="verification-copy"><strong>QR session access</strong><small>Confirm the active class session</small></span>
+                                <span className="verification-copy"><strong>Class code</strong><small>Confirm the class</small></span>
                                 <span className="step-state">01</span>
                             </div>
                             <div className="verification-connector"><span /></div>
                             <div className="verification-step">
                                 <span className="verification-icon face-icon"><ScanFace size={22} /></span>
-                                <span className="verification-copy"><strong>Facial identity check</strong><small>Verify the enrolled student</small></span>
+                                <span className="verification-copy"><strong>Face check</strong><small>Confirm your identity</small></span>
                                 <span className="step-state">02</span>
                             </div>
                             <div className="preview-result">
                                 <span className="result-icon"><CheckCircle2 size={18} /></span>
                                 <span><strong>Attendance record</strong><small>Created only after both checks succeed</small></span>
                             </div>
-                            <div className="preview-disclaimer">Verification technologies are introduced in staged releases.</div>
+
                         </div>
                         <div className="floating-note note-top"><span className="floating-note-icon"><Layers3 size={16} /></span> Academic records</div>
-                        <div className="floating-note note-bottom"><span className="floating-note-icon"><ShieldCheck size={16} /></span> Verification-first design</div>
+                        <div className="floating-note note-bottom"><span className="floating-note-icon"><ShieldCheck size={16} /></span> Reliable attendance</div>
                     </div>
                 </div>
             </section>
@@ -102,29 +101,29 @@ export function HomePage() {
                 <div className="container">
                     <div className="section-heading section-heading-center">
                         <span className="eyebrow">A CLEARER INSTITUTIONAL WORKFLOW</span>
-                        <h2>Designed around the work institutions already do.</h2>
-                        <p>RollNexa connects the academic records that support teaching with a structured approach to attendance verification.</p>
+                        <h2>The essentials of academic administration, connected.</h2>
+                        <p>Keep people, courses and attendance information organised in one place.</p>
                     </div>
                     <div className="feature-card-grid">
                         <article className="feature-card">
                             <span className="feature-icon feature-icon-teal"><Building2Icon /></span>
                             <span className="feature-kicker">ACADEMIC FOUNDATION</span>
                             <h3>Organised academic records</h3>
-                            <p>Maintain faculties, departments, programmes, academic sessions, courses and course offerings in one connected system.</p>
+                            <p>Keep institutional structure, academic sessions and course information organised.</p>
                             <Link to="/features" className="text-link">Explore academic management <ArrowRight size={15} /></Link>
                         </article>
                         <article className="feature-card">
                             <span className="feature-icon feature-icon-blue"><Users size={22} /></span>
-                            <span className="feature-kicker">ROLE-BASED WORKSPACES</span>
+                            <span className="feature-kicker">WORKSPACES FOR EVERY ROLE</span>
                             <h3>Clear responsibilities</h3>
-                            <p>Give administrators, lecturers and students access to the records and workflows appropriate to their roles.</p>
+                            <p>Give administrators, lecturers and students the tools they need.</p>
                             <Link to="/features" className="text-link">Explore platform features <ArrowRight size={15} /></Link>
                         </article>
                         <article className="feature-card">
                             <span className="feature-icon feature-icon-amber"><Fingerprint size={22} /></span>
                             <span className="feature-kicker">ATTENDANCE INTEGRITY</span>
                             <h3>Verification before recording</h3>
-                            <p>The attendance design requires QR session verification followed by facial identity verification before presence is recorded.</p>
+                            <p>Students check in with a class QR Code and a face check.</p>
                             <Link to="/how-it-works" className="text-link">See the workflow <ArrowRight size={15} /></Link>
                         </article>
                     </div>
@@ -135,13 +134,13 @@ export function HomePage() {
                 <div className="container workflow-band">
                     <div className="workflow-copy">
                         <span className="eyebrow">THE ATTENDANCE MODEL</span>
-                        <h2>Session access is not the same as identity.</h2>
-                        <p>RollNexa separates the question of whether a student is accessing the correct class session from the question of whether the student is who they claim to be.</p>
-                        <Link to="/how-it-works" className="button button-dark">Understand the workflow <ArrowRight size={16} /></Link>
+                        <h2>A simple, two-step check-in.</h2>
+                        <p>Students scan the class code, then confirm their identity. Attendance is recorded after both steps succeed.</p>
+                        <Link to="/how-it-works" className="button button-dark">See how it works <ArrowRight size={16} /></Link>
                     </div>
                     <div className="workflow-steps">
-                        <div className="workflow-step"><span>01</span><QrCode size={21} /><div><strong>QR Code</strong><small>Session access verification</small></div></div>
-                        <div className="workflow-step"><span>02</span><ScanFace size={21} /><div><strong>Facial recognition</strong><small>Student identity verification</small></div></div>
+                        <div className="workflow-step"><span>01</span><QrCode size={21} /><div><strong>QR Code</strong><small>Confirm the class</small></div></div>
+                        <div className="workflow-step"><span>02</span><ScanFace size={21} /><div><strong>Face verification</strong><small>Confirm student identity</small></div></div>
                         <div className="workflow-step workflow-step-final"><span>03</span><CheckCircle2 size={21} /><div><strong>Attendance record</strong><small>Recorded only when both checks succeed</small></div></div>
                     </div>
                 </div>
@@ -151,8 +150,8 @@ export function HomePage() {
                 <div className="container closing-inner">
                     <div>
                         <span className="eyebrow eyebrow-light">ROLLNEXA</span>
-                        <h2>Bring your academic workflows together.</h2>
-                        <p>Access is managed by authorised institutional administrators. Sign in with your RollNexa account to continue.</p>
+                        <h2>Keep your institution organised.</h2>
+                        <p>Sign in with the account provided by your institution.</p>
                     </div>
                     <Link className="button button-light" to="/login">Sign in to RollNexa <ArrowUpRight size={17} /></Link>
                 </div>
@@ -170,27 +169,27 @@ export function AboutPage() {
         <>
             <PageIntro
                 eyebrow="ABOUT ROLLNEXA"
-                title="A connected foundation for academic administration."
-                description="RollNexa is being developed to help institutions organise academic information and strengthen the integrity of attendance records through a structured, role-based platform."
+                title="Academic administration, made clearer."
+                description="RollNexa helps institutions manage academic information, coordinate teaching and keep reliable attendance records."
             />
             <section className="section section-white">
                 <div className="container two-column-section">
                     <div>
                         <span className="eyebrow">THE PURPOSE</span>
-                        <h2>Make academic information easier to manage and attendance easier to trust.</h2>
+                        <h2>Bring everyday academic work into one place.</h2>
                     </div>
                     <div className="prose-block">
-                        <p>Academic administration depends on connected information: who is enrolled, which courses are offered, which lecturers are assigned and when teaching activities take place.</p>
-                        <p>RollNexa brings these relationships into a shared system. Its attendance model adds a verification sequence in which a student first accesses an active session using a QR Code and then completes facial identity verification.</p>
-                        <p>The platform is being delivered in stages. Existing academic management capabilities are retained as the user-facing experience moves to React.</p>
+                        <p>Institutions work with connected information: students, courses, lecturers, programmes and academic schedules.</p>
+                        <p>RollNexa brings these records together. Students check in by scanning the class QR Code and completing a face check.</p>
+                        <p>Each person sees the information and tools relevant to their role.</p>
                     </div>
                 </div>
             </section>
             <section className="section section-mist">
                 <div className="container value-grid">
-                    <article><span className="value-icon"><BookOpen size={21} /></span><h3>Structured information</h3><p>Keep academic entities and their relationships organised and consistent.</p></article>
-                    <article><span className="value-icon"><ShieldCheck size={21} /></span><h3>Accountable access</h3><p>Use role-based access and server-side permission checks for institutional workflows.</p></article>
-                    <article><span className="value-icon"><Fingerprint size={21} /></span><h3>Verification-led attendance</h3><p>Require both session access and identity verification before a present record is created.</p></article>
+                    <article><span className="value-icon"><BookOpen size={21} /></span><h3>Structured information</h3><p>Keep departments, programmes and courses organised.</p></article>
+                    <article><span className="value-icon"><ShieldCheck size={21} /></span><h3>Accountable access</h3><p>Give each user access to the tasks and information they need.</p></article>
+                    <article><span className="value-icon"><Fingerprint size={21} /></span><h3>Reliable attendance</h3><p>Record attendance only after both check-in steps succeed.</p></article>
                 </div>
             </section>
         </>
@@ -202,19 +201,19 @@ export function FeaturesPage() {
         { icon: <Building2Icon />, title: "Institutional structure", text: "Manage faculties, departments and programmes while preserving their relationships." },
         { icon: <CalendarDaysIcon />, title: "Academic calendar", text: "Configure academic sessions, semesters and the current academic period." },
         { icon: <BookOpen size={22} />, title: "Course management", text: "Maintain the course catalogue, programme-specific offerings and registration rules." },
-        { icon: <Users size={22} />, title: "User and role management", text: "Create and manage administrator, lecturer and student accounts with role-based access." },
-        { icon: <QrCode size={22} />, title: "QR session verification", text: "Available rotating session QR Codes with short-lived signed tokens, server-side validation and student registration checks. QR verification alone does not record attendance." },
-        { icon: <ScanFace size={22} />, title: "Facial identity verification", text: "Server-side YuNet face detection and SFace matching with encrypted templates and a randomised head-turn challenge." },
-        { icon: <FileBarChartIcon />, title: "Attendance reporting", text: "Review session history and attendance summaries, with automated dual-verification records distinguished from lecturer-approved manual exceptions." },
-        { icon: <ShieldCheck size={22} />, title: "Consent and alternative attendance", text: "Students can manage biometric consent and use a lecturer-approved manual exception when automated biometric attendance is not suitable." },
+        { icon: <Users size={22} />, title: "User and role management", text: "Manage administrator, lecturer and student accounts." },
+        { icon: <QrCode size={22} />, title: "QR Code check-in", text: "Use a time-limited class code to check in to an active session." },
+        { icon: <ScanFace size={22} />, title: "Face verification", text: "Confirm your identity with a quick camera check." },
+        { icon: <FileBarChartIcon />, title: "Attendance reports", text: "Review class attendance, session history and approved alternatives." },
+        { icon: <ShieldCheck size={22} />, title: "Flexible attendance", text: "Students can manage face verification or request an approved alternative when needed." },
     ];
 
     return (
         <>
             <PageIntro
                 eyebrow="THE ROLLNEXA PLATFORM"
-                title="The academic workflow, in one place."
-                description="RollNexa connects institutional structure, course administration and a verification-first attendance model. Capabilities are released in stages and are identified below by their current implementation status."
+                title="Academic work, in one place."
+                description="Everything institutions need to organise academic activity and manage attendance."
             />
             <section className="section section-white">
                 <div className="container">
@@ -222,7 +221,7 @@ export function FeaturesPage() {
                         {features.map((feature) => (
                             <article className="feature-detail-card" key={feature.title}>
                                 <span className="feature-icon feature-icon-teal">{feature.icon}</span>
-                                <div className="feature-detail-title"><h3>{feature.title}</h3><span className="status-tag status-available">Available in 1.0.0</span></div>
+                                <div className="feature-detail-title"><h3>{feature.title}</h3></div>
                                 <p>{feature.text}</p>
                             </article>
                         ))}
@@ -231,8 +230,8 @@ export function FeaturesPage() {
             </section>
             <section className="section section-mist">
                 <div className="container feature-note">
-                    <span className="feature-note-icon"><Clock3 size={21} /></span>
-                    <div><strong>Features are introduced in controlled releases.</strong><p>Version 1.0.0 adds server-side facial enrolment and matching to the existing QR workflow. Automated attendance requires both checks. The current head-turn liveness challenge is a basic safeguard, not a certified anti-spoofing system; students who cannot use biometrics can request a lecturer-approved manual attendance exception.</p></div>
+                    <span className="feature-note-icon"><ShieldCheck size={21} /></span>
+                    <div><strong>Attendance with an alternative.</strong><p>Automated check-in requires both the class QR Code and face verification. Students who cannot use face verification can ask their lecturer for an approved alternative.</p></div>
                 </div>
             </section>
         </>
@@ -241,25 +240,22 @@ export function FeaturesPage() {
 
 export function HowItWorksPage() {
     const steps = [
-        { number: "01", icon: <CalendarDaysIcon />, title: "A lecturer opens a session", text: "An authorised lecturer creates an attendance session for a course offering they are actively assigned to. The session has a defined start and end time." },
-        { number: "02", icon: <QrCode size={23} />, title: "The student verifies session access", text: "The student scans the lecturer's rotating, time-limited QR Code. The server validates the signed token, session status, expiry, lecturer assignment and student course registration. This completes only the first verification stage." },
-        { number: "03", icon: <ScanFace size={23} />, title: "The student verifies identity", text: "The browser captures two frames for a randomised head-turn challenge. Django performs face detection, feature extraction, template matching and the pose-change check on the server." },
-        { number: "04", icon: <CheckCircle2 size={23} />, title: "Attendance is recorded", text: "Only after both checks succeed, in the required order and within the session window, does the server create an automated present record. A lecturer-approved manual exception is recorded separately when biometrics cannot be used." },
+        { number: "01", icon: <CalendarDaysIcon />, title: "Your lecturer opens the class", text: "Your lecturer starts an attendance session for the course." },
+        { number: "02", icon: <QrCode size={23} />, title: "Scan the class code", text: "Scan the QR Code displayed by your lecturer." },
+        { number: "03", icon: <ScanFace size={23} />, title: "Confirm your identity", text: "Look at the camera and follow the short on-screen prompt. RollNexa completes the check automatically." },
+        { number: "04", icon: <CheckCircle2 size={23} />, title: "You're checked in", text: "Your attendance is recorded when both checks succeed. An approved alternative is available if you cannot use face verification." },
     ];
 
     return (
         <>
             <PageIntro
                 eyebrow="HOW IT WORKS"
-                title="Two independent checks. One attendance decision."
-                description="The automated RollNexa attendance policy requires successful QR Code verification followed by successful server-side facial identity verification. Neither check is sufficient on its own; a manual exception remains available when biometric attendance cannot be used."
+                title="Check in with two simple steps."
+                description="Scan the class QR Code, then confirm your identity. Your attendance is recorded after both steps succeed."
             />
             <section className="section section-white">
                 <div className="container">
-                    <div className="implementation-note">
-                        <Clock3 size={18} />
-                        <span>Version 1.0.0 implements server-side facial enrolment and matching after QR verification. A successful QR scan alone is not an attendance record. A lecturer-approved manual exception remains available when biometric attendance cannot be used.</span>
-                    </div>
+
                     <div className="process-list">
                         {steps.map((step) => (
                             <article className="process-item" key={step.number}>
@@ -273,11 +269,11 @@ export function HowItWorksPage() {
             </section>
             <section className="section section-mist">
                 <div className="container decision-panel">
-                    <div><span className="eyebrow">ATTENDANCE DECISION</span><h2>Both verification outcomes must be successful.</h2></div>
+                    <div><span className="eyebrow">ATTENDANCE DECISION</span><h2>Both steps must be complete.</h2></div>
                     <div className="decision-rules">
-                        <div><CheckCircle2 size={18} /><span>QR verification succeeds</span></div>
-                        <div><CheckCircle2 size={18} /><span>Facial verification succeeds after QR</span></div>
-                        <div className="decision-result"><ShieldCheck size={19} /><strong>Present record may be created</strong></div>
+                        <div><CheckCircle2 size={18} /><span>Scan the class code</span></div>
+                        <div><CheckCircle2 size={18} /><span>Confirm your identity</span></div>
+                        <div className="decision-result"><ShieldCheck size={19} /><strong>Attendance recorded</strong></div>
                     </div>
                 </div>
             </section>
@@ -290,20 +286,20 @@ export function ContactPage() {
         <>
             <PageIntro
                 eyebrow="CONTACT"
-                title="Need access to RollNexa?"
-                description="RollNexa accounts are created and managed by authorised administrators within each institution."
+                title="Need help with access?"
+                description="Your institution manages RollNexa accounts."
             />
             <section className="section section-white">
                 <div className="container contact-grid">
                     <div className="contact-card contact-card-primary">
                         <span className="contact-card-icon"><GraduationCap size={23} /></span>
                         <h2>For students and lecturers</h2>
-                        <p>Contact your department, faculty or institution's designated RollNexa administrator if you need an account, have trouble signing in or need your account details updated.</p>
+                        <p>Contact your institution if you need an account or help signing in.</p>
                     </div>
                     <div className="contact-card">
                         <span className="contact-card-icon"><Users size={23} /></span>
                         <h2>For institutional administrators</h2>
-                        <p>Use your authorised administrator account to manage institutional structure, user accounts, academic sessions and course information.</p>
+                        <p>Sign in to manage users, academic information and attendance.</p>
                         <Link to="/login" className="text-link">Sign in to the platform <ArrowRight size={15} /></Link>
                     </div>
                 </div>
@@ -315,20 +311,20 @@ export function ContactPage() {
 export function PrivacyPage() {
     return (
         <>
-            <PageIntro eyebrow="PRIVACY INFORMATION" title="Privacy is part of the system design." description="This overview describes the data categories and safeguards relevant to the current RollNexa platform, including server-side biometric verification." />
+            <PageIntro eyebrow="PRIVACY INFORMATION" title="How RollNexa uses your information." description="This notice explains what information RollNexa uses and how it is handled." />
             <section className="section section-white">
                 <div className="container legal-content">
-                    <div className="legal-review-note"><ShieldCheck size={19} /><span>This product overview is not a substitute for an institution-approved privacy notice. Each deploying institution must publish its controller details, lawful basis, retention schedule and contact route before collecting personal or biometric data.</span></div>
-                    <h2>Information used by the current platform</h2>
-                    <p>The existing platform processes account details, role and institutional profile information, academic structure, course assignments, course registrations, attendance-session administration records and pending QR verification metadata, including a one-way token fingerprint and verification expiry.</p>
-                    <h2>QR verification and biometric processing</h2>
-                    <p>The browser camera is used locally to decode the lecturer's QR Code. QR tokens are short-lived and signed; the server stores a token fingerprint rather than the raw token. For facial enrolment and attendance verification, the browser sends camera frames to the same-origin Django backend over HTTPS. The server processes those frames in memory, extracts facial features and compares them with the student's enrolled template. The application stores an encrypted facial feature template and limited verification audit metadata; it does not save the submitted camera frames as image files.</p>
+                    <div className="legal-review-note"><ShieldCheck size={19} /><span>Your institution is responsible for its privacy notice, lawful basis, retention periods and privacy contact details. Confirm these with your institution before using face verification.</span></div>
+                    <h2>Information we use</h2>
+                    <p>RollNexa uses your account details, institutional profile, course registrations and attendance records to provide the service.</p>
+                    <h2>Face verification</h2>
+                    <p>Your camera reads the class QR Code and captures your face during enrolment and check-in. Camera images are sent securely for verification and processed temporarily; RollNexa does not save them as photographs. RollNexa stores an encrypted face record and limited attendance-verification information.</p>
                     <h2>Consent and alternative attendance</h2>
-                    <p>Students must review the versioned biometric notice and grant consent before facial enrolment. They can withdraw consent through Biometric Settings; withdrawal deletes the stored facial template and expires pending QR verification attempts. Students who do not consent or cannot complete biometric verification may ask their lecturer to record a separately labelled manual attendance exception. The institution must approve the legal basis, privacy notice, retention schedule and alternative procedure before collecting biometric data.</p>
+                    <p>Face verification is optional and requires your consent. You can withdraw consent at any time; your stored face record will be deleted. If you do not consent or cannot complete the check, ask your lecturer about the approved attendance alternative.</p>
                     <h2>Access and security</h2>
-                    <p>Access to platform functions is role-based and enforced by the Django backend. The platform uses authenticated sessions, CSRF protection, encrypted biometric templates and restricted access to institutional records. The biometric encryption key is held in deployment secrets and must be backed up securely.</p>
+                    <p>Access to information is limited according to each user's role. Face records are encrypted and access to institutional information is restricted.</p>
                     <h2>Institutional responsibility</h2>
-                    <p>The institution operating RollNexa is responsible for determining its applicable data-protection obligations, communicating them to users and responding to requests concerning their personal information.</p>
+                    <p>Your institution is responsible for explaining its privacy practices and responding to requests about your information.</p>
                 </div>
             </section>
         </>
@@ -338,18 +334,16 @@ export function PrivacyPage() {
 export function TermsPage() {
     return (
         <>
-            <PageIntro eyebrow="TERMS OF USE" title="Using the RollNexa platform." description="These preliminary usage principles describe the intended use of RollNexa. The deploying institution must approve and publish its binding terms before operational use." />
+            <PageIntro eyebrow="TERMS OF USE" title="Using RollNexa." description="These terms explain the basic rules for using RollNexa. Your institution may also have additional policies." />
             <section className="section section-white">
                 <div className="container legal-content">
-                    <div className="legal-review-note"><ShieldCheck size={19} /><span>Institutional review required: these preliminary principles are not a final legal agreement.</span></div>
+                    <div className="legal-review-note"><ShieldCheck size={19} /><span>Follow your institution's academic and information-use policies when using RollNexa.</span></div>
                     <h2>Authorised access</h2>
                     <p>Users should access RollNexa only through accounts provisioned by an authorised institutional administrator. Users are responsible for protecting their credentials and reporting suspected unauthorised access.</p>
                     <h2>Permitted use</h2>
                     <p>The platform is intended for institutional academic administration and attendance workflows. Users must not attempt to access records outside their authorised role or interfere with the availability, security or integrity of the service.</p>
                     <h2>Academic and attendance records</h2>
-                    <p>Users must provide accurate information and use attendance functions only for their intended institutional purpose. Automated attendance is recorded only after both QR Code and server-side facial verification succeed. A lecturer-approved manual exception may be recorded when biometric attendance cannot be used; it is labelled separately and attributed to the approving lecturer.</p>
-                    <h2>Availability and staged functionality</h2>
-                    <p>RollNexa is released in stages. Institutions should rely on the deployed release and its administrator guidance when determining available functionality. The current head-turn liveness check is a basic challenge-response heuristic, not a certified presentation-attack-detection system.</p>
+                    <p>Users must provide accurate information and use attendance functions only for their intended institutional purpose. Attendance is recorded after the class QR Code and face checks succeed. An approved alternative may be recorded separately when face verification cannot be used.</p>
                     <h2>Institutional policies</h2>
                     <p>Use of RollNexa remains subject to the institution's applicable academic, information-security, acceptable-use and data-protection policies.</p>
                 </div>

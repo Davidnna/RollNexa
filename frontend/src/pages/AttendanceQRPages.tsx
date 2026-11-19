@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { AlertCircle, ArrowLeft, Camera, CheckCircle2, Clock3, LoaderCircle, QrCode, RefreshCw, ShieldCheck } from "lucide-react";
+import { AlertCircle, ArrowLeft, Camera, Clock3, LoaderCircle, QrCode, RefreshCw, ShieldCheck } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 
 import { useAuth } from "../context/AuthContext";
@@ -101,11 +101,9 @@ export function AttendanceQRPage() {
         <div className="dashboard-page attendance-qr-page">
             <div className="dashboard-page-heading workspace-page-heading">
                 <div>
-                    <span className="eyebrow">LECTURER WORKSPACE</span>
-                    <h1>Live attendance QR Code</h1>
-                    <p>Display this rotating code for students registered in the selected course offering.</p>
+                    <h1>Class check-in code</h1>
+                    <p>Display this code for students in the selected course.</p>
                 </div>
-                <span className="release-chip"><span /> ROLLNEXA 1.0.5</span>
             </div>
 
             <Link to="/app/attendance" className="attendance-back-link"><ArrowLeft size={16} /> Back to attendance sessions</Link>
@@ -143,14 +141,14 @@ export function AttendanceQRPage() {
                                     <span>Code expires in</span>
                                     <strong>{secondsRemaining}s</strong>
                                 </div>
-                                <p className="attendance-qr-refresh-note">A new QR Code is generated every 30 seconds. Each code remains valid for up to 60 seconds to allow for scanning and network delay.</p>
+                                <p className="attendance-qr-refresh-note">The code refreshes automatically. Students should scan the current code.</p>
                             </>
                         ) : (
                             <div className="attendance-qr-state attendance-qr-state-warning">
                                 <AlertCircle size={24} />
-                                <strong>{qrQuery.isError ? "Unable to issue a QR Code." : "The current QR Code has expired."}</strong>
+                                <strong>{qrQuery.isError ? "Unable to issue a QR Code." : "This code has expired."}</strong>
                                 <p>{qrQuery.error instanceof Error ? qrQuery.error.message : "A fresh code will be requested automatically."}</p>
-                                <button type="button" className="button button-outline" onClick={() => void qrQuery.refetch()}><RefreshCw size={15} /> Generate new code</button>
+                                <button type="button" className="button button-outline" onClick={() => void qrQuery.refetch()}><RefreshCw size={15} /> Refresh code</button>
                             </div>
                         )}
 
@@ -161,16 +159,11 @@ export function AttendanceQRPage() {
 
                     <aside className="attendance-qr-instructions">
                         <span className="attendance-instruction-icon"><ShieldCheck size={22} /></span>
-                        <h2>Student check-in instructions</h2>
-                        <ol>
-                            <li>Students must sign in to their own RollNexa account.</li>
-                            <li>They open Attendance and select Scan QR Code, or use their phone camera app.</li>
-                            <li>They scan the code displayed on this screen; the RollNexa link opens the verification page.</li>
-                            <li>RollNexa validates the session, token and course registration.</li>
-                        </ol>
+                        <h2>For students</h2>
+                        <p>Students sign in to RollNexa and scan this code. They then follow the face check to complete attendance.</p>
                         <div className="attendance-qr-policy-note">
-                            <strong>Dual verification remains mandatory.</strong>
-                            <p>This release verifies the QR stage only. Facial recognition must also succeed before a present attendance record can be created. Scanning this code alone does not mark a student present.</p>
+                            <strong>Attendance check-in</strong>
+                            <p>Attendance is recorded after the face check is complete.</p>
                         </div>
                         <div className="attendance-qr-session-meta">
                             <div><span>Programme</span><strong>{session.programme_name}</strong></div>
@@ -228,7 +221,7 @@ export function AttendanceScanPage() {
         },
         onError: (error) => {
             processingRef.current = false;
-            setScanError(error instanceof Error ? error.message : "The QR Code could not be verified.");
+            setScanError(error instanceof Error ? error.message : "This class code could not be verified.");
             setScannerEnabled(cameraRequestedRef.current);
         },
     });
@@ -252,6 +245,12 @@ export function AttendanceScanPage() {
     }, [navigate, submitToken, user?.role]);
 
     useEffect(() => {
+        const verified = verificationMutation.data;
+        if (!verified) return;
+        navigate(`/app/attendance/face-check/${verified.verificationId}`, { replace: true });
+    }, [verificationMutation.data, navigate]);
+
+    useEffect(() => {
         if (user?.role !== "student" || !scannerEnabled || verificationMutation.isSuccess) return;
 
         const elementId = "rollnexa-qr-reader";
@@ -267,7 +266,7 @@ export function AttendanceScanPage() {
             (decodedText) => {
                 const token = extractQrToken(decodedText);
                 if (!token) {
-                    setScanError("This is not a valid RollNexa attendance QR Code.");
+                    setScanError("This is not a valid class code.");
                     return;
                 }
                 submitToken(token);
@@ -280,7 +279,7 @@ export function AttendanceScanPage() {
             return undefined;
         }).catch((error: unknown) => {
             if (!disposed) {
-                setCameraError(error instanceof Error ? error.message : "The camera could not be started. Check browser permissions and try again.");
+                setCameraError(error instanceof Error ? error.message : "We could not open the camera. Check your browser permissions and try again.");
                 setScannerEnabled(false);
             }
         });
@@ -309,53 +308,31 @@ export function AttendanceScanPage() {
         <div className="dashboard-page attendance-scan-page">
             <div className="dashboard-page-heading workspace-page-heading">
                 <div>
-                    <span className="eyebrow">STUDENT WORKSPACE</span>
-                    <h1>Scan attendance QR Code</h1>
-                    <p>Scan the current code displayed by your lecturer to complete the first verification stage.</p>
+                    <h1>Scan class code</h1>
+                    <p>Scan the code shown by your lecturer.</p>
                 </div>
-                <span className="release-chip"><span /> ROLLNEXA 1.0.5</span>
             </div>
             <Link to="/app/attendance" className="attendance-back-link"><ArrowLeft size={16} /> Back to attendance</Link>
 
             {verification ? (
-                <section className="attendance-verification-result">
-                    <span className="attendance-result-icon"><CheckCircle2 size={30} /></span>
-                    <span className="eyebrow">QR VERIFICATION SUCCESSFUL</span>
-                    <h2>{verification.session.courseCode} — {verification.session.courseTitle}</h2>
-                    <p>{verification.session.title} · {verification.session.academicSession} · {verification.session.semester}</p>
-                    <div className="attendance-result-status"><ShieldCheck size={19} /><strong>{verification.alreadyVerified ? "Your QR verification is already active" : "First verification stage completed"}</strong></div>
-                    <div className="attendance-qr-policy-note">
-                        <strong>Attendance has not yet been recorded.</strong>
-                        <p>Facial recognition must also verify your identity. RollNexa will only create a present record after both checks succeed. Your QR verification is valid until {new Date(verification.expiresAt).toLocaleTimeString()}.</p>
-                    </div>
-                    <div className="attendance-result-actions">
-                        <Link to={`/app/attendance/face-check/${verification.verificationId}`} className="button button-primary"><ShieldCheck size={15} /> Continue to facial verification</Link>
-                        <Link to="/app/history" className="button button-outline">View attendance history</Link>
-                        <button type="button" className="button button-outline" onClick={() => { verificationMutation.reset(); processingRef.current = false; cameraRequestedRef.current = true; setScannerEnabled(true); }}>Scan another code</button>
-                    </div>
-                </section>
+                <div className="workspace-loading"><LoaderCircle className="workspace-spin" /> Opening face check…</div>
             ) : (
                 <div className="attendance-scan-layout">
                     <section className="attendance-scanner-card">
-                        <div className="attendance-scanner-heading"><span><Camera size={20} /></span><div><h2>Camera scanner</h2><p>Allow camera access and position the QR Code inside the scanning frame.</p></div></div>
+                        <div className="attendance-scanner-heading"><span><Camera size={20} /></span><div><h2>Scan the class code</h2><p>Allow camera access and point it at the class code.</p></div></div>
                         <div id="rollnexa-qr-reader" className="attendance-qr-reader" />
-                        {verificationMutation.isPending && <div className="workspace-alert workspace-alert-info"><LoaderCircle className="workspace-spin" size={17} /> Verifying your QR Code…</div>}
+                        {verificationMutation.isPending && <div className="workspace-alert workspace-alert-info"><LoaderCircle className="workspace-spin" size={17} /> Checking the class code…</div>}
                         {cameraError && <div className="workspace-alert workspace-alert-error"><AlertCircle size={17} />{cameraError}</div>}
                         {scanError && <div className="workspace-alert workspace-alert-error"><AlertCircle size={17} />{scanError}</div>}
-                        {!scannerEnabled && !verificationMutation.isPending && <button type="button" className="button button-outline" onClick={() => { cameraRequestedRef.current = true; setCameraError(""); setScannerEnabled(true); }}><Camera size={15} /> {cameraError ? "Try camera again" : "Start camera scanner"}</button>}
+                        {!scannerEnabled && !verificationMutation.isPending && <button type="button" className="button button-outline" onClick={() => { cameraRequestedRef.current = true; setCameraError(""); setScannerEnabled(true); }}><Camera size={15} /> {cameraError ? "Try again" : "Open camera"}</button>}
                     </section>
                     <aside className="attendance-scan-guidance">
                         <span className="attendance-instruction-icon"><ShieldCheck size={22} /></span>
-                        <h2>Before you scan</h2>
-                        <ul>
-                            <li>Sign in with your own active student account.</li>
-                            <li>Confirm that you are registered for the course.</li>
-                            <li>Scan the QR Code currently displayed by your lecturer.</li>
-                            <li>Keep the page open for the next verification stage.</li>
-                        </ul>
+                        <h2>Need help?</h2>
+                        <p>Sign in with your student account and scan the current code shown by your lecturer. Keep this page open until check-in is complete.</p>
                         <div className="attendance-qr-policy-note">
                             <strong>Two checks are mandatory.</strong>
-                            <p>QR verification alone cannot mark you present. Facial recognition is required as the second check.</p>
+                            <p>Your attendance is recorded after the face check is complete.</p>
                         </div>
                     </aside>
                 </div>

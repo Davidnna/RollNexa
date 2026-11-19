@@ -54,11 +54,11 @@ export function LoginPage() {
                 <Link to="/" className="login-back-link"><ArrowLeft size={16} /> Back to RollNexa</Link>
                 <div className="login-side-content">
                     <span className="login-side-kicker">ROLLNEXA WORKSPACE</span>
-                    <h1>Academic workflows, <span>connected.</span></h1>
-                    <p>Sign in to access your role-based workspace for academic administration and attendance management.</p>
+                    <h1>Your institution, <span>connected.</span></h1>
+                    <p>Sign in to manage your courses and attendance.</p>
                     <div className="login-side-points">
-                        <div><ShieldCheck size={18} /><span>Secure, role-based access</span></div>
-                        <div><LockKeyhole size={18} /><span>Protected account sessions</span></div>
+                        <div><ShieldCheck size={18} /><span>Secure access</span></div>
+                        <div><LockKeyhole size={18} /><span>Your account, protected</span></div>
                     </div>
                 </div>
                 <div className="login-side-footer">Attendance, connected.</div>
@@ -68,7 +68,7 @@ export function LoginPage() {
                     <Link to="/" className="login-mobile-brand"><img src="/static/images/rollnexa-logo.svg" alt="RollNexa" /></Link>
                     <span className="eyebrow">WELCOME BACK</span>
                     <h2>Sign in to your account</h2>
-                    <p className="login-form-description">Use the username and password provided by your institution.</p>
+                    <p className="login-form-description">Enter the sign-in details provided by your institution.</p>
                     <form className="login-form" onSubmit={handleSubmit}>
                         {error && <div className="form-alert form-alert-error" role="alert">{error}</div>}
                         <label htmlFor="username">Username</label>
@@ -98,11 +98,11 @@ export function LoginPage() {
                             </button>
                         </div>
                         <button className="button button-primary login-submit" type="submit" disabled={submitting}>
-                            {submitting ? "Signing in…" : "Sign in securely"}
+                            {submitting ? "Signing in…" : "Sign in"}
                             {!submitting && <ArrowRight size={17} />}
                         </button>
                     </form>
-                    <div className="login-support-note"><ShieldCheck size={17} /><span>Access is provisioned by your institution. If you need an account or password assistance, contact your RollNexa administrator.</span></div>
+                    <div className="login-support-note"><ShieldCheck size={17} /><span>Need an account or password help? Contact your institution.</span></div>
                     <Link to="/" className="login-home-link">Return to public website</Link>
                 </div>
             </div>

@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, ArrowLeft, Camera, CheckCircle2, LoaderCircle, ScanFace, ShieldCheck, Trash2 } from "lucide-react";
+import { AlertCircle, ArrowLeft, Camera, CheckCircle2, LoaderCircle, ShieldCheck, Trash2 } from "lucide-react";
 import { Link, Navigate, useParams } from "react-router-dom";
 
 import { useAuth } from "../context/AuthContext";
@@ -44,6 +44,24 @@ interface FacePreviewResponse {
     poseRatio: number | null;
 }
 
+
+function getCameraErrorMessage(error: unknown): string {
+    const name = error instanceof DOMException ? error.name : "";
+    if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+        return "Allow camera access in your browser settings, then try again.";
+    }
+    if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+        return "No camera was found on this device.";
+    }
+    if (name === "NotReadableError" || name === "TrackStartError") {
+        return "Your camera is being used by another app. Close it and try again.";
+    }
+    if (name === "OverconstrainedError") {
+        return "Your camera could not start with these settings. Try again.";
+    }
+    return "We could not open your camera. Check your browser settings and try again.";
+}
+
 function useCamera(enabled: boolean) {
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const streamRef = useRef<MediaStream | null>(null);
@@ -59,7 +77,7 @@ function useCamera(enabled: boolean) {
             setCameraReady(false);
             try {
                 if (!navigator.mediaDevices?.getUserMedia) {
-                    throw new Error("Camera access requires a supported browser and a secure HTTPS connection.");
+                    throw new DOMException("Camera access is unavailable.", "NotSupportedError");
                 }
                 const isMobileViewport = window.matchMedia("(max-width: 760px)").matches;
                 const stream = await navigator.mediaDevices.getUserMedia({
@@ -83,7 +101,7 @@ function useCamera(enabled: boolean) {
                 }
             } catch (error) {
                 if (!disposed) {
-                    setCameraError(error instanceof Error ? error.message : "The camera could not be started.");
+                    setCameraError(getCameraErrorMessage(error));
                 }
             }
         }
@@ -170,7 +188,7 @@ export function BiometricSettingsPage() {
         status: "waiting",
         ready: false,
         faceCount: 0,
-        message: "Starting the live face guide…",
+        message: "Getting the camera ready…",
         boundingBox: null,
         poseRatio: null,
     });
@@ -224,7 +242,7 @@ export function BiometricSettingsPage() {
             setPageError("");
             await queryClient.invalidateQueries({ queryKey: ["biometrics"] });
         },
-        onError: (error) => setPageError(error instanceof Error ? error.message : "Facial enrolment could not be completed."),
+        onError: (error) => setPageError(error instanceof Error ? error.message : "Face setup could not be completed."),
     });
 
     const deleteMutation = useMutation({
@@ -233,7 +251,7 @@ export function BiometricSettingsPage() {
             setPageError("");
             await queryClient.invalidateQueries({ queryKey: ["biometrics"] });
         },
-        onError: (error) => setPageError(error instanceof Error ? error.message : "The facial template could not be deleted."),
+        onError: (error) => setPageError(error instanceof Error ? error.message : "Your face record could not be removed. Please try again."),
     });
 
     const status = statusQuery.data;
@@ -278,16 +296,16 @@ export function BiometricSettingsPage() {
                     setLivePreview({
                         ...result,
                         message: stage === 0
-                            ? "Face detected. Look straight at the camera."
+                            ? "Look straight at the camera."
                             : stage === 1
-                                ? "Face detected. Turn your head slightly to your left."
-                                : "Face detected. Turn your head slightly to your right.",
+                                ? "Turn slightly left."
+                                : "Turn slightly right.",
                     });
                     return;
                 }
 
                 stableFramesRef.current += 1;
-                setLivePreview({ ...result, message: "Good position. Hold still while the frame is captured…" });
+                setLivePreview({ ...result, message: "Good. Hold still…" });
                 if (stableFramesRef.current < 2) return;
 
                 const nextFrames = [...framesRef.current, frame].slice(0, 3);
@@ -302,16 +320,17 @@ export function BiometricSettingsPage() {
                         status: "captured",
                         ready: true,
                         faceCount: 1,
-                        message: "All three frames passed the live face checks. Submit to complete enrolment.",
+                        message: "Your face has been captured. Finishing setup…",
                         boundingBox: null,
                         poseRatio: null,
                     });
+                    enrollmentMutation.mutate(nextFrames);
                 } else {
                     setLivePreview({
                         ...result,
                         status: "captured",
                         ready: true,
-                        message: `${nextFrames.length} of 3 frames captured. Follow the next instruction.`,
+                        message: `${nextFrames.length} of 3 frames captured. Follow the next prompt.`,
                     });
                 }
             } catch (error) {
@@ -342,6 +361,7 @@ export function BiometricSettingsPage() {
     if (user?.role !== "student") return <Navigate to="/app" replace />;
 
     function startEnrollmentCamera() {
+        enrollmentMutation.reset();
         framesRef.current = [];
         stableFramesRef.current = 0;
         baselinePoseRef.current = null;
@@ -351,14 +371,20 @@ export function BiometricSettingsPage() {
             status: "waiting",
             ready: false,
             faceCount: 0,
-            message: "Starting the live face guide…",
+            message: "Getting the camera ready…",
             boundingBox: null,
             poseRatio: null,
         });
         setCameraEnabled(true);
     }
 
+    function retryEnrollmentCamera() {
+        setCameraEnabled(false);
+        window.setTimeout(() => setCameraEnabled(true), 120);
+    }
+
     function resetEnrollmentCapture() {
+        enrollmentMutation.reset();
         setCameraEnabled(false);
         framesRef.current = [];
         stableFramesRef.current = 0;
@@ -368,7 +394,7 @@ export function BiometricSettingsPage() {
             status: "waiting",
             ready: false,
             faceCount: 0,
-            message: "Start the camera when you are ready.",
+            message: "Ready when you are.",
             boundingBox: null,
             poseRatio: null,
         });
@@ -383,66 +409,64 @@ export function BiometricSettingsPage() {
         <div className="dashboard-page biometric-page">
             <div className="dashboard-page-heading workspace-page-heading">
                 <div>
-                    <span className="eyebrow">STUDENT WORKSPACE</span>
-                    <h1>Biometric settings</h1>
-                    <p>Manage your biometric consent and facial enrolment for attendance verification.</p>
+                    <h1>Face verification</h1>
+                    <p>Set up and manage face verification for attendance.</p>
                 </div>
-                <span className="release-chip"><span /> ROLLNEXA 1.0.5</span>
             </div>
             <Link to="/app/attendance" className="attendance-back-link"><ArrowLeft size={16} /> Back to attendance</Link>
 
             {pageError && <div className="workspace-alert workspace-alert-error"><AlertCircle size={17} />{pageError}</div>}
-            {statusQuery.isLoading && <div className="workspace-loading"><LoaderCircle className="workspace-spin" /> Loading biometric settings…</div>}
-            {statusQuery.isError && <div className="workspace-alert workspace-alert-error">{statusQuery.error instanceof Error ? statusQuery.error.message : "Biometric settings could not be loaded."}</div>}
+            {statusQuery.isLoading && <div className="workspace-loading"><LoaderCircle className="workspace-spin" /> Loading…</div>}
+            {statusQuery.isError && <div className="workspace-alert workspace-alert-error">{statusQuery.error instanceof Error ? statusQuery.error.message : "We could not load your face settings."}</div>}
 
             {status && (
                 <>
                     <section className="biometric-status-card">
                         <div className="biometric-status-icon"><ShieldCheck size={24} /></div>
                         <div className="biometric-status-copy">
-                            <span className="eyebrow">BIOMETRIC STATUS</span>
-                            <h2>{status.isEnrolled ? "Facial enrolment complete" : consentGranted ? "Consent granted · enrolment pending" : "Facial enrolment not active"}</h2>
-                            <p>{status.isEnrolled ? `Your encrypted facial template was enrolled ${status.enrolledAt ? new Date(status.enrolledAt).toLocaleString() : ""}.` : "A facial template is required for automated attendance verification."}</p>
+                            <span className="eyebrow">YOUR STATUS</span>
+                            <h2>{status.consentStatus === "consent_update_required" ? "Review the updated notice" : status.isEnrolled ? "Face verification is ready" : consentGranted ? "Ready to set up" : "Not set up"}</h2>
+                            <p>{status.isEnrolled ? `Set up on ${status.enrolledAt ? new Date(status.enrolledAt).toLocaleDateString() : "your account"}.` : "Set up face verification to check in automatically."}</p>
                         </div>
-                        <span className={`workspace-status ${status.isEnrolled ? "is-positive" : "is-neutral"}`}>{status.isEnrolled ? "Enrolled" : "Not enrolled"}</span>
+                        <span className={`workspace-status ${status.isEnrolled && status.consentStatus !== "consent_update_required" ? "is-positive" : "is-neutral"}`}>{status.consentStatus === "consent_update_required" ? "Review needed" : status.isEnrolled ? "Ready" : "Not set up"}</span>
                     </section>
 
                     {!consentGranted ? (
                         <section className="biometric-panel">
-                            <span className="eyebrow">INFORMED CHOICE</span>
-                            <h2>Biometric consent</h2>
-                            <p>During enrolment, RollNexa sends small camera preview frames securely to its server for live face detection and positioning guidance. When enrolment is submitted, the server extracts and encrypts your facial feature template. Camera frames are processed in memory and are not saved as photographs.</p>
+                            <span className="eyebrow">BEFORE YOU CONTINUE</span>
+                            <h2>About face verification</h2>
+                            <p>RollNexa uses your face to confirm your identity at check-in. Camera images are sent securely for a temporary check. We store an encrypted face record, not your photographs.</p>
                             <ul className="biometric-policy-list">
-                                <li>Facial enrolment is optional.</li>
-                                <li>You can withdraw consent and request deletion of your stored facial template at any time.</li>
-                                <li>Withdrawing consent does not prevent attendance. Ask your lecturer to use the lecturer-approved manual attendance exception process.</li>
-                                <li>Camera frames are processed in memory and are not saved as image files by this application.</li>
+                                <li>Setting up face verification is optional.</li>
+                                <li>You can withdraw consent and remove your face record at any time.</li>
+                                <li>If you do not use face verification, your lecturer can record an approved alternative.</li>
+                                <li>Camera images are processed temporarily and are not saved as photographs.</li>
                             </ul>
                             <label className="biometric-consent-check">
                                 <input type="checkbox" checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)} />
-                                <span>I have read this notice and voluntarily agree to biometric processing for RollNexa attendance verification.</span>
+                                <span>I have read this notice and agree to use face verification for attendance.</span>
                             </label>
                             <div className="biometric-action-row">
                                 <button className="button button-primary" type="button" disabled={!acknowledged || consentMutation.isPending} onClick={() => consentMutation.mutate("granted")}>
-                                    {consentMutation.isPending ? <LoaderCircle size={16} className="workspace-spin" /> : <ShieldCheck size={16} />} Grant biometric consent
+                                    {consentMutation.isPending ? <LoaderCircle size={16} className="workspace-spin" /> : <ShieldCheck size={16} />} Continue
                                 </button>
                                 {status.consentStatus === "consent_update_required" && (
-                                    <button className="button button-outline" type="button" disabled={consentMutation.isPending} onClick={() => { if (window.confirm("Withdraw your previous biometric consent and delete any stored facial template?")) consentMutation.mutate("withdrawn"); }}>Withdraw previous consent</button>
+                                    <button className="button button-outline" type="button" disabled={consentMutation.isPending} onClick={() => { if (window.confirm("Withdraw your previous face verification consent and delete any stored face record?")) consentMutation.mutate("withdrawn"); }}>Withdraw and delete face record</button>
                                 )}
                             </div>
                         </section>
                     ) : (
                         <section className="biometric-panel">
                             <div className="biometric-panel-heading">
-                                <div><span className="eyebrow">ENROLMENT</span><h2>Facial template</h2></div>
-                                <span className="workspace-status is-positive">Consent granted</span>
+                                <div><span className="eyebrow">FACE VERIFICATION</span><h2>{status.isEnrolled ? "Face verification is ready" : "Set up face verification"}</h2></div>
+                                <span className="workspace-status is-positive">Consent given</span>
                             </div>
-                            <p>Keep your face inside the guide. RollNexa detects it continuously, gives positioning feedback and captures each frame automatically when your face is stable. The server validates all three frames before creating your encrypted facial template.</p>
-                            {!status.modelsAvailable && <div className="workspace-alert workspace-alert-warning"><AlertCircle size={17} />Facial recognition model files are not available on this server yet. Enrolment will become available after the deployment installs the model assets.</div>}
-                            {status.encryptionStatus === "missing" && <div className="workspace-alert workspace-alert-warning"><AlertCircle size={17} />Biometric enrolment is temporarily unavailable because the encryption service is not configured. Contact the system administrator.</div>}
-                            {status.encryptionStatus === "invalid" && <div className="workspace-alert workspace-alert-error"><AlertCircle size={17} />Biometric enrolment is temporarily unavailable because the server encryption configuration is invalid. The administrator must correct the Fernet key before enrolment can continue.</div>}
-                            {!status.isEnrolled && !cameraEnabled && (
-                                <button className="button button-primary" type="button" disabled={!status.modelsAvailable || status.encryptionStatus !== "valid"} onClick={startEnrollmentCamera}><Camera size={16} /> Start facial enrolment</button>
+                            <p>{status.isEnrolled ? "Your face is set up for attendance check-in." : "Follow the on-screen guidance. RollNexa will capture each view automatically."}</p>
+                            {!status.modelsAvailable && <div className="workspace-alert workspace-alert-warning"><AlertCircle size={17} />Face verification is temporarily unavailable. Please try again later.</div>}
+                            {status.encryptionStatus === "missing" && <div className="workspace-alert workspace-alert-warning"><AlertCircle size={17} />Face verification is temporarily unavailable. Please contact your institution.</div>}
+                            {status.encryptionStatus === "invalid" && <div className="workspace-alert workspace-alert-error"><AlertCircle size={17} />Face verification is temporarily unavailable. Please contact your institution.</div>}
+                            {!status.isEnrolled && !cameraEnabled && frames.length < 3 && (
+                                <button className="button button-primary" type="button" disabled={!status.modelsAvailable || status.encryptionStatus !== "valid"} onClick={startEnrollmentCamera}><Camera size={16} /> Set up face verification</button>
                             )}
                             {cameraEnabled && (
                                 <div className="biometric-capture-layout biometric-live-capture">
@@ -462,14 +486,19 @@ export function BiometricSettingsPage() {
                                         )}
                                     </div>
                                     <div className="biometric-capture-controls">
-                                        <span className="biometric-stage-label">STEP {Math.min(frames.length + 1, 3)} OF 3</span>
-                                        <strong>{frames.length === 0 ? "Look directly at the camera" : frames.length === 1 ? "Turn your head slightly to your left" : "Turn your head slightly to your right"}</strong>
-                                        <p>{frames.length} of 3 frames captured. Keep your face inside the guide. RollNexa captures each frame automatically when your position is stable.</p>
+                                        <span className="biometric-stage-label">VIEW {Math.min(frames.length + 1, 3)} OF 3</span>
+                                        <strong>{frames.length === 0 ? "Look at the camera" : frames.length === 1 ? "Turn slightly left" : "Turn slightly right"}</strong>
+                                        <p>Use even lighting and keep your face in the frame. Each view is captured automatically.</p>
                                         <div className={`biometric-live-status ${livePreview.ready ? "is-ready" : ""}`} role="status" aria-live="polite">
                                             <span className="biometric-live-indicator" />
                                             <span>{camera.cameraReady ? livePreview.message : camera.cameraError || "Waiting for camera permission…"}</span>
                                         </div>
-                                        {camera.cameraError && <div className="workspace-alert workspace-alert-error">{camera.cameraError}</div>}
+                                        {camera.cameraError && (
+                                            <div className="biometric-camera-error">
+                                                <div className="workspace-alert workspace-alert-error">{camera.cameraError}</div>
+                                                <button className="button button-outline" type="button" onClick={retryEnrollmentCamera}>Try camera again</button>
+                                            </div>
+                                        )}
                                         <div className="biometric-frame-progress" aria-label={`${frames.length} of 3 frames captured`}>
                                             {[0, 1, 2].map((index) => <span key={index} className={index < frames.length ? "is-complete" : ""} />)}
                                         </div>
@@ -480,27 +509,32 @@ export function BiometricSettingsPage() {
                                 </div>
                             )}
                             {frames.length === 3 && !cameraEnabled && (
-                                <div className="biometric-enrollment-ready">
-                                    <CheckCircle2 size={20} />
-                                    <div><strong>All three frames passed the live checks.</strong><p>Review the capture status, then submit to create your encrypted facial template.</p></div>
-                                    <div className="biometric-action-row">
-                                        <button className="button button-primary" type="button" disabled={enrollmentMutation.isPending} onClick={submitEnrollment}>{enrollmentMutation.isPending ? <LoaderCircle size={15} className="workspace-spin" /> : <ScanFace size={15} />} Submit enrolment</button>
-                                        <button className="button button-outline" type="button" onClick={resetEnrollmentCapture}>Retake frames</button>
+                                <div className="biometric-enrollment-ready" role="status" aria-live="polite">
+                                    {enrollmentMutation.isPending ? <LoaderCircle size={20} className="workspace-spin" /> : <CheckCircle2 size={20} />}
+                                    <div>
+                                        <strong>{enrollmentMutation.isPending ? "Finishing setup…" : "Setup could not be completed"}</strong>
+                                        <p>{enrollmentMutation.isPending ? "Saving your face record securely." : "Check your connection and try again."}</p>
                                     </div>
+                                    {enrollmentMutation.isError && (
+                                        <div className="biometric-action-row">
+                                            <button className="button button-primary" type="button" onClick={submitEnrollment}>Try again</button>
+                                            <button className="button button-outline" type="button" onClick={resetEnrollmentCapture}>Start again</button>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                             {status.isEnrolled && (
                                 <div className="biometric-action-row">
-                                    <button className="button button-outline" type="button" disabled={deleteMutation.isPending} onClick={() => { if (window.confirm("Delete your stored facial template? You can enrol again while consent remains active.")) deleteMutation.mutate(); }}><Trash2 size={15} /> Delete facial template</button>
+                                    <button className="button button-outline" type="button" disabled={deleteMutation.isPending} onClick={() => { if (window.confirm("Remove your saved face record? You can set it up again while consent remains active.")) deleteMutation.mutate(); }}><Trash2 size={15} /> Remove face record</button>
                                 </div>
                             )}
                             <div className="biometric-withdraw-row">
-                                <div><strong>Withdraw consent</strong><p>Withdrawal immediately deletes the stored facial template and expires pending QR verification attempts.</p></div>
-                                <button className="button button-outline" type="button" disabled={consentMutation.isPending} onClick={() => { if (window.confirm("Withdraw biometric consent and delete your stored facial template? You can still attend through a lecturer-approved manual exception.")) consentMutation.mutate("withdrawn"); }}>Withdraw consent</button>
+                                <div><strong>Withdraw consent</strong><p>Your face record will be deleted and any pending check-in will be cancelled.</p></div>
+                                <button className="button button-outline" type="button" disabled={consentMutation.isPending} onClick={() => { if (window.confirm("Withdraw consent and delete your saved face record? You can still check in using an approved alternative.")) consentMutation.mutate("withdrawn"); }}>Withdraw consent</button>
                             </div>
                         </section>
                     )}
-                    <div className="biometric-alternative-note"><ShieldCheck size={18} /><p><strong>Alternative attendance remains available.</strong> If you do not enrol, withdraw consent or cannot complete facial verification, contact your lecturer for a recorded manual attendance exception. It is kept separate from automated dual verification.</p></div>
+                    <div className="biometric-alternative-note"><ShieldCheck size={18} /><p><strong>Need another way to check in?</strong> Your lecturer can record an approved alternative if you do not use face verification or cannot complete it.</p></div>
                 </>
             )}
         </div>
@@ -512,9 +546,23 @@ export function AttendanceFaceCheckPage() {
     const { verificationId = "" } = useParams();
     const queryClient = useQueryClient();
     const [cameraEnabled, setCameraEnabled] = useState(false);
-    const [baselineFrame, setBaselineFrame] = useState<Blob | null>(null);
     const [pageError, setPageError] = useState("");
+    const [livePreview, setLivePreview] = useState<FacePreviewResponse>({
+        status: "waiting",
+        ready: false,
+        faceCount: 0,
+        message: "Getting the camera ready…",
+        boundingBox: null,
+        poseRatio: null,
+    });
+    const [verificationStage, setVerificationStage] = useState<"aligning" | "turning" | "checking" | "failed">("aligning");
     const camera = useCamera(cameraEnabled);
+    const baselineFrameRef = useRef<Blob | null>(null);
+    const baselinePoseRef = useRef<number | null>(null);
+    const stableFramesRef = useRef(0);
+    const previewInFlightRef = useRef(false);
+    const verificationSubmittedRef = useRef(false);
+    const challengeRequestedRef = useRef(false);
 
     const biometricQuery = useQuery({
         queryKey: ["biometrics", "status"],
@@ -531,19 +579,27 @@ export function AttendanceFaceCheckPage() {
             body: JSON.stringify({}),
         }),
         onSuccess: () => {
-            setBaselineFrame(null);
+            baselineFrameRef.current = null;
+            baselinePoseRef.current = null;
+            stableFramesRef.current = 0;
+            verificationSubmittedRef.current = false;
             setPageError("");
+            setVerificationStage("aligning");
             setCameraEnabled(true);
         },
-        onError: (error) => setPageError(error instanceof Error ? error.message : "A facial challenge could not be created."),
+        onError: (error) => {
+            setVerificationStage("failed");
+            setPageError(error instanceof Error ? error.message : "We could not start face verification.");
+        },
     });
     const faceMutation = useMutation({
-        mutationFn: async (challengeFrame: Blob) => {
-            if (!challengeMutation.data || !baselineFrame) throw new Error("Capture both required camera frames.");
+        mutationFn: async (frames: { baselineFrame: Blob; challengeFrame: Blob }) => {
+            const challenge = challengeMutation.data;
+            if (!challenge) throw new Error("Please restart the face check.");
             const formData = new FormData();
-            formData.append("challengeId", challengeMutation.data.challengeId);
-            formData.append("baselineFrame", baselineFrame, "baseline-frame.jpg");
-            formData.append("challengeFrame", challengeFrame, "challenge-frame.jpg");
+            formData.append("challengeId", challenge.challengeId);
+            formData.append("baselineFrame", frames.baselineFrame, "reference-frame.jpg");
+            formData.append("challengeFrame", frames.challengeFrame, "challenge-frame.jpg");
             return apiRequest<FaceVerificationResponse>(`/api/v1/biometrics/verifications/${verificationId}/verify/`, {
                 method: "POST",
                 body: formData,
@@ -552,96 +608,278 @@ export function AttendanceFaceCheckPage() {
         onSuccess: async () => {
             setCameraEnabled(false);
             setPageError("");
+            setVerificationStage("checking");
             await queryClient.invalidateQueries({ queryKey: ["workspace"] });
             await queryClient.invalidateQueries({ queryKey: ["attendance-verification", verificationId] });
             await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
         },
         onError: async (error) => {
-            setPageError(error instanceof Error ? error.message : "Facial verification could not be completed.");
+            setCameraEnabled(false);
+            setVerificationStage("failed");
+            setPageError(error instanceof Error ? error.message : "We could not verify your face. Please try again.");
             await queryClient.invalidateQueries({ queryKey: ["attendance-verification", verificationId] });
         },
     });
 
+    const requestChallenge = useCallback(() => {
+        challengeRequestedRef.current = true;
+        setPageError("");
+        challengeMutation.mutate();
+    }, [challengeMutation.mutate]);
+
+    useEffect(() => {
+        if (
+            verificationQuery.data?.status === "qr_verified"
+            && biometricQuery.data?.isEnrolled
+            && biometricQuery.data.consentStatus === "granted"
+            && !challengeMutation.data
+            && !challengeMutation.isPending
+            && !challengeRequestedRef.current
+        ) {
+            requestChallenge();
+        }
+    }, [verificationQuery.data?.status, biometricQuery.data?.isEnrolled, biometricQuery.data?.consentStatus, challengeMutation.data, challengeMutation.isPending, requestChallenge]);
+
+    useEffect(() => {
+        const challenge = challengeMutation.data;
+        if (!cameraEnabled || !camera.cameraReady || !challenge || faceMutation.isPending || faceMutation.isSuccess) {
+            return;
+        }
+
+        let disposed = false;
+
+        async function inspectLiveFrame() {
+            if (previewInFlightRef.current || verificationSubmittedRef.current || disposed) return;
+            previewInFlightRef.current = true;
+
+            try {
+                if (Date.now() >= new Date(challenge.expiresAt).getTime()) {
+                    throw new Error("This check has timed out. Please try again.");
+                }
+
+                const previewFrame = await camera.capturePreviewFrame();
+                const formData = new FormData();
+                formData.append("frame", previewFrame, "live-face-check.jpg");
+                const result = await apiRequest<FacePreviewResponse>("/api/v1/biometrics/face-preview/", {
+                    method: "POST",
+                    body: formData,
+                });
+                if (disposed) return;
+
+                setLivePreview(result);
+                if (!result.ready || result.poseRatio === null) {
+                    stableFramesRef.current = 0;
+                    setVerificationStage(baselineFrameRef.current ? "turning" : "aligning");
+                    return;
+                }
+
+                if (!baselineFrameRef.current) {
+                    if (Math.abs(result.poseRatio - 0.5) > 0.10) {
+                        stableFramesRef.current = 0;
+                        setVerificationStage("aligning");
+                        setLivePreview({ ...result, message: "Look straight at the camera." });
+                        return;
+                    }
+
+                    stableFramesRef.current += 1;
+                    setVerificationStage("aligning");
+                    setLivePreview({ ...result, message: "Good. Hold still…" });
+                    if (stableFramesRef.current < 2) return;
+
+                    const baselineFrame = await camera.captureFrame();
+                    if (disposed) return;
+                    baselineFrameRef.current = baselineFrame;
+                    baselinePoseRef.current = result.poseRatio;
+                    stableFramesRef.current = 0;
+                    setVerificationStage("turning");
+                    setLivePreview({
+                        ...result,
+                        message: challenge.direction === "turn_left" ? "Now turn slightly left." : "Now turn slightly right.",
+                    });
+                    return;
+                }
+
+                const baselinePose = baselinePoseRef.current;
+                if (baselinePose === null) return;
+                const poseReady = challenge.direction === "turn_left"
+                    ? result.poseRatio <= baselinePose - 0.08
+                    : result.poseRatio >= baselinePose + 0.08;
+
+                if (!poseReady) {
+                    stableFramesRef.current = 0;
+                    setVerificationStage("turning");
+                    setLivePreview({
+                        ...result,
+                        message: challenge.direction === "turn_left" ? "Turn a little further left." : "Turn a little further right.",
+                    });
+                    return;
+                }
+
+                stableFramesRef.current += 1;
+                setVerificationStage("turning");
+                setLivePreview({ ...result, message: "Good. Hold still…" });
+                if (stableFramesRef.current < 2) return;
+
+                const baselineFrame = baselineFrameRef.current;
+                if (!baselineFrame) throw new Error("Please try the face check again.");
+                verificationSubmittedRef.current = true;
+                stableFramesRef.current = 0;
+                setVerificationStage("checking");
+                setLivePreview({ ...result, message: "Checking your attendance…" });
+                const challengeFrame = await camera.captureFrame();
+                if (disposed) return;
+                faceMutation.mutate({ baselineFrame, challengeFrame });
+            } catch (error) {
+                if (!disposed) {
+                    setCameraEnabled(false);
+                    setVerificationStage("failed");
+                    setPageError(error instanceof Error ? error.message : "We could not complete the face check.");
+                }
+            } finally {
+                previewInFlightRef.current = false;
+            }
+        }
+
+        const timer = window.setInterval(() => void inspectLiveFrame(), 900);
+        void inspectLiveFrame();
+        return () => {
+            disposed = true;
+            window.clearInterval(timer);
+        };
+    }, [cameraEnabled, camera.cameraReady, challengeMutation.data, faceMutation.isPending, faceMutation.isSuccess]);
+
     if (user?.role !== "student") return <Navigate to="/app" replace />;
+    if (!verificationId) return <Navigate to="/app/attendance" replace />;
+
     const biometricStatus = biometricQuery.data;
     const challenge = challengeMutation.data;
     const isComplete = faceMutation.isSuccess || verificationQuery.data?.status === "completed";
+    const attemptEnded = verificationQuery.data && ["failed", "expired"].includes(verificationQuery.data.status);
 
-    async function captureBaseline() {
-        setPageError("");
-        try {
-            setBaselineFrame(await camera.captureFrame());
-        } catch (error) {
-            setPageError(error instanceof Error ? error.message : "The camera frame could not be captured.");
-        }
-    }
-
-    async function captureChallenge() {
-        setPageError("");
-        try {
-            const frame = await camera.captureFrame();
-            faceMutation.mutate(frame);
-        } catch (error) {
-            setPageError(error instanceof Error ? error.message : "The camera frame could not be captured.");
-        }
-    }
-
-    function retryChallenge() {
+    function retryFaceCheck() {
         setCameraEnabled(false);
-        setBaselineFrame(null);
-        faceMutation.reset();
+        baselineFrameRef.current = null;
+        baselinePoseRef.current = null;
+        stableFramesRef.current = 0;
+        previewInFlightRef.current = false;
+        verificationSubmittedRef.current = false;
+        challengeRequestedRef.current = false;
         challengeMutation.reset();
+        faceMutation.reset();
         setPageError("");
+        setVerificationStage("aligning");
+        requestChallenge();
     }
 
-    if (!verificationId) return <Navigate to="/app/attendance" replace />;
+    function retryCamera() {
+        setPageError("");
+        setCameraEnabled(false);
+        window.setTimeout(() => setCameraEnabled(true), 120);
+    }
 
     return (
         <div className="dashboard-page biometric-page">
             <div className="dashboard-page-heading workspace-page-heading">
-                <div><span className="eyebrow">STUDENT WORKSPACE</span><h1>Facial attendance verification</h1><p>Complete the second verification stage for your QR-verified attendance session.</p></div>
-                <span className="release-chip"><span /> ROLLNEXA 1.0.5</span>
+                <div>
+                    <h1>Confirm attendance</h1>
+                    <p>Look at the camera and follow the short instruction. We will finish automatically.</p>
+                </div>
             </div>
-            <Link to="/app/attendance/check-in" className="attendance-back-link"><ArrowLeft size={16} /> Back to QR scanning</Link>
-            {pageError && <div className="workspace-alert workspace-alert-error"><AlertCircle size={17} />{pageError}</div>}
+            <Link to="/app/attendance" className="attendance-back-link"><ArrowLeft size={16} /> Back to attendance</Link>
+            {pageError && <div className="workspace-alert workspace-alert-error" role="alert"><AlertCircle size={17} />{pageError}</div>}
 
             {isComplete ? (
                 <section className="attendance-verification-result">
                     <span className="attendance-result-icon"><CheckCircle2 size={30} /></span>
-                    <span className="eyebrow">DUAL VERIFICATION COMPLETE</span>
-                    <h2>Attendance recorded successfully</h2>
-                    <p>Both the QR Code and server-side facial verification succeeded. Your attendance record is now available in your history.</p>
-                    <div className="attendance-result-actions"><Link to="/app/history" className="button button-primary">View attendance history</Link><Link to="/app/attendance" className="button button-outline">Return to attendance</Link></div>
+                    <h2>You're checked in</h2>
+                    <p>Your attendance has been recorded.</p>
+                    <div className="attendance-result-actions"><Link to="/app/history" className="button button-primary">View attendance</Link></div>
                 </section>
             ) : biometricQuery.isLoading || verificationQuery.isLoading ? (
-                <div className="workspace-loading"><LoaderCircle className="workspace-spin" /> Preparing verification…</div>
-            ) : verificationQuery.data && ["failed", "expired"].includes(verificationQuery.data.status) ? (
-                <section className="biometric-panel"><h2>Verification attempt is no longer active</h2><p>This attempt has expired or reached its maximum number of failed facial checks. Scan the lecturer's current QR Code to start a new attendance attempt.</p><Link to="/app/attendance/check-in" className="button button-primary">Scan a new QR Code</Link></section>
-            ) : biometricStatus && (!biometricStatus.isEnrolled || biometricStatus.consentStatus !== "granted") ? (
-                <section className="biometric-panel"><h2>Facial enrolment is required</h2><p>Complete biometric consent and enrolment before using automated facial verification. You may also ask your lecturer to record an approved manual attendance exception.</p><Link to="/app/biometrics" className="button button-primary">Open biometric settings</Link></section>
-            ) : !cameraEnabled && !challenge ? (
-                <section className="biometric-panel"><span className="eyebrow">SECOND VERIFICATION STAGE</span><h2>Confirm your identity</h2><p>RollNexa will request two live camera frames. The server checks your enrolled facial template and asks you to perform a short head movement.</p><button className="button button-primary" type="button" disabled={challengeMutation.isPending || verificationQuery.data?.status !== "qr_verified"} onClick={() => challengeMutation.mutate()}>{challengeMutation.isPending ? <LoaderCircle size={16} className="workspace-spin" /> : <ScanFace size={16} />} Start facial verification</button></section>
-            ) : (
+                <div className="workspace-loading"><LoaderCircle className="workspace-spin" /> Preparing check-in…</div>
+            ) : biometricQuery.isError || verificationQuery.isError ? (
                 <section className="biometric-panel">
-                    <span className="eyebrow">LIVE CAMERA CHALLENGE</span>
-                    <h2>{baselineFrame ? challenge?.prompt : "Look directly at the camera"}</h2>
-                    <p>{baselineFrame ? "Turn your head toward the requested side, keep your face visible and capture the second frame." : "Keep your face centred, look toward the camera and capture a neutral reference frame."}</p>
-                    <div className="biometric-capture-layout">
-                        <div className="biometric-camera-frame"><video ref={camera.videoRef} autoPlay playsInline muted /></div>
+                    <h2>We couldn't prepare check-in</h2>
+                    <p>Refresh the page and try again.</p>
+                    <button className="button button-primary" type="button" onClick={() => { void biometricQuery.refetch(); void verificationQuery.refetch(); }}>Try again</button>
+                </section>
+            ) : attemptEnded ? (
+                <section className="biometric-panel">
+                    <h2>This check-in has ended</h2>
+                    <p>Scan the current class code to try again.</p>
+                    <Link to="/app/attendance/check-in" className="button button-primary">Scan QR Code</Link>
+                </section>
+            ) : biometricStatus && (!biometricStatus.isEnrolled || biometricStatus.consentStatus !== "granted") ? (
+                <section className="biometric-panel">
+                    <h2>Set up face verification first</h2>
+                    <p>Complete the face setup before checking in. You can also ask your lecturer for an approved alternative.</p>
+                    <Link to="/app/biometrics" className="button button-primary">Set up face verification</Link>
+                </section>
+            ) : verificationQuery.data?.status !== "qr_verified" ? (
+                <section className="biometric-panel">
+                    <h2>This check-in is not ready</h2>
+                    <p>Scan the current class code to start again.</p>
+                    <Link to="/app/attendance/check-in" className="button button-primary">Scan class code</Link>
+                </section>
+            ) : challengeMutation.isPending ? (
+                <div className="workspace-loading"><LoaderCircle className="workspace-spin" /> Getting the camera ready…</div>
+            ) : challengeMutation.isError ? (
+                <section className="biometric-panel">
+                    <h2>We couldn't start the face check</h2>
+                    <p>Check your connection and try again.</p>
+                    <button className="button button-primary" type="button" onClick={retryFaceCheck}>Try again</button>
+                </section>
+            ) : faceMutation.isError || verificationStage === "failed" ? (
+                <section className="biometric-panel">
+                    <h2>Let's try that again</h2>
+                    <p>Keep your face in the frame and follow the prompt.</p>
+                    <button className="button button-primary" type="button" onClick={retryFaceCheck}>Try again</button>
+                </section>
+            ) : camera.cameraError ? (
+                <section className="biometric-panel">
+                    <h2>Camera access is needed</h2>
+                    <p>Allow camera access in your browser, then try again.</p>
+                    <button className="button button-primary" type="button" onClick={retryCamera}>Try camera again</button>
+                </section>
+            ) : (
+                <section className="biometric-panel biometric-check-panel">
+                    <div className="biometric-check-heading">
+                        <span className="biometric-stage-label">{verificationStage === "aligning" ? "POSITION YOUR FACE" : verificationStage === "turning" ? "FOLLOW THE PROMPT" : "CHECKING"}</span>
+                        <h2>{verificationStage === "aligning" ? "Look at the camera" : verificationStage === "turning" ? (challenge?.direction === "turn_left" ? "Turn slightly left" : "Turn slightly right") : "Checking your attendance…"}</h2>
+                        <p>{verificationStage === "aligning" ? "Keep your face inside the guide." : verificationStage === "turning" ? "Move gently, then hold still." : "This will only take a moment."}</p>
+                    </div>
+                    <div className="biometric-capture-layout biometric-live-capture biometric-verification-capture">
+                        <div className="biometric-camera-frame">
+                            <video ref={camera.videoRef} autoPlay playsInline muted />
+                            <div className="biometric-face-guide" aria-hidden="true" />
+                            {livePreview.boundingBox && (
+                                <div
+                                    className="biometric-face-box"
+                                    style={{
+                                        left: `${livePreview.boundingBox.x * 100}%`,
+                                        top: `${livePreview.boundingBox.y * 100}%`,
+                                        width: `${livePreview.boundingBox.width * 100}%`,
+                                        height: `${livePreview.boundingBox.height * 100}%`,
+                                    }}
+                                />
+                            )}
+                            {verificationStage === "checking" && <div className="biometric-camera-checking"><LoaderCircle className="workspace-spin" size={25} /><span>Checking…</span></div>}
+                        </div>
                         <div className="biometric-capture-controls">
-                            <strong>{baselineFrame ? "Second frame" : "Reference frame"}</strong>
-                            <p>{challenge ? `Challenge expires at ${new Date(challenge.expiresAt).toLocaleTimeString()}.` : "Waiting for camera permission."}</p>
-                            {camera.cameraError && <div className="workspace-alert workspace-alert-error">{camera.cameraError}</div>}
-                            <div className="biometric-action-row">
-                                {!baselineFrame ? <button className="button button-primary" type="button" disabled={!camera.cameraReady} onClick={() => void captureBaseline()}><Camera size={15} /> Capture reference</button> : <button className="button button-primary" type="button" disabled={!camera.cameraReady || faceMutation.isPending} onClick={() => void captureChallenge()}>{faceMutation.isPending ? <LoaderCircle size={15} className="workspace-spin" /> : <ScanFace size={15} />} Capture challenge</button>}
-                                <button className="button button-outline" type="button" onClick={retryChallenge}>Restart challenge</button>
+                            <div className="biometric-frame-progress" aria-label={verificationStage === "aligning" ? "Step one of two" : "Step two of two"}>
+                                <span className={verificationStage !== "aligning" ? "is-complete" : "is-current"} />
+                                <span className={verificationStage === "checking" ? "is-complete" : verificationStage === "turning" ? "is-current" : ""} />
                             </div>
+                            <div className={`biometric-live-status ${livePreview.ready ? "is-ready" : ""}`} role="status" aria-live="polite">
+                                <span className="biometric-live-indicator" />
+                                <span>{camera.cameraReady ? livePreview.message : "Opening camera…"}</span>
+                            </div>
+                            <p className="biometric-verification-footnote">Use even lighting and keep your face visible.</p>
                         </div>
                     </div>
-                    {faceMutation.isPending && <div className="workspace-alert workspace-alert-info"><LoaderCircle className="workspace-spin" size={16} /> Verifying your face securely on the server…</div>}
                 </section>
             )}
-            <div className="biometric-alternative-note"><ShieldCheck size={18} /><p><strong>Privacy and alternative.</strong> Captured frames are processed in memory and are not stored as image files. If the camera is unavailable or verification cannot be completed, contact your lecturer for a manual attendance exception.</p></div>
+            <div className="biometric-alternative-note"><ShieldCheck size={18} /><p><strong>Need another way to check in?</strong> Your lecturer can record an approved alternative if you cannot complete face verification.</p></div>
         </div>
     );
 }

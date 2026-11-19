@@ -58,7 +58,7 @@ export function PublicLayout() {
                             <img src="/static/images/rollnexa-mark.svg" alt="" />
                             <span>RollNexa</span>
                         </Link>
-                        <p>Academic administration and verified attendance, connected in one platform.</p>
+                        <p>Academic management and attendance, connected in one platform.</p>
                     </div>
                     <div className="footer-links">
                         <span className="footer-heading">Explore</span>
@@ -74,13 +74,13 @@ export function PublicLayout() {
                     </div>
                     <div className="footer-note-block">
                         <span className="footer-heading">RollNexa</span>
-                        <p>Accounts are provisioned by authorised institutional administrators. Contact your institution if you need access.</p>
+                        <p>Your institution provides your account. Contact them if you need access.</p>
                         <span className="footer-tagline">Attendance, connected.</span>
                     </div>
                 </div>
                 <div className="container footer-bottom">
                     <span>© {new Date().getFullYear()} RollNexa</span>
-                    <span>Academic management · Attendance integrity</span>
+                    <span>Academic management · Attendance</span>
                 </div>
             </footer>
         </div>

@@ -202,32 +202,32 @@ function getResourceConfig(resource: string, role: string): ResourceConfig {
             fields: [{ name: "course", label: "Course", type: "select", optionKey: "courses", required: true }, { name: "programme", label: "Programme", type: "select", optionKey: "programmes", required: true }, { name: "semester", label: "Semester", type: "select", optionKey: "semesters", required: true }, { name: "level", label: "Level", type: "select", options: levels, required: true }, { name: "credit_units", label: "Approved credit units", type: "number", required: true }, { name: "stress_code", label: "Classification", type: "select", options: stressCodes }, { name: "source_url", label: "Curriculum source URL", type: "text" }, { name: "source_note", label: "Source note", type: "textarea" }, { name: "max_students", label: "Maximum students", type: "number" }, { name: "registration_open", label: "Open student registration", type: "checkbox" }, { name: "notes", label: "Notes", type: "textarea" }],
         },
         assignments: {
-            resource, title: "Teaching assignments", description: "Assign one lecturer to several programme offerings of the same course, semester and level in a single operation. Cross-department teaching is supported without changing the lecturer's home department.", createLabel: "Assign lecturer to offerings",
+            resource, title: "Teaching assignments", description: "Assign a lecturer to the same course across multiple programmes in one step.", createLabel: "Assign lecturer to offerings",
             columns: [{ key: "lecturer_name", label: "Lecturer" }, { key: "lecturer_department", label: "Home department" }, { key: "course_code", label: "Course" }, { key: "programme_name", label: "Programme" }, { key: "academic_session", label: "Session" }, { key: "is_cross_department", label: "Cross-department" }, { key: "is_active", label: "Status" }],
             fields: [{ name: "offering", label: "Course offering", type: "select", optionKey: "offerings", required: true }, { name: "lecturer", label: "Lecturer", type: "select", optionKey: "lecturers", required: true }],
         },
         "lecturer-courses": {
-            resource, title: "My courses", description: "Review your active teaching assignments and open a class roster for a course offering.",
+            resource, title: "My courses", description: "View your courses and class lists.",
             columns: [{ key: "course_code", label: "Code" }, { key: "course_title", label: "Course" }, { key: "programme_name", label: "Programme" }, { key: "level", label: "Level" }, { key: "semester_name", label: "Semester" }, { key: "academic_session", label: "Session" }, { key: "registered_count", label: "Registered" }],
             readOnly: true,
         },
         "student-courses": {
-            resource, title: "Course registration", description: "Review course offerings available to your assigned programme and level. Registration and withdrawal are controlled by the academic offering settings.",
+            resource, title: "Course registration", description: "View available courses and manage your registration.",
             columns: [{ key: "course_code", label: "Code" }, { key: "course_title", label: "Course" }, { key: "programme_name", label: "Programme" }, { key: "level", label: "Level" }, { key: "semester_name", label: "Semester" }, { key: "academic_session", label: "Session" }, { key: "credit_units", label: "Units" }, { key: "registration_open", label: "Registration" }, { key: "is_registered", label: "My status" }],
             readOnly: true,
         },
         "attendance-sessions": {
-            resource, title: "Attendance sessions", description: "Schedule and manage sessions for your assigned course offerings. Display a rotating QR Code, review dual-verification attendance and record lecturer-approved manual exceptions where required.", createLabel: "Schedule session",
-            columns: [{ key: "course_code", label: "Course" }, { key: "title", label: "Session title" }, { key: "programme_name", label: "Programme" }, { key: "starts_at", label: "Starts" }, { key: "ends_at", label: "Ends" }, { key: "status", label: "Status" }, { key: "registered_count", label: "Enrolled" }, { key: "qr_verified_count", label: "QR verified" }, { key: "attendance_count", label: "Present" }, { key: "manual_attendance_count", label: "Manual exceptions" }],
+            resource, title: "Attendance sessions", description: "Schedule classes, display check-in codes, review attendance and record approved alternatives when needed.", createLabel: "Schedule session",
+            columns: [{ key: "course_code", label: "Course" }, { key: "title", label: "Session title" }, { key: "programme_name", label: "Programme" }, { key: "starts_at", label: "Starts" }, { key: "ends_at", label: "Ends" }, { key: "status", label: "Status" }, { key: "registered_count", label: "Enrolled" }, { key: "qr_verified_count", label: "Code scanned" }, { key: "attendance_count", label: "Present" }, { key: "manual_attendance_count", label: "Approved alternatives" }],
             fields: [{ name: "offering", label: "Assigned course offering", type: "select", optionKey: "offerings", required: true }, { name: "title", label: "Session title" }, { name: "starts_at", label: "Starts at", type: "datetime-local", required: true }, { name: "ends_at", label: "Ends at", type: "datetime-local", required: true }, { name: "notes", label: "Lecturer notes", type: "textarea" }],
         },
         "attendance-monitor": {
-            resource, title: "Attendance monitoring", description: "Review institution-wide attendance activity, distinguishing automated dual-verification records from lecturer-approved manual exceptions.",
-            columns: [{ key: "course_code", label: "Course" }, { key: "title", label: "Session" }, { key: "programme_name", label: "Programme" }, { key: "academic_session", label: "Academic session" }, { key: "starts_at", label: "Starts" }, { key: "status", label: "Status" }, { key: "registered_count", label: "Enrolled" }, { key: "qr_verified_count", label: "QR verified" }, { key: "attendance_count", label: "Present" }, { key: "manual_attendance_count", label: "Manual exceptions" }],
+            resource, title: "Attendance monitoring", description: "Review attendance across the institution, including approved alternatives.",
+            columns: [{ key: "course_code", label: "Course" }, { key: "title", label: "Session" }, { key: "programme_name", label: "Programme" }, { key: "academic_session", label: "Academic session" }, { key: "starts_at", label: "Starts" }, { key: "status", label: "Status" }, { key: "registered_count", label: "Enrolled" }, { key: "qr_verified_count", label: "Code scanned" }, { key: "attendance_count", label: "Present" }, { key: "manual_attendance_count", label: "Approved alternatives" }],
             readOnly: true,
         },
         "attendance-history": {
-            resource, title: "Attendance history", description: "Review your attendance history, including automated dual-verification records and clearly labelled lecturer-approved manual exceptions.",
+            resource, title: "Attendance history", description: "View your attendance history and any approved alternatives.",
             columns: [{ key: "course_code", label: "Course" }, { key: "course_title", label: "Course title" }, { key: "session_title", label: "Session" }, { key: "academic_session", label: "Academic session" }, { key: "recorded_at", label: "Recorded at" }, { key: "recording_method", label: "Method" }, { key: "manual_reason", label: "Manual reason" }],
             readOnly: true,
         },
@@ -238,8 +238,8 @@ function getResourceConfig(resource: string, role: string): ResourceConfig {
 }
 
 function formatCell(value: unknown, key: string): string {
-    if (key === "recording_method" && value === "dual_verified") return "QR + facial verification";
-    if (key === "recording_method" && value === "manual_exception") return "Manual exception";
+    if (key === "recording_method" && value === "dual_verified") return "Verified check-in";
+    if (key === "recording_method" && value === "manual_exception") return "Approved alternative";
     if (typeof value === "boolean") {
         if (key === "is_active") return value ? "Active" : "Inactive";
         if (key === "is_current") return value ? "Current" : "—";
@@ -891,9 +891,9 @@ function ResourceWorkspace({
                 {dataQuery.isLoading ? (
                     <div className="workspace-loading"><LoaderCircle size={22} className="workspace-spin" /> Loading records…</div>
                 ) : dataQuery.isError ? (
-                    <div className="workspace-empty"><AlertCircle size={24} /><strong>Unable to load this workspace</strong><p>{dataQuery.error instanceof Error ? dataQuery.error.message : "Please try again."}</p><button className="button button-outline" onClick={() => void dataQuery.refetch()}><RefreshCw size={15} /> Retry</button></div>
+                    <div className="workspace-empty"><AlertCircle size={24} /><strong>We could not load this page</strong><p>{dataQuery.error instanceof Error ? dataQuery.error.message : "Try again."}</p><button className="button button-outline" onClick={() => void dataQuery.refetch()}><RefreshCw size={15} /> Retry</button></div>
                 ) : results.length === 0 ? (
-                    <div className="workspace-empty"><ClipboardList size={25} /><strong>No records found</strong><p>{config.emptyText ?? "There are no records matching the current filters."}</p></div>
+                    <div className="workspace-empty"><ClipboardList size={25} /><strong>No records found</strong><p>{config.emptyText ?? "No matching records found."}</p></div>
                 ) : (
                     <div className="workspace-table-scroll">
                         <table className="workspace-data-table">
@@ -1022,14 +1022,14 @@ function ReportsWorkspace() {
     const metrics = [
         { label: "Attendance sessions", value: data?.attendance.sessions ?? 0 },
         { label: "Present records", value: data?.attendance.presentRecords ?? data?.attendance.verifiedRecords ?? 0 },
-        { label: "Automated dual-verification", value: data?.attendance.verifiedRecords ?? 0 },
-        { label: "Manual exceptions", value: data?.attendance.manualExceptions ?? 0 },
+        { label: "Verified check-ins", value: data?.attendance.verifiedRecords ?? 0 },
+        { label: "Approved alternatives", value: data?.attendance.manualExceptions ?? 0 },
         { label: "Scheduled sessions", value: data?.attendance.scheduled ?? 0 },
         { label: "Closed sessions", value: data?.attendance.closed ?? 0 },
     ];
     return (
         <>
-            {isLoading ? <div className="workspace-loading"><LoaderCircle className="workspace-spin" /> Loading reports…</div> : isError ? <div className="workspace-alert workspace-alert-error"><AlertCircle size={17} />Unable to load reporting data. <button onClick={() => void refetch()}>Retry</button></div> : (
+            {isLoading ? <div className="workspace-loading"><LoaderCircle className="workspace-spin" /> Loading reports…</div> : isError ? <div className="workspace-alert workspace-alert-error"><AlertCircle size={17} />We could not load the reports. <button onClick={() => void refetch()}>Retry</button></div> : (
                 <>
                     <div className="workspace-metric-grid">{metrics.map((metric) => <article className="workspace-metric-card" key={metric.label}><span>{metric.label}</span><strong>{metric.value.toLocaleString()}</strong></article>)}</div>
                     {data?.academic && <section className="workspace-table-card workspace-report-card"><div className="workspace-table-heading"><div><strong>Academic overview</strong><span>Current platform records</span></div></div><div className="workspace-report-stats">{Object.entries(data.academic).map(([key, value]) => <div key={key}><strong>{value.toLocaleString()}</strong><span>{key.replace(/([A-Z])/g, " $1").replace(/^./, (letter) => letter.toUpperCase())}</span></div>)}</div></section>}
@@ -1125,20 +1125,20 @@ export function WorkspacePage() {
     const showTabs = section === "academic" || (section === "courses" && role === "admin");
     const pageTitle = section === "attendance" && role === "student" ? "Attendance check-in" : config.title;
     const pageDescription = section === "attendance" && role === "student"
-        ? "Scan your lecturer's current session QR Code, then complete server-side facial verification. If you cannot use biometrics, ask your lecturer about the manual attendance alternative."
+        ? "Scan the class code and follow the face check to finish checking in. Ask your lecturer if you need another way to check in."
         : config.description;
 
     if (section === "reports") {
-        return <div className="dashboard-page workspace-page"><PageHeading title="Reports and analytics" description="Review academic activity and attendance-session summaries available to your role." /><ReportsWorkspace /></div>;
+        return <div className="dashboard-page workspace-page"><PageHeading title="Reports and analytics" description="View academic activity and attendance summaries." /><ReportsWorkspace /></div>;
     }
     if (section === "profile" || section === "settings") {
         return <div className="dashboard-page workspace-page"><PageHeading title={section === "profile" ? "My profile" : "Account settings"} description="Manage your personal details and account security." /><ProfileWorkspace /></div>;
     }
     if (section === "rosters") {
-        return <div className="dashboard-page workspace-page"><PageHeading title="Class rosters" description="Select an assigned course offering to view its currently registered students." /><RosterWorkspace /></div>;
+        return <div className="dashboard-page workspace-page"><PageHeading title="Class rosters" description="Choose a course to view its registered students." /><RosterWorkspace /></div>;
     }
     if (section === "attendance" && role === "student") {
-        return <div className="dashboard-page workspace-page"><PageHeading title={pageTitle} description={pageDescription} /><div className="workspace-feature-notice"><span><ShieldCheck size={26} /></span><h2>Two-stage verification is required</h2><p>Scan the QR Code displayed by your lecturer, then complete server-side facial verification. QR verification alone never creates an automated present record. A lecturer-approved manual exception is available when biometric attendance cannot be used.</p><Link className="button button-primary" to="/app/attendance/check-in">Scan QR Code <ArrowRight size={16} /></Link><Link className="workspace-coming-soon" to="/app/biometrics">Manage biometric consent and facial enrolment</Link></div></div>;
+        return <div className="dashboard-page workspace-page"><PageHeading title={pageTitle} description={pageDescription} /><div className="workspace-feature-notice"><span><ShieldCheck size={26} /></span><h2>Check in to class</h2><p>Scan the code shown by your lecturer, then follow the face check. Your attendance is recorded when both steps are complete. If you cannot use face verification, ask your lecturer for an approved alternative.</p><Link className="button button-primary" to="/app/attendance/check-in">Scan QR Code <ArrowRight size={16} /></Link><Link className="workspace-coming-soon" to="/app/biometrics">Manage face verification</Link></div></div>;
     }
 
     return (
@@ -1172,11 +1172,11 @@ export function WorkspacePage() {
                 roleFilter={roleFilter}
                 onOfferingChange={(id) => navigate(`/app/rosters?offering=${id}`)}
             />
-            {section === "attendance" && role === "admin" && <p className="workspace-report-footnote">Administrative monitoring is read-only. Attendance records cannot be manually added or edited.</p>}
+            {section === "attendance" && role === "admin" && <p className="workspace-report-footnote">Attendance records shown here are for monitoring.</p>}
         </div>
     );
 }
 
 function PageHeading({ title, description }: { title: string; description: string }) {
-    return <div className="dashboard-page-heading workspace-page-heading"><div><span className="eyebrow">ROLLNEXA WORKSPACE</span><h1>{title}</h1><p>{description}</p></div><span className="release-chip"><span /> ROLLNEXA 1.0.5</span></div>;
+    return <div className="dashboard-page-heading workspace-page-heading"><div><h1>{title}</h1><p>{description}</p></div></div>;
 }

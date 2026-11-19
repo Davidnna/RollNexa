@@ -1,8 +1,8 @@
-# RollNexa 1.0.5
+# RollNexa 1.0.6
 
 **Academic management and dual-verification attendance.**
 
-Version 1.0.5 validates the Fernet encryption key before enrolment, reports missing and invalid key configuration separately, trims surrounding whitespace, and improves the mobile facial-enrolment camera layout. Camera frames are cropped to match the visible camera viewport before server-side detection. No database schema changes or migrations are introduced.
+Version 1.0.6 refines the public website and authenticated workspaces, improves layouts across mobile screen sizes, simplifies user-facing language, and makes face enrolment and attendance verification more automatic. After a student scans a class code, RollNexa opens the face check automatically, guides the student through the required movement, captures the necessary frames and submits the verification without manual capture buttons. No database schema changes or migrations are introduced.
 
 RollNexa is a web-based academic administration and smart attendance platform. It manages institutional structure, user accounts, academic sessions, courses, course offerings, lecturer assignments and student registrations. Its automated attendance workflow combines a rotating QR Code with server-side facial recognition. An automated present record is created only when both verification stages succeed.
 
@@ -390,7 +390,7 @@ The Dockerfile builds the React application, installs Python dependencies, downl
 Build locally:
 
 ```bash
-docker build -t rollnexa:1.0.5 .
+docker build -t rollnexa:1.0.6 .
 ```
 
 Before deploying to Render:

@@ -6,7 +6,6 @@ import {
     CheckCircle2,
     CircleAlert,
     ClipboardCheck,
-    GraduationCap,
     LockKeyhole,
     RefreshCw,
     ShieldCheck,
@@ -66,18 +65,17 @@ export function DashboardHome() {
         <div className="dashboard-page">
             <div className="dashboard-page-heading">
                 <div>
-                    <span className="eyebrow">YOUR WORKSPACE</span>
+                    <span className="eyebrow">OVERVIEW</span>
                     <h1>Good day, {greetingName}.</h1>
-                    <p>Here is an overview of the information available to your account.</p>
+                    <p>Your academic and attendance overview.</p>
                 </div>
-                <span className="release-chip"><span /> ROLLNEXA 1.0.5</span>
             </div>
 
-            {summaryQuery.isLoading && <div className="dashboard-loading"><span className="loading-spinner" /> Loading your workspace summary…</div>}
+            {summaryQuery.isLoading && <div className="dashboard-loading"><span className="loading-spinner" /> Loading your overview…</div>}
             {summaryQuery.isError && (
                 <div className="inline-alert inline-alert-error">
                     <CircleAlert size={18} />
-                    <span>{summaryQuery.error instanceof Error ? summaryQuery.error.message : "The dashboard summary could not be loaded."}</span>
+                    <span>{summaryQuery.error instanceof Error ? summaryQuery.error.message : "We could not load your dashboard. Try again."}</span>
                     <button onClick={() => void summaryQuery.refetch()}><RefreshCw size={15} /> Retry</button>
                 </div>
             )}
@@ -147,24 +145,20 @@ export function DashboardHome() {
                                         </article>
                                     ))}
                                 </div>
-                            ) : <div className="empty-state">No active course assignments are currently associated with your account.</div>}
+                            ) : <div className="empty-state">No courses are available yet.</div>}
                         </section>
                     )}
 
                     {summaryQuery.data.attendance && (
                         <section className="dashboard-panel student-attendance-panel">
                             <div className="student-attendance-icon"><CheckCircle2 size={23} /></div>
-                            <div><span className="eyebrow">ATTENDANCE RECORDS</span><h2>{summaryQuery.data.attendance.presentRecords} attendance entries</h2><p>{summaryQuery.data.attendance.verifiedRecords} automated dual-verification records and {summaryQuery.data.attendance.manualExceptions} lecturer-approved manual exceptions. Both appear separately in your attendance history.</p></div>
+                            <div><span className="eyebrow">ATTENDANCE</span><h2>{summaryQuery.data.attendance.presentRecords} recorded check-ins</h2><p>{summaryQuery.data.attendance.verifiedRecords} verified check-ins and {summaryQuery.data.attendance.manualExceptions} approved alternatives.</p></div>
                         </section>
                     )}
                 </>
             )}
 
-            <section className="dashboard-release-note">
-                <div className="release-note-icon"><GraduationCap size={20} /></div>
-                <div><strong>Your RollNexa workspace is ready for daily academic operations.</strong><p>Manage academic records, course registration, class rosters and attendance sessions through your role-specific workspace.</p></div>
-                <Link to="/features">Release information <ArrowRight size={15} /></Link>
-            </section>
+
         </div>
     );
 }
@@ -214,7 +208,7 @@ export function PasswordChangePage() {
                 <label>Current password<input type="password" autoComplete="current-password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} required /></label>
                 <label>New password<input type="password" autoComplete="new-password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} required minLength={8} /></label>
                 <label>Confirm new password<input type="password" autoComplete="new-password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} required minLength={8} /></label>
-                <div className="password-form-hint"><ShieldCheck size={16} /> Your password is validated against the platform's configured password rules.</div>
+                <div className="password-form-hint"><ShieldCheck size={16} /> Use a strong password that you do not use for another account.</div>
                 <button className="button button-primary" type="submit" disabled={submitting}>{submitting ? "Updating password…" : "Update password"} <ArrowRight size={16} /></button>
             </form>
         </div>
@@ -226,7 +220,7 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
     const location = useLocation();
 
     if (isLoading) {
-        return <div className="full-page-loading"><span className="loading-spinner" /> Checking your session…</div>;
+        return <div className="full-page-loading"><span className="loading-spinner" /> Loading…</div>;
     }
 
     if (!isAuthenticated) {

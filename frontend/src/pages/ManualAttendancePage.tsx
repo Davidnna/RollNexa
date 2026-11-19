@@ -47,10 +47,10 @@ interface ManualRecordsResponse {
 }
 
 const reasonOptions = [
-    { value: "consent_withdrawn", label: "Biometric consent not given or withdrawn" },
+    { value: "consent_withdrawn", label: "Face verification not used" },
     { value: "camera_unavailable", label: "Camera unavailable" },
     { value: "accessibility", label: "Accessibility accommodation" },
-    { value: "recognition_failed", label: "Facial verification unsuccessful" },
+    { value: "recognition_failed", label: "Face check unsuccessful" },
     { value: "technical_issue", label: "Technical issue" },
     { value: "other", label: "Other approved reason" },
 ];
@@ -119,15 +119,14 @@ export function ManualAttendancePage() {
             setPageError("Provide an explanation when selecting Other.");
             return;
         }
-        if (!window.confirm("Confirm that you are approving an alternative manual attendance record for this student?")) return;
+        if (!window.confirm("Confirm that you are recording attendance for this student?")) return;
         recordMutation.mutate();
     }
 
     return (
         <div className="dashboard-page biometric-page manual-attendance-page">
             <div className="dashboard-page-heading workspace-page-heading">
-                <div><span className="eyebrow">LECTURER WORKSPACE</span><h1>Manual attendance exception</h1><p>Record an approved alternative when a student cannot complete biometric verification.</p></div>
-                <span className="release-chip"><span /> ROLLNEXA 1.0.5</span>
+                <div><h1>Alternative attendance</h1><p>Record attendance for a student who cannot use face verification.</p></div>
             </div>
             <Link to="/app/attendance" className="attendance-back-link"><ArrowLeft size={16} /> Back to attendance sessions</Link>
 
@@ -143,23 +142,23 @@ export function ManualAttendancePage() {
                         <div className="biometric-status-copy"><span className="eyebrow">ATTENDANCE SESSION</span><h2>{session.course_code} · {session.title || "Attendance session"}</h2><p>{session.course_title} · {session.programme_name} · {session.academic_session} · {session.semester_name}</p></div>
                         <span className={`workspace-status ${session.is_open ? "is-positive" : "is-neutral"}`}>{session.is_open ? "Open" : session.status}</span>
                     </section>
-                    {!session.is_open && <div className="workspace-alert workspace-alert-warning"><AlertCircle size={17} />Manual attendance can only be approved while this attendance session is active and within its scheduled time window.</div>}
+                    {!session.is_open && <div className="workspace-alert workspace-alert-warning"><AlertCircle size={17} />You can record an alternative only while this class session is open.</div>}
                     <section className="biometric-panel">
-                        <span className="eyebrow">LECTURER-APPROVED ALTERNATIVE</span>
-                        <h2>Record a student's attendance</h2>
-                        <p>This creates a present record labelled as a manual exception. It does not represent successful QR Code or facial verification.</p>
+                        <span className="eyebrow">APPROVED ALTERNATIVE</span>
+                        <h2>Record attendance</h2>
+                        <p>This records attendance separately from the automatic check-in process.</p>
                         <form className="manual-attendance-form" onSubmit={submitManualRecord}>
                             <label className="workspace-form-field"><span>Registered student</span><select value={studentId} onChange={(event) => setStudentId(event.target.value)} required><option value="">Select a student</option>{eligibleStudents.map((student) => <option key={student.id} value={student.id}>{student.name} · {student.institutional_id || student.username}</option>)}</select></label>
-                            <label className="workspace-form-field"><span>Reason for exception</span><select value={reason} onChange={(event) => setReason(event.target.value)}>{reasonOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
-                            <label className="workspace-form-field"><span>Additional notes {reason === "other" ? "(required)" : "(optional)"}</span><textarea rows={3} value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Record a brief explanation for the audit trail." /></label>
-                            <button className="button button-primary" type="submit" disabled={!session.is_open || !eligibleStudents.length || recordMutation.isPending}>{recordMutation.isPending ? <LoaderCircle size={15} className="workspace-spin" /> : <ShieldCheck size={15} />} Approve manual attendance</button>
-                            {!eligibleStudents.length && <p className="workspace-form-hint">All registered students already have an attendance record, or no students are currently registered.</p>}
+                            <label className="workspace-form-field"><span>Reason</span><select value={reason} onChange={(event) => setReason(event.target.value)}>{reasonOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+                            <label className="workspace-form-field"><span>Notes {reason === "other" ? "(required)" : "(optional)"}</span><textarea rows={3} value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Add a short note if needed." /></label>
+                            <button className="button button-primary" type="submit" disabled={!session.is_open || !eligibleStudents.length || recordMutation.isPending}>{recordMutation.isPending ? <LoaderCircle size={15} className="workspace-spin" /> : <ShieldCheck size={15} />} Record attendance</button>
+                            {!eligibleStudents.length && <p className="workspace-form-hint">There are no students available to record for this session.</p>}
                         </form>
                     </section>
                     <section className="biometric-panel">
                         <span className="eyebrow">AUDIT HISTORY</span>
-                        <h2>Manual exceptions recorded for this session</h2>
-                        {!recordsQuery.data?.manualRecords.length ? <p>No manual attendance exceptions have been recorded for this session.</p> : (
+                        <h2>Alternative attendance recorded</h2>
+                        {!recordsQuery.data?.manualRecords.length ? <p>No alternative attendance has been recorded for this session.</p> : (
                             <div className="workspace-table-scroll"><table className="workspace-data-table"><thead><tr><th>Student</th><th>Institutional ID</th><th>Reason</th><th>Recorded at</th></tr></thead><tbody>{recordsQuery.data.manualRecords.map((record) => <tr key={record.id}><td>{record.studentName}</td><td>{record.institutionalId || "—"}</td><td>{record.reason}</td><td>{new Date(record.recordedAt).toLocaleString()}</td></tr>)}</tbody></table></div>
                         )}
                     </section>

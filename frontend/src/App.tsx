@@ -34,7 +34,7 @@ function NotFoundPage() {
         <div className="not-found-page">
             <span className="eyebrow">404 · PAGE NOT FOUND</span>
             <h1>This page is not available.</h1>
-            <p>The page may have moved or may not be part of this RollNexa release.</p>
+            <p>The page may have moved or is no longer available.</p>
             <a className="button button-primary" href="/">Return home</a>
         </div>
     );
