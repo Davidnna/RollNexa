@@ -642,10 +642,12 @@ export function AttendanceFaceCheckPage() {
 
     useEffect(() => {
         const challenge = challengeMutation.data;
-        if (!cameraEnabled || !camera.cameraReady || !challenge || faceMutation.isPending || faceMutation.isSuccess) {
+        if (!cameraEnabled || !camera.cameraReady || faceMutation.isPending || faceMutation.isSuccess) {
             return;
         }
+        if (!challenge) return;
 
+        const activeChallenge: FaceChallenge = challenge;
         let disposed = false;
 
         async function inspectLiveFrame() {
@@ -653,7 +655,7 @@ export function AttendanceFaceCheckPage() {
             previewInFlightRef.current = true;
 
             try {
-                if (Date.now() >= new Date(challenge.expiresAt).getTime()) {
+                if (Date.now() >= new Date(activeChallenge.expiresAt).getTime()) {
                     throw new Error("This check has timed out. Please try again.");
                 }
 
@@ -694,14 +696,14 @@ export function AttendanceFaceCheckPage() {
                     setVerificationStage("turning");
                     setLivePreview({
                         ...result,
-                        message: challenge.direction === "turn_left" ? "Now turn slightly left." : "Now turn slightly right.",
+                        message: activeChallenge.direction === "turn_left" ? "Now turn slightly left." : "Now turn slightly right.",
                     });
                     return;
                 }
 
                 const baselinePose = baselinePoseRef.current;
                 if (baselinePose === null) return;
-                const poseReady = challenge.direction === "turn_left"
+                const poseReady = activeChallenge.direction === "turn_left"
                     ? result.poseRatio <= baselinePose - 0.08
                     : result.poseRatio >= baselinePose + 0.08;
 
@@ -710,7 +712,7 @@ export function AttendanceFaceCheckPage() {
                     setVerificationStage("turning");
                     setLivePreview({
                         ...result,
-                        message: challenge.direction === "turn_left" ? "Turn a little further left." : "Turn a little further right.",
+                        message: activeChallenge.direction === "turn_left" ? "Turn a little further left." : "Turn a little further right.",
                     });
                     return;
                 }

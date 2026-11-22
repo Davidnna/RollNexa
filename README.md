@@ -1,6 +1,8 @@
-# RollNexa 1.0.6
+# RollNexa 1.0.7
 
 **Academic management and dual-verification attendance.**
+
+Version 1.0.7 fixes the strict TypeScript challenge-state narrowing issue in the automatic facial-verification flow. It preserves the 1.0.6 user-experience refinements, mobile layouts, simplified interface language and automatic face enrolment and attendance verification. No database schema changes or migrations are introduced.
 
 Version 1.0.6 refines the public website and authenticated workspaces, improves layouts across mobile screen sizes, simplifies user-facing language, and makes face enrolment and attendance verification more automatic. After a student scans a class code, RollNexa opens the face check automatically, guides the student through the required movement, captures the necessary frames and submits the verification without manual capture buttons. No database schema changes or migrations are introduced.
 
@@ -390,7 +392,7 @@ The Dockerfile builds the React application, installs Python dependencies, downl
 Build locally:
 
 ```bash
-docker build -t rollnexa:1.0.6 .
+docker build -t rollnexa:1.0.7 .
 ```
 
 Before deploying to Render:
