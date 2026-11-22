@@ -3,6 +3,7 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 
 from accounts.models import UserProfile
+from core.models import AuditEvent
 from academics.models import (
     AcademicSession,
     Course,
@@ -394,6 +395,7 @@ class AcademicWorkflowImprovementApiTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["updated_count"], 3)
         self.assertFalse(CourseOffering.objects.filter(registration_open=False).exists())
+        self.assertTrue(AuditEvent.objects.filter(event_type="course_registration.globally_open").exists())
 
     def test_administrator_can_close_registration_for_all_active_offerings(self):
         self.client.force_authenticate(user=self.admin)

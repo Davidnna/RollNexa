@@ -9,6 +9,7 @@ from django.utils import timezone
 
 from accounts.models import UserProfile
 from academics.models import CourseLecturerAssignment, CourseRegistration
+from core.audit import record_audit_event
 
 from .models import AttendanceRecord, AttendanceSession, AttendanceVerification
 
@@ -53,6 +54,14 @@ def create_attendance_session(*, offering_id, created_by, title, starts_at, ends
     )
     session.full_clean()
     session.save()
+    record_audit_event(
+        actor=created_by,
+        event_type="attendance.session_created",
+        object_type="attendance_session",
+        object_id=session.pk,
+        summary="An attendance session was scheduled.",
+        metadata={"offering_id": offering.pk},
+    )
     return session
 
 
@@ -72,6 +81,14 @@ def activate_attendance_session(*, session_id, lecturer_profile, at=None):
     session.activated_at = moment
     session.activated_by = lecturer_profile.user
     session.save(update_fields=["status", "activated_at", "activated_by", "updated_at"])
+    record_audit_event(
+        actor=lecturer_profile.user,
+        event_type="attendance.session_activated",
+        object_type="attendance_session",
+        object_id=session.pk,
+        summary="An attendance session was activated.",
+        metadata={"offering_id": session.offering_id},
+    )
     return session
 
 
@@ -91,6 +108,14 @@ def close_attendance_session(*, session_id, lecturer_profile, at=None):
     AttendanceVerification.objects.filter(
         session=session, status=AttendanceVerification.STATUS_QR_VERIFIED
     ).update(status=AttendanceVerification.STATUS_EXPIRED, updated_at=closed_at)
+    record_audit_event(
+        actor=lecturer_profile.user,
+        event_type="attendance.session_closed",
+        object_type="attendance_session",
+        object_id=session.pk,
+        summary="An attendance session was closed.",
+        metadata={"offering_id": session.offering_id},
+    )
     return session
 
 
@@ -107,6 +132,14 @@ def cancel_attendance_session(*, session_id, lecturer_profile, at=None):
     AttendanceVerification.objects.filter(
         session=session, status=AttendanceVerification.STATUS_QR_VERIFIED
     ).update(status=AttendanceVerification.STATUS_EXPIRED, updated_at=session.cancelled_at)
+    record_audit_event(
+        actor=lecturer_profile.user,
+        event_type="attendance.session_cancelled",
+        object_type="attendance_session",
+        object_id=session.pk,
+        summary="A scheduled attendance session was cancelled.",
+        metadata={"offering_id": session.offering_id},
+    )
     return session
 
 
@@ -186,6 +219,14 @@ def record_verified_attendance(*, verification_id, recorded_at=None):
             )
             record.full_clean()
             record.save()
+            record_audit_event(
+                actor=student_profile.user,
+                event_type="attendance.recorded_dual_verified",
+                object_type="attendance_record",
+                object_id=record.pk,
+                summary="Attendance was recorded after QR and facial verification.",
+                metadata={"session_id": session.pk, "student_profile_id": student_profile.pk},
+            )
 
             verification.status = AttendanceVerification.STATUS_COMPLETED
             verification.save(update_fields=["status", "updated_at"])
@@ -302,6 +343,18 @@ def record_manual_attendance_exception(
     try:
         with transaction.atomic():
             record.save()
+            record_audit_event(
+                actor=lecturer_profile.user,
+                event_type="attendance.recorded_manual_exception",
+                object_type="attendance_record",
+                object_id=record.pk,
+                summary="A lecturer approved a manual attendance exception.",
+                metadata={
+                    "session_id": session.pk,
+                    "student_profile_id": student_profile.pk,
+                    "reason": reason,
+                },
+            )
     except IntegrityError as exc:
         raise ValidationError("Attendance has already been recorded for this student and session.") from exc
     return record
@@ -437,4 +490,12 @@ def verify_attendance_qr(*, token, student_profile, at=None):
     )
     verification.full_clean()
     verification.save()
+    record_audit_event(
+        actor=student_profile.user,
+        event_type="attendance.qr_verified",
+        object_type="attendance_verification",
+        object_id=verification.pk,
+        summary="A student scanned a valid attendance QR Code.",
+        metadata={"session_id": session.pk, "student_profile_id": student_profile.pk},
+    )
     return verification, False

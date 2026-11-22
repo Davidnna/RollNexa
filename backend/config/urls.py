@@ -3,7 +3,7 @@ from django.urls import include, path, re_path
 from django.views.generic import RedirectView
 
 from core.frontend import frontend_app
-from core.views import healthz
+from core.views import healthz, readyz
 
 admin.site.site_header = "RollNexa Administration"
 admin.site.site_title = "RollNexa Admin"
@@ -11,6 +11,7 @@ admin.site.index_title = "Platform management"
 
 urlpatterns = [
     path("healthz", healthz, name="healthz"),
+    path("readyz", readyz, name="readyz"),
     path("api/v1/", include("api.urls")),
     path("admin/", admin.site.urls),
     path("", frontend_app, name="home"),

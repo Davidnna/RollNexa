@@ -1,8 +1,8 @@
-# RollNexa 1.0.7
+# RollNexa 1.1.0
 
 **Academic management and dual-verification attendance.**
 
-Version 1.0.7 fixes the strict TypeScript challenge-state narrowing issue in the automatic facial-verification flow. It preserves the 1.0.6 user-experience refinements, mobile layouts, simplified interface language and automatic face enrolment and attendance verification. No database schema changes or migrations are introduced.
+Version 1.1.0 is the system-hardening release. It adds an append-only operational audit ledger, database-backed readiness checks, production HTTPS/HSTS defaults, a restrictive policy for the React application, biometric request-size and file-count limits, JPEG dimension checks before image decoding, and concurrency protection for facial challenge issuance. It retains the 1.0.7 user experience and automatic attendance workflow. One additive database migration creates the audit-event table; existing academic, account, biometric and attendance records are not rewritten or deleted.
 
 Version 1.0.6 refines the public website and authenticated workspaces, improves layouts across mobile screen sizes, simplifies user-facing language, and makes face enrolment and attendance verification more automatic. After a student scans a class code, RollNexa opens the face check automatically, guides the student through the required movement, captures the necessary frames and submits the verification without manual capture buttons. No database schema changes or migrations are introduced.
 
@@ -139,7 +139,7 @@ Biometric data used for unique identification is sensitive personal data. For Ni
 | Lecturer | View assigned offerings and rosters, manage attendance sessions, display QR Codes, review records and approve manual exceptions for their assigned offerings. |
 | Student | View and register for eligible courses, scan attendance QR Codes, manage biometric consent/enrolment, complete facial verification and review attendance history. |
 
-The administrator role is represented by Django superuser accounts. Lecturer and student roles are stored on `UserProfile`. Django API views and domain services enforce permissions. Hiding an action in React is not treated as an access-control mechanism.
+The administrator role is represented by Django superuser accounts. Lecturer and student roles are stored on `UserProfile`. Django API views and domain services enforce permissions. Hiding an action in React is not treated as an access-control mechanism. Django Administration is diagnostic and read-only for user, academic, attendance and biometric records; account and academic changes must go through the audited application workflows. Group administration is not exposed.
 
 ## 5. Technology stack
 
@@ -175,7 +175,8 @@ rollnexa/
             migrations/            Biometric database migrations
             model_assets/           Downloaded ONNX models and licence notices (not committed)
         config/                    Django settings, ASGI, WSGI and URL configuration
-        core/                      Shared health, error and React-serving views
+        core/                      Shared health, readiness, security headers and audit ledger
+            migrations/            Audit-event database migration
         static/                    Django static assets and built React application
         templates/                 Legacy Django templates still used by backend views
         manage.py                  Django management entry point
@@ -193,6 +194,7 @@ rollnexa/
     Dockerfile                     Multi-stage React and Django image build
     render.yaml                    Render Blueprint configuration
     build.sh                       Local build helper
+    scripts/                       k6 concurrent QR check-in test harness
     .dockerignore                  Docker build exclusions
     .gitignore                     Git exclusions
     .editorconfig                  Four-space editor and whitespace conventions
@@ -212,6 +214,8 @@ All API endpoints use the `/api/v1/` prefix and the same-origin Django session. 
 - `POST /api/v1/auth/logout/` — end the current session.
 - `POST /api/v1/auth/password-change/` — change the authenticated user's password.
 - `GET /api/v1/dashboard/summary/` — role-scoped dashboard summary.
+- `GET /readyz` — readiness check for database connectivity and required face-model assets.
+- `GET /healthz` — liveness check for the web process.
 - `/api/v1/workspace/` — role-protected academic, account, roster, attendance and reporting resources.
 
 ### QR attendance
@@ -327,7 +331,7 @@ Run Django management commands from the `backend/` directory:
 )
 ```
 
-The existing migrations add biometric consent, encrypted face enrolment, verification challenges and audit records. They also extend the attendance record to distinguish automated dual verification from lecturer-approved manual exceptions. Existing automated attendance rows are migrated as `dual_verified`; the database is not reset.
+Apply the existing biometric and attendance migrations and the new `core.0001_initial` migration, which creates the audit-event ledger. The attendance migrations distinguish automated dual verification from lecturer-approved manual exceptions. Existing automated attendance rows are migrated as `dual_verified`; the database is not reset.
 
 Create a local administrator if the database does not already have one:
 
@@ -392,7 +396,7 @@ The Dockerfile builds the React application, installs Python dependencies, downl
 Build locally:
 
 ```bash
-docker build -t rollnexa:1.0.7 .
+docker build -t rollnexa:1.1.0 .
 ```
 
 Before deploying to Render:
@@ -401,33 +405,123 @@ Before deploying to Render:
 2. Ensure `DATABASE_URL`, `DIRECT_DATABASE_URL` where required, `SECRET_KEY` and other existing production settings are configured.
 3. Set `BIOMETRIC_ENCRYPTION_KEY` in Render. The Blueprint uses `generateValue: true`, which asks Render to create a Base64-encoded 256-bit secret compatible with Fernet. Render generates this value only when the variable does not already exist; syncing the Blueprint does not replace an existing value. If the application reports an invalid key and no facial templates have ever been successfully enrolled, replace the existing value using Render's **Generate Random Value** option and redeploy. If any templates have been enrolled, do not replace the key; use a controlled key migration. For local development, generate a Fernet key with the command in section 9.2. Do not commit the value.
 4. Set `BIOMETRIC_ENCRYPTION_KEY_VERSION=v1`, `BIOMETRIC_CONSENT_POLICY_VERSION=1.1`, `BIOMETRIC_FACE_MATCH_THRESHOLD=0.363` and `BIOMETRIC_FACE_DETECTION_THRESHOLD=0.75`.
-5. Deploy and verify `/healthz`, authentication, database migrations and the biometric status endpoint.
-6. Complete controlled enrolment and verification tests before enabling student biometric enrolment institution-wide.
+5. Confirm the Blueprint applies `SECURE_SSL_REDIRECT=true` and `SECURE_HSTS_SECONDS=31536000`. The readiness endpoint is exempt from redirects so Render can probe it over the service network.
+6. If using a custom domain, add it to `ALLOWED_HOSTS` and add its HTTPS origin to `CSRF_TRUSTED_ORIGINS`.
+7. Deploy and verify `/healthz`, `/readyz`, HTTPS redirects, HSTS, authentication, database migrations and the biometric status endpoint.
+8. Complete controlled enrolment and verification tests before enabling student biometric enrolment institution-wide.
 
 The service can start without a biometric key, but biometric enrolment and matching fail closed until the key is configured. A missing model asset causes the Docker build to fail rather than silently deploying a non-functional facial recogniser.
 
 ## 11. Operational and security notes
 
+### Audit ledger
+
+The `core.AuditEvent` table is an append-only event ledger. System administrators can review it in Django Administration under **Audit events**. The actor's username is retained as a snapshot if the user account is later removed. Event metadata is intentionally limited to operational identifiers and state changes; it must never contain passwords, session/QR tokens, encryption keys, camera frames, facial templates, embeddings or free-text notes. Application model saves reject updates to existing audit-event rows, and Django Administration does not expose add, change or delete actions. User, group, academic, attendance and biometric records are read-only in Django Administration so mutations use the application workflows that emit audit events. Database owners can still alter data directly, so database access remains privileged and must be audited by the hosting provider.
+
+### Production checks
+
+Run the backend tests and deployment checks from `backend/`:
+
+```bash
+python manage.py check
+python manage.py check --deploy
+python manage.py makemigrations --check --dry-run
+python manage.py test
+```
+
+Run the frontend checks from the repository root:
+
+```bash
+npm --prefix frontend run typecheck
+npm --prefix frontend run build
+```
+
+Build the container with `docker build -t rollnexa:1.1.0 .`. The repository currently pins direct frontend dependencies in `frontend/package.json` but does not include a generated `package-lock.json`; generate and commit one with `npm --prefix frontend install` in a network-enabled development environment to make transitive frontend dependency resolution reproducible.
+
 - Keep the production database and biometric encryption key backed up under separate access controls.
+- Production defaults enforce HTTPS redirects and one-year HSTS. `/healthz` and `/readyz` are exempt from Django's redirect so Render health probes can reach them; the application routes are not exempt.
+- The React application receives a Content Security Policy that permits same-origin scripts and API calls, the Google Fonts hosts used by the interface, and camera media streams. A Permissions Policy allows camera access only to the same origin and disables microphone and geolocation access.
+- Biometric multipart requests are limited to 8 MB at the request boundary, no more than three uploaded files, 2 MB per image, and the image dimensions are inspected from the JPEG header before OpenCV decodes the image. Camera images are expected to be JPEGs generated by the frontend.
+- Security- and operations-relevant actions are written to the read-only **Audit events** section in Django Administration. Events cover account lifecycle and password changes, academic and course-registration changes, lecturer assignments, attendance-session lifecycle, QR check-ins, automated and manual attendance records, biometric consent, enrolment and verification outcomes. Audit metadata is filtered to exclude passwords, tokens, secrets, image/frame data, templates, embeddings, cookies, credentials and free-text notes.
+- DRF login, QR and biometric endpoints use scoped throttles. The default Django cache is process-local; the current Render Blueprint uses one Gunicorn worker. Before adding workers or service instances, configure a shared cache such as Redis and edge-level rate limiting so limits cannot be bypassed by spreading requests across processes. Django Administration login is separate from the DRF login throttle; restrict administrator access at the hosting/identity layer and require strong unique administrator credentials. Multi-factor authentication is not implemented in this application release.
+- For a custom domain, include the hostname in `ALLOWED_HOSTS` and its HTTPS origin in `CSRF_TRUSTED_ORIGINS`. The Render-provided hostname is added automatically.
+- Audit events are append-only through the application and read-only in Django Administration. The institution must define and implement its own retention schedule; the application does not automatically purge audit events or biometric consent/verification history.
 - Restrict access to Render environment settings, database administration and deployment credentials.
 - Use HTTPS for all production camera capture and API requests.
 - Do not enable biometric collection until the institution approves the privacy notice, lawful basis, DPIA, retention schedule and manual alternative procedure.
 - Calibrate the face-match threshold using representative, consented test data and measure false-accept and false-reject rates before operational use.
 - Test camera access, lighting, pose, different supported devices and accessibility scenarios.
 - Review manual exceptions and failed verification attempts through appropriate institutional audit processes.
-- Establish a retention and deletion schedule for biometric consent events and verification audit records; this release records them but does not implement an automatic scheduled purge.
+- Establish a retention and deletion schedule for biometric consent events, biometric verification attempts and general audit events. The audit ledger records changes but does not implement an automatic scheduled purge.
 - The QR rotation window reduces the useful life of a copied code but does not prove physical proximity. The face challenge is an additional identity check, not a certified anti-spoofing guarantee.
 
-## 12. Third-party model attribution
+### Concurrent QR check-in test
+
+A k6 script is included at `scripts/k6_qr_checkin.js`. It performs a one-time concurrent QR check-in using up to eight distinct test-student accounts. Each account must be active, registered for the session's course offering and not already marked present. Create a temporary JSON file at `scripts/students.test.json` containing an array of `{ "username": "...", "password": "..." }` test accounts, and save a freshly issued QR token to `scripts/qr-token.txt`. These paths are excluded from Git. Restrict their local permissions and never use real student credentials.
+
+Run the test immediately after the lecturer activates the test session and issues a fresh QR token; the QR token has a short validity window:
+
+```bash
+chmod 600 scripts/students.test.json scripts/qr-token.txt
+export BASE_URL="https://your-rollnexa-domain"
+export STUDENTS_JSON="$(cat scripts/students.test.json)"
+export QR_TOKEN="$(cat scripts/qr-token.txt)"
+k6 run scripts/k6_qr_checkin.js
+unset STUDENTS_JSON QR_TOKEN
+```
+
+The script verifies that all test students can authenticate and create or reuse a pending QR verification, and reports QR check-in latency. It deliberately stops at `qr_verified`; it does not simulate face verification or create attendance records. Use a staging deployment for load tests. The eight-VU limit respects the current conservative login and QR API throttles. This script is a test harness, not evidence that a load test has already been executed.
+
+### Backup and restore drill
+
+Create a PostgreSQL custom-format backup using the direct database connection string. Keep the dump outside GitHub and protect it with the institution's approved storage encryption and access controls:
+
+```bash
+pg_dump --format=custom --no-owner --no-acl "$DIRECT_DATABASE_URL" --file="rollnexa-backup.dump"
+pg_restore --list "rollnexa-backup.dump"
+```
+
+Restore only into an isolated staging database, never over production as part of a routine test:
+
+```bash
+pg_restore --no-owner --no-acl --clean --if-exists --dbname="$STAGING_DATABASE_URL" "rollnexa-backup.dump"
+```
+
+After restoring, run Django checks and verify account, course, registration and attendance counts against the backup manifest. If biometric templates exist, configure the matching backed-up `BIOMETRIC_ENCRYPTION_KEY` and key version in the isolated staging service, then verify that a controlled template can be decrypted without displaying or exporting the resulting feature vector. Database backups and the biometric encryption key must be recoverable together; a database-only restore cannot recover facial matching if the key has been lost. Record the date and outcome of each restore drill.
+
+## 12. Hardening status and residual validation
+
+### Implemented in version 1.1.0
+
+- HTTPS redirects and one-year HSTS are enabled by the Render Blueprint; health probes use separate liveness and readiness endpoints.
+- The React application receives a restrictive Content Security Policy and a same-origin camera Permissions Policy. Session and CSRF cookies are secure, HttpOnly and SameSite=Lax in production.
+- User, academic, attendance and biometric records are read-only in Django Administration. Application changes use role-protected workflows and write append-only audit events.
+- Biometric multipart request size, file count and per-image size are bounded. JPEG dimensions are checked before OpenCV image decoding.
+- Facial challenge issuance locks the session and verification in a consistent order. Attendance recording remains transactional and requires the server-side QR and face verification states.
+- A k6 script is provided for a controlled concurrent QR check-in test.
+
+### Must still be validated in the deployment environment
+
+- Execute `python manage.py check --deploy`, `python manage.py makemigrations --check --dry-run` and the complete Django test suite against the release. The current build environment used for preparing this package does not contain Django or PostgreSQL, so runtime tests and migration execution have not been performed here.
+- Run the Vite production build and Docker image build. The frontend registry was unavailable during package preparation, so a `package-lock.json` could not be generated. Direct frontend dependencies are exact-version pinned in `package.json`, but transitive dependency resolution is not yet lockfile-reproducible. Generate and commit the lockfile from a network-enabled environment before treating the frontend supply chain as fully reproducible.
+- Run the included k6 test against a staging deployment, perform a restore drill from a real database backup, and verify that encrypted facial templates can be decrypted in staging using the separately backed-up key.
+- Measure false-accept and false-reject rates using a representative, consented evaluation set. The SFace threshold `0.363` is a published benchmark reference, not a RollNexa-specific calibrated threshold.
+- The randomised head-turn challenge is a heuristic liveness check, not a certified presentation-attack detection system. It must not be represented as proof that sophisticated photo, screen or video replay attacks are impossible. Retain the lecturer-approved manual alternative and evaluate a dedicated PAD model before high-stakes deployment.
+- The DRF throttles use Django's process-local cache. Configure shared cache and edge rate limiting before scaling beyond the current single-worker/single-instance configuration. Django Administration does not have built-in MFA in this release; protect administrator access with the institution's identity and network controls.
+- The institution must approve the privacy notice, lawful basis, DPIA, biometric retention schedule, audit retention schedule and incident-response process before collecting real student biometric data.
+
+A successful container build and application smoke test are necessary but do not replace the accuracy, security, privacy, backup/restore and load evaluations listed above.
+
+## 13. Third-party model attribution
 
 - **YuNet face detector** — OpenCV Zoo `face_detection_yunet_2023mar.onnx`; MIT License. Model file SHA-256: `8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4`.
 - **SFace face recogniser** — OpenCV Zoo `face_recognition_sface_2021dec.onnx`; Apache License 2.0. Model file SHA-256: `0ba9fbfa01b5270c96627c4ef784da859931e02f04419c829e83484087c34e79`.
 - **OpenCV** — Python headless distribution, version pinned in `backend/requirements.txt`.
-- **NumPy** and **cryptography** — dependencies pinned by the backend requirements.
+- **NumPy** and **cryptography** — dependencies constrained to supported version ranges in the backend requirements.
 
 The model downloader stores the corresponding upstream `LICENSE` texts beside the downloaded model files. Model references: [YuNet model and MIT notice](https://github.com/opencv/opencv_zoo/tree/main/models/face_detection_yunet), [SFace model and Apache 2.0 notice](https://github.com/opencv/opencv_zoo/tree/main/models/face_recognition_sface), and [OpenCV DNN face detection and recognition documentation](https://docs.opencv.org/4.x/d0/dd4/tutorial_dnn_face.html).
 
-## 13. Repository structure and release conventions
+## 14. Repository structure and release conventions
 
 The repository separates application source by responsibility: all Django code, templates, static assets and Python dependencies live in `backend/`; all React, TypeScript, Vite and frontend dependencies live in `frontend/`. Root-level files are limited to repository documentation, version metadata, editor settings and deployment/build orchestration.
 

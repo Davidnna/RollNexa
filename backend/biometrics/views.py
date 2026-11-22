@@ -34,6 +34,7 @@ from .services import (
     verify_face_challenge,
 )
 from .workflows import create_or_replace_face_enrollment, update_biometric_consent
+from core.audit import record_audit_event
 
 
 CHALLENGE_TTL = timedelta(seconds=90)
@@ -136,9 +137,12 @@ class FacePreviewView(NoCacheAPIView):
 
     def post(self, request):
         student = _student_profile(request)
-        frame = request.FILES.get("frame")
-        if frame is None:
-            return Response({"detail": "A live camera frame is required."}, status=400)
+        preview_frames = request.FILES.getlist("frame")
+        if len(preview_frames) != 1 or len(request.FILES) != 1:
+            return Response({"detail": "Submit exactly one live camera frame."}, status=400)
+        frame = preview_frames[0]
+        if getattr(frame, "size", 0) > 2 * 1024 * 1024:
+            return Response({"detail": "The camera frame must be no larger than 2 MB."}, status=413)
 
         consent = _current_consent(student)
         if (
@@ -168,6 +172,12 @@ class FaceEnrollmentView(NoCacheAPIView):
     def post(self, request):
         student = _student_profile(request)
         frames = request.FILES.getlist("frames")
+        if len(frames) != 3 or len(request.FILES) != 1:
+            return Response({"detail": "Submit exactly three facial enrolment frames."}, status=400)
+        if any(getattr(frame, "size", 0) > 2 * 1024 * 1024 for frame in frames):
+            return Response({"detail": "Each facial frame must be no larger than 2 MB."}, status=413)
+        if sum(getattr(frame, "size", 0) for frame in frames) > 6 * 1024 * 1024:
+            return Response({"detail": "The combined facial enrolment images are too large."}, status=413)
         consent = _current_consent(student)
         if not consent or not consent.is_granted or consent.policy_version != getattr(settings, "BIOMETRIC_CONSENT_POLICY_VERSION", "1.1"):
             return Response({"detail": "Current biometric consent is required before facial enrolment."}, status=403)
@@ -205,6 +215,14 @@ class FaceEnrollmentView(NoCacheAPIView):
                 student=student,
                 status=AttendanceVerification.STATUS_QR_VERIFIED,
             ).update(status=AttendanceVerification.STATUS_EXPIRED, updated_at=moment)
+            record_audit_event(
+                actor=request.user,
+                event_type="biometrics.enrollment_deleted",
+                object_type="user_profile",
+                object_id=student.pk,
+                summary="A student removed their stored facial template.",
+                metadata={"templates_deleted": int(deleted)},
+            )
         return Response({
             "detail": "Your stored facial template has been deleted." if deleted else "No facial template was stored.",
             "isEnrolled": False,
@@ -216,9 +234,22 @@ class FaceChallengeView(NoCacheAPIView):
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "biometric_challenge"
 
+    @transaction.atomic
     def post(self, request, verification_id):
         student = _student_profile(request)
-        verification = _verification_for_student(verification_id, student)
+        # Lock order is session then verification, matching session close and QR check-in.
+        verification_reference = get_object_or_404(
+            AttendanceVerification.objects.only("pk", "session_id"),
+            pk=verification_id,
+            student=student,
+        )
+        session = AttendanceSession.objects.select_for_update().get(pk=verification_reference.session_id)
+        verification = get_object_or_404(
+            AttendanceVerification.objects.select_for_update(),
+            pk=verification_id,
+            student=student,
+        )
+        verification.session = session
         now = timezone.now()
         consent = _current_consent(student)
         enrollment = FaceEnrollment.objects.filter(student=student, is_active=True).first()
@@ -286,10 +317,22 @@ class FaceVerificationView(NoCacheAPIView):
         challenge_id = request.data.get("challengeId", "")
         baseline_frame = request.FILES.get("baselineFrame")
         challenge_frame = request.FILES.get("challengeFrame")
-        if not challenge_id or not baseline_frame or not challenge_frame:
-            return Response({"detail": "A challenge and both camera frames are required."}, status=400)
+        if (
+            not challenge_id
+            or not baseline_frame
+            or not challenge_frame
+            or len(request.FILES) != 2
+            or len(request.FILES.getlist("baselineFrame")) != 1
+            or len(request.FILES.getlist("challengeFrame")) != 1
+        ):
+            return Response({"detail": "Submit a challenge and exactly two camera frames."}, status=400)
+        if any(getattr(frame, "size", 0) > 2 * 1024 * 1024 for frame in (baseline_frame, challenge_frame)):
+            return Response({"detail": "Each camera frame must be no larger than 2 MB."}, status=413)
+        if baseline_frame.size + challenge_frame.size > 4 * 1024 * 1024:
+            return Response({"detail": "The combined verification images are too large."}, status=413)
 
         now = timezone.now()
+        # Consume the challenge in a short transaction; CPU inference runs after row locks are released.
         with transaction.atomic():
             verification = get_object_or_404(
                 AttendanceVerification.objects.select_for_update().select_related("session"),
@@ -338,6 +381,9 @@ class FaceVerificationView(NoCacheAPIView):
                 encrypted_template=enrollment.encrypted_template,
                 direction=challenge.direction,
             )
+            verified_at = timezone.now()
+            if challenge.expires_at <= verified_at or verification.expires_at <= verified_at:
+                return Response({"detail": "The facial verification timed out. Scan the current QR Code and try again."}, status=410)
         except BiometricServiceUnavailable as exc:
             return Response({"detail": exc.message, "code": exc.code}, status=503)
         except BiometricServiceError as exc:
@@ -355,7 +401,15 @@ class FaceVerificationView(NoCacheAPIView):
                     failure_code=exc.code,
                     liveness_passed=False,
                     model_version=MODEL_VERSION,
-                    occurred_at=now,
+                    occurred_at=timezone.now(),
+                )
+                record_audit_event(
+                    actor=request.user,
+                    event_type="biometrics.verification_failed",
+                    object_type="attendance_verification",
+                    object_id=verification.pk,
+                    summary="A student's facial verification attempt failed.",
+                    metadata={"failure_code": exc.code},
                 )
                 attempts_remaining = max(0, MAX_FACE_ATTEMPTS - failed_count)
                 if attempts_remaining == 0 and locked_verification.status == AttendanceVerification.STATUS_QR_VERIFIED:
@@ -383,7 +437,7 @@ class FaceVerificationView(NoCacheAPIView):
                 ).first()
                 if not locked_consent or not locked_enrollment:
                     return Response({"detail": "Biometric consent or enrolment changed during verification. Start again or request a manual attendance exception."}, status=403)
-                record = complete_attendance_verification(verification_id=verification.pk, verified_at=now)
+                record = complete_attendance_verification(verification_id=verification.pk, verified_at=verified_at)
                 BiometricVerificationAttempt.objects.create(
                     verification=verification,
                     student=student,
@@ -391,9 +445,17 @@ class FaceVerificationView(NoCacheAPIView):
                     result=BiometricVerificationAttempt.RESULT_PASSED,
                     liveness_passed=result["liveness_passed"],
                     model_version=result["model_version"],
-                    occurred_at=now,
+                    occurred_at=verified_at,
                 )
-                FaceEnrollment.objects.filter(pk=enrollment.pk).update(last_verified_at=now)
+                FaceEnrollment.objects.filter(pk=enrollment.pk).update(last_verified_at=verified_at)
+                record_audit_event(
+                    actor=request.user,
+                    event_type="biometrics.verification_succeeded",
+                    object_type="attendance_verification",
+                    object_id=verification.pk,
+                    summary="A student's facial verification succeeded.",
+                    metadata={"attendance_record_id": record.pk, "model_version": result["model_version"]},
+                )
         except ValidationError as exc:
             return Response({"detail": " ".join(exc.messages), "errors": exc.messages}, status=400)
         return Response({

@@ -43,3 +43,13 @@ backend/static/frontend/
 
 # Downloaded third-party ONNX model assets
 backend/biometrics/model_assets/*.onnx
+
+# Local database backups and downloaded biometric model assets
+*.dump
+*.backup
+*.sql
+backend/biometrics/model_assets/
+
+# Local load-test credentials and short-lived attendance tokens
+scripts/students.test.json
+scripts/qr-token.txt

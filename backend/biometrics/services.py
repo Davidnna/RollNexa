@@ -150,6 +150,46 @@ def _load_models(model_directory, score_threshold):
     return detector, recognizer
 
 
+def _jpeg_dimensions(raw):
+    """Read JPEG dimensions before decoding to limit decompression-bomb exposure."""
+    if len(raw) < 4 or raw[:3] != b"\xff\xd8\xff":
+        raise BiometricServiceError("image_invalid", "Use a valid JPEG camera image.")
+
+    frame_markers = {
+        0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7,
+        0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF,
+    }
+    index = 2
+    while index < len(raw):
+        if raw[index] != 0xFF:
+            index += 1
+            continue
+        while index < len(raw) and raw[index] == 0xFF:
+            index += 1
+        if index >= len(raw):
+            break
+        marker = raw[index]
+        index += 1
+        if marker in {0xD8, 0xD9, 0x01} or 0xD0 <= marker <= 0xD7:
+            continue
+        if index + 2 > len(raw):
+            break
+        segment_length = int.from_bytes(raw[index:index + 2], "big")
+        if segment_length < 2 or index + segment_length > len(raw):
+            break
+        if marker in frame_markers:
+            if segment_length < 7:
+                break
+            height = int.from_bytes(raw[index + 3:index + 5], "big")
+            width = int.from_bytes(raw[index + 5:index + 7], "big")
+            if width <= 0 or height <= 0:
+                break
+            return width, height
+        index += segment_length
+
+    raise BiometricServiceError("image_invalid", "The JPEG camera image has no valid frame dimensions.")
+
+
 def _decode_image(uploaded_file):
     if uploaded_file is None:
         raise BiometricServiceError("image_missing", "A camera frame is required.")
@@ -161,10 +201,7 @@ def _decode_image(uploaded_file):
     if not raw:
         raise BiometricServiceError("image_empty", "The camera frame is empty. Capture the image again.")
 
-    image = cv2.imdecode(np.frombuffer(raw, dtype=np.uint8), cv2.IMREAD_COLOR)
-    if image is None:
-        raise BiometricServiceError("image_invalid", "The uploaded camera frame is not a supported image.")
-    height, width = image.shape[:2]
+    width, height = _jpeg_dimensions(raw)
     if width < MIN_IMAGE_WIDTH or height < MIN_IMAGE_HEIGHT:
         raise BiometricServiceError(
             "image_resolution_low",
@@ -172,11 +209,21 @@ def _decode_image(uploaded_file):
         )
     if width * height > MAX_IMAGE_PIXELS:
         raise BiometricServiceError("image_resolution_high", "The camera frame resolution is too large.")
+
+    image = cv2.imdecode(np.frombuffer(raw, dtype=np.uint8), cv2.IMREAD_COLOR)
+    if image is None:
+        raise BiometricServiceError("image_invalid", "The uploaded camera frame is not a supported JPEG image.")
     return image
 
 
 def _face_detection_threshold():
-    return float(getattr(settings, "BIOMETRIC_FACE_DETECTION_THRESHOLD", DEFAULT_FACE_DETECTION_THRESHOLD))
+    threshold = float(getattr(settings, "BIOMETRIC_FACE_DETECTION_THRESHOLD", DEFAULT_FACE_DETECTION_THRESHOLD))
+    if not np.isfinite(threshold) or not 0.0 < threshold <= 1.0:
+        raise BiometricServiceUnavailable(
+            "face_detection_configuration_invalid",
+            "Facial detection is temporarily unavailable. Contact the system administrator.",
+        )
+    return threshold
 
 
 def _face_yaw_ratio(face):
@@ -350,6 +397,11 @@ def build_enrollment_template(frames):
         raise BiometricServiceError("enrollment_frame_count", "Capture exactly three facial enrolment frames.")
     samples = [_extract_face_sample(frame) for frame in frames]
     threshold = float(getattr(settings, "BIOMETRIC_FACE_MATCH_THRESHOLD", 0.363))
+    if not np.isfinite(threshold) or not 0.0 < threshold <= 1.0:
+        raise BiometricServiceUnavailable(
+            "face_match_configuration_invalid",
+            "Facial matching is temporarily unavailable. Contact the system administrator.",
+        )
     if samples[1].yaw_ratio > samples[0].yaw_ratio - MIN_YAW_CHANGE:
         raise BiometricServiceError(
             "enrollment_left_pose_missing",
@@ -376,6 +428,11 @@ def verify_face_challenge(*, baseline_frame, challenge_frame, encrypted_template
     challenged = _extract_face_sample(challenge_frame)
     template = decrypt_template(encrypted_template)
     threshold = float(getattr(settings, "BIOMETRIC_FACE_MATCH_THRESHOLD", 0.363))
+    if not np.isfinite(threshold) or not 0.0 < threshold <= 1.0:
+        raise BiometricServiceUnavailable(
+            "face_match_configuration_invalid",
+            "Facial matching is temporarily unavailable. Contact the system administrator.",
+        )
 
     baseline_score = _similarity(baseline.embedding, template)
     challenge_score = _similarity(challenged.embedding, template)

@@ -23,3 +23,11 @@ backend/htmlcov
 backend/.pytest_cache
 backend/static/frontend
 backend/biometrics/model_assets/*.onnx
+
+# Local database backups and downloaded model artefacts
+*.dump
+*.backup
+*.sql
+backend/biometrics/model_assets/
+scripts/students.test.json
+scripts/qr-token.txt

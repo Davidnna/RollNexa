@@ -25,6 +25,8 @@ COPY --from=frontend-builder /app/backend/static/frontend/ ./static/frontend/
 
 RUN python biometrics/download_models.py \
     && DATABASE_URL=postgresql://rollnexa:build-only@127.0.0.1:5432/rollnexa \
+        python manage.py check \
+    && DATABASE_URL=postgresql://rollnexa:build-only@127.0.0.1:5432/rollnexa \
         python manage.py collectstatic --noinput \
     && addgroup --system rollnexa \
     && adduser --system --ingroup rollnexa rollnexa \

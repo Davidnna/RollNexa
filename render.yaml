@@ -8,7 +8,7 @@ services:
         dockerfilePath: ./Dockerfile
         dockerContext: .
         autoDeployTrigger: commit
-        healthCheckPath: /healthz
+        healthCheckPath: /readyz
         envVars:
             -
                 key: DATABASE_URL
@@ -25,6 +25,18 @@ services:
             -
                 key: WEB_CONCURRENCY
                 value: "1"
+            -
+                key: SECURE_SSL_REDIRECT
+                value: "true"
+            -
+                key: SECURE_HSTS_SECONDS
+                value: "31536000"
+            -
+                key: SECURE_HSTS_INCLUDE_SUBDOMAINS
+                value: "false"
+            -
+                key: SECURE_HSTS_PRELOAD
+                value: "false"
             -
                 key: BIOMETRIC_ENCRYPTION_KEY
                 generateValue: true

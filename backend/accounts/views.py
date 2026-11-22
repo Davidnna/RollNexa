@@ -16,6 +16,8 @@ from django.utils.cache import add_never_cache_headers
 from django.utils.crypto import constant_time_compare
 from django.views.decorators.http import require_POST, require_http_methods
 
+from core.audit import record_audit_event
+
 from .forms import AdminCreateAccountForm, AdminUpdateAccountForm, InitialAdminSetupForm
 from .models import UserProfile
 
@@ -241,6 +243,14 @@ def user_create(request):
             profile.must_change_password = True
             profile.created_by = request.user
             profile.save()
+            record_audit_event(
+                actor=request.user,
+                event_type="account.created",
+                object_type="user",
+                object_id=user.pk,
+                summary="An administrator created a user account.",
+                metadata={"role": profile.role},
+            )
 
         # Keep the one-time credential briefly in the server-side Django session,
         # then redirect (POST/Redirect/GET) to avoid duplicate account creation
@@ -278,6 +288,14 @@ def user_edit(request, user_id):
                 profile.programme = None
                 profile.current_level = ""
             profile.save()
+            record_audit_event(
+                actor=request.user,
+                event_type="account.updated",
+                object_type="user",
+                object_id=target.pk,
+                summary="An administrator updated a user account.",
+                metadata={"role": profile.role},
+            )
         messages.success(request, f"The account for {target.get_username()} has been updated.")
         return redirect("user_list")
     return render(request, "accounts/user_edit.html", {"form": form, "target_user": target})
@@ -330,6 +348,14 @@ def toggle_account_status(request, user_id):
                 removed_by=request.user,
                 removal_note="Lecturer account deactivated by administrator",
             )
+        record_audit_event(
+            actor=request.user,
+            event_type="account.activated" if target.is_active else "account.deactivated",
+            object_type="user",
+            object_id=target.pk,
+            summary="An administrator changed a user account's active status.",
+            metadata={"is_active": target.is_active, "revoked_assignment_count": revoked_count},
+        )
     state = "activated" if target.is_active else "deactivated"
     message = f"The account for {target.get_username()} has been {state}."
     if revoked_count:
@@ -342,11 +368,19 @@ class RollNexaPasswordChangeView(PasswordChangeView):
     template_name = "registration/password_change_form.html"
     success_url = "/accounts/password-change/done/"
 
+    @transaction.atomic
     def form_valid(self, form):
         response = super().form_valid(form)
         profile = self.request.user.profile
         profile.must_change_password = False
         profile.save(update_fields=["must_change_password", "updated_at"])
+        record_audit_event(
+            actor=self.request.user,
+            event_type="account.password_changed",
+            object_type="user",
+            object_id=self.request.user.pk,
+            summary="A user changed their account password.",
+        )
         messages.success(self.request, "Your password has been updated.")
         return response
 
@@ -382,6 +416,13 @@ def initial_admin_setup(request):
                 profile.role = UserProfile.ROLE_ADMIN
                 profile.must_change_password = False
                 profile.save(update_fields=["role", "must_change_password", "updated_at"])
+                record_audit_event(
+                    actor=administrator,
+                    event_type="system.initial_admin_created",
+                    object_type="user",
+                    object_id=administrator.pk,
+                    summary="The initial system administrator account was created.",
+                )
 
             login(request, administrator)
             messages.success(request, "Your RollNexa system administrator account is ready.")

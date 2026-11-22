@@ -3,6 +3,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from .models import UserProfile
+from core.models import AuditEvent
 from academics.models import (
     AcademicSession, Course, CourseLecturerAssignment, CourseOffering, Department,
     Faculty, Programme, Semester,
@@ -63,6 +64,12 @@ class RollNexaAccountTests(TestCase):
         self.assertEqual(lecturer.profile.role, UserProfile.ROLE_LECTURER)
         self.assertTrue(lecturer.profile.must_change_password)
         self.assertEqual(lecturer.profile.created_by, self.admin)
+        self.assertTrue(AuditEvent.objects.filter(
+            actor=self.admin,
+            event_type="account.created",
+            object_type="user",
+            object_id=str(lecturer.pk),
+        ).exists())
 
     def test_student_creation_requires_programme_when_programmes_exist(self):
         faculty = Faculty.objects.create(code="SCI", name="Faculty of Science")
@@ -213,3 +220,34 @@ class RollNexaAccountTests(TestCase):
         self.assertRedirects(response, reverse("admin_dashboard"))
         self.assertTrue(User.objects.filter(username="firstadmin", is_superuser=True).exists())
         self.assertEqual(User.objects.get(username="firstadmin").profile.role, UserProfile.ROLE_ADMIN)
+
+class DjangoAdminWriteRestrictionTests(TestCase):
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+        from django.test import RequestFactory
+
+        self.admin_user = get_user_model().objects.create_superuser(
+            username="readonly_admin",
+            email="readonly_admin@example.test",
+            password="StrongTestPassword!2026",
+        )
+        self.request = RequestFactory().get("/admin/")
+        self.request.user = self.admin_user
+
+    def test_user_and_academic_admin_models_are_read_only(self):
+        from django.contrib import admin
+
+        from academics.models import Course
+
+        user_admin = admin.site._registry[User]
+        course_admin = admin.site._registry[Course]
+        for model_admin in (user_admin, course_admin):
+            self.assertFalse(model_admin.has_add_permission(self.request))
+            self.assertFalse(model_admin.has_change_permission(self.request))
+            self.assertFalse(model_admin.has_delete_permission(self.request))
+
+    def test_group_management_is_not_registered_in_django_admin(self):
+        from django.contrib import admin
+        from django.contrib.auth.models import Group
+
+        self.assertNotIn(Group, admin.site._registry)

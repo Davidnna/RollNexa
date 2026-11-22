@@ -24,6 +24,7 @@ from academics.models import (
     Semester,
 )
 from attendance.models import AttendanceRecord, AttendanceVerification
+from core.models import AuditEvent
 from attendance.services import (
     activate_attendance_session,
     create_attendance_session,
@@ -175,6 +176,11 @@ class BiometricWorkflowTests(TestCase):
             ).count(),
             1,
         )
+        self.assertTrue(AuditEvent.objects.filter(
+            event_type="biometrics.consent_granted",
+            object_type="user_profile",
+            object_id=str(self.student.pk),
+        ).exists())
 
     def test_consent_requires_the_current_policy_version(self):
         with self.assertRaises(ValidationError):
@@ -532,6 +538,40 @@ class BiometricProcessingUnitTests(TestCase):
                 direction="turn_left",
             )
         self.assertTrue(result["liveness_passed"])
+
+
+    def test_jpeg_dimensions_are_checked_before_image_decode(self):
+        from .services import BiometricServiceError, _decode_image
+
+        height = 2000
+        width = 2200
+        jpeg_header = (
+            b"\xff\xd8\xff\xc0\x00\x11\x08"
+            + height.to_bytes(2, "big")
+            + width.to_bytes(2, "big")
+            + b"\x03\x01\x11\x00\x02\x11\x00\x03\x11\x00"
+        )
+        upload = SimpleUploadedFile("large.jpg", jpeg_header, content_type="image/jpeg")
+        with patch("biometrics.services.cv2.imdecode", side_effect=AssertionError("decode must not run")):
+            with self.assertRaises(BiometricServiceError) as context:
+                _decode_image(upload)
+        self.assertEqual(context.exception.code, "image_resolution_high")
+
+    def test_non_jpeg_camera_payload_is_rejected(self):
+        from .services import BiometricServiceError, _decode_image
+
+        upload = SimpleUploadedFile("image.png", b"\x89PNG\r\n\x1a\n", content_type="image/png")
+        with self.assertRaises(BiometricServiceError) as context:
+            _decode_image(upload)
+        self.assertEqual(context.exception.code, "image_invalid")
+
+    @override_settings(BIOMETRIC_FACE_DETECTION_THRESHOLD=1.5)
+    def test_invalid_detection_threshold_fails_closed(self):
+        from .services import BiometricServiceUnavailable, _face_detection_threshold
+
+        with self.assertRaises(BiometricServiceUnavailable) as context:
+            _face_detection_threshold()
+        self.assertEqual(context.exception.code, "face_detection_configuration_invalid")
 
     def test_wrong_head_turn_direction_fails_liveness_check(self):
         from .services import BiometricServiceError, FaceSample, verify_face_challenge

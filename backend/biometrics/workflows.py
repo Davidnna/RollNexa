@@ -5,6 +5,7 @@ from django.utils import timezone
 
 from accounts.models import UserProfile
 from attendance.models import AttendanceVerification
+from core.audit import record_audit_event
 
 from .models import BiometricConsent, BiometricConsentEvent, FaceEnrollment
 from .services import MODEL_VERSION, build_enrollment_template, encrypt_template
@@ -52,6 +53,18 @@ def update_biometric_consent(*, student, action, policy_version):
         policy_version=event_policy_version,
         occurred_at=moment,
     )
+    record_audit_event(
+        actor=student.user,
+        event_type=f"biometrics.consent_{action}",
+        object_type="user_profile",
+        object_id=student.pk,
+        summary=(
+            "A student granted biometric consent."
+            if action == BiometricConsentEvent.ACTION_GRANTED
+            else "A student withdrew biometric consent."
+        ),
+        metadata={"policy_version": event_policy_version},
+    )
     return consent
 
 
@@ -83,4 +96,12 @@ def create_or_replace_face_enrollment(*, student, frames):
     )
     enrollment.full_clean()
     enrollment.save()
+    record_audit_event(
+        actor=student.user,
+        event_type="biometrics.enrollment_created",
+        object_type="user_profile",
+        object_id=student.pk,
+        summary="A student completed facial enrolment.",
+        metadata={"model_version": MODEL_VERSION, "sample_count": len(frames)},
+    )
     return enrollment

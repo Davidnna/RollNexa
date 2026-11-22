@@ -24,6 +24,7 @@ from academics.models import (
 
 from .forms import AttendanceSessionForm
 from .models import AttendanceRecord, AttendanceSession, AttendanceVerification
+from core.models import AuditEvent
 from .services import (
     activate_attendance_session,
     complete_attendance_verification,
@@ -654,6 +655,11 @@ class AttendanceManagementTests(TestCase):
         self.assertIsNone(record.face_verified_at)
         self.assertEqual(record.recorded_by, self.lecturer_user)
         self.assertEqual(AttendanceRecord.objects.filter(session=session, student=self.student).count(), 1)
+        self.assertTrue(AuditEvent.objects.filter(
+            event_type="attendance.recorded_manual_exception",
+            object_type="attendance_record",
+            object_id=str(record.pk),
+        ).exists())
 
     def test_manual_attendance_exception_requires_assigned_lecturer(self):
         session = self._active_session()

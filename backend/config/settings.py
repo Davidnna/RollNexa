@@ -54,6 +54,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "core.middleware.BiometricRequestSizeLimitMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -62,6 +63,7 @@ MIDDLEWARE = [
     "accounts.middleware.ForcePasswordChangeMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "core.middleware.RollNexaSecurityHeadersMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -150,21 +152,25 @@ REST_FRAMEWORK = {
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 USE_X_FORWARDED_HOST = True
-# Render terminates HTTPS at its edge and forwards the original scheme in a header.
-# Its public HTTP endpoint is already redirected to HTTPS by Render.
+# Trust Render's forwarded scheme and enforce HTTPS for application routes.
+# Liveness/readiness endpoints are exempt for platform health checks.
 SECURE_SSL_REDIRECT = (
-    os.environ.get("SECURE_SSL_REDIRECT", "false").strip().lower()
+    os.environ.get("SECURE_SSL_REDIRECT", "false" if DEBUG else "true").strip().lower()
     in {"1", "true", "yes", "on"}
 )
+SECURE_REDIRECT_EXEMPT = [r"^healthz$", r"^readyz$"]
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
 SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_SAMESITE = "Lax"
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
 SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
-SECURE_HSTS_SECONDS = int(os.environ.get("SECURE_HSTS_SECONDS", "0"))
+SECURE_HSTS_SECONDS = int(os.environ.get("SECURE_HSTS_SECONDS", "31536000" if not DEBUG else "0"))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = os.environ.get("SECURE_HSTS_INCLUDE_SUBDOMAINS", "false").strip().lower() in {"1", "true", "yes", "on"}
+SECURE_HSTS_PRELOAD = os.environ.get("SECURE_HSTS_PRELOAD", "false").strip().lower() in {"1", "true", "yes", "on"}
 
 # Keep error details out of public production responses.
 ADMINS = []
@@ -188,3 +194,6 @@ BIOMETRIC_MODEL_DIR = Path(
 
 # Biometric uploads are small and are processed in memory; do not spool camera frames to disk.
 FILE_UPLOAD_MAX_MEMORY_SIZE = 8 * 1024 * 1024
+DATA_UPLOAD_MAX_MEMORY_SIZE = 8 * 1024 * 1024
+DATA_UPLOAD_MAX_NUMBER_FILES = 3
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 100

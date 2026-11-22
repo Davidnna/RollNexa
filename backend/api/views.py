@@ -7,6 +7,7 @@ from django.contrib.auth import (
 )
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.middleware.csrf import get_token
 from django.utils import timezone
 from django.utils.decorators import method_decorator
@@ -18,6 +19,7 @@ from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from accounts.models import UserProfile
+from core.audit import record_audit_event
 from academics.models import (
     AcademicSession,
     Course,
@@ -168,13 +170,20 @@ class PasswordChangeView(NoCacheAPIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        request.user.set_password(new_password)
-        request.user.save(update_fields=["password"])
-
-        profile = getattr(request.user, "profile", None)
-        if profile and profile.must_change_password:
-            profile.must_change_password = False
-            profile.save(update_fields=["must_change_password", "updated_at"])
+        with transaction.atomic():
+            request.user.set_password(new_password)
+            request.user.save(update_fields=["password"])
+            profile = getattr(request.user, "profile", None)
+            if profile and profile.must_change_password:
+                profile.must_change_password = False
+                profile.save(update_fields=["must_change_password", "updated_at"])
+            record_audit_event(
+                actor=request.user,
+                event_type="account.password_changed",
+                object_type="user",
+                object_id=request.user.pk,
+                summary="A user changed their account password.",
+            )
 
         update_session_auth_hash(request._request, request.user)
         return Response({

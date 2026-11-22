@@ -17,6 +17,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from .views import NoCacheAPIView
+from core.audit import record_audit_event
 
 from accounts.forms import AdminCreateAccountForm, AdminUpdateAccountForm
 from accounts.models import UserProfile
@@ -61,6 +62,13 @@ ACADEMIC_FORMS = {
     "programmes": (Programme, ProgrammeForm),
     "sessions": (AcademicSession, AcademicSessionForm),
     "semesters": (Semester, SemesterForm),
+}
+ACADEMIC_RESOURCE_LABELS = {
+    "faculties": "faculty",
+    "departments": "department",
+    "programmes": "programme",
+    "sessions": "academic session",
+    "semesters": "semester",
 }
 
 ADMIN_RESOURCES = {
@@ -642,6 +650,14 @@ class CourseRegistrationControlView(NoCacheAPIView):
                 registration_open=should_open,
                 updated_at=timezone.now(),
             )
+            record_audit_event(
+                actor=request.user,
+                event_type=f"course_registration.globally_{action}",
+                object_type="course_offerings",
+                object_id="all_active",
+                summary="Global course registration was opened." if should_open else "Global course registration was closed.",
+                metadata={"updated_count": updated_count},
+            )
 
         state = "open" if should_open else "closed"
         return Response({
@@ -832,6 +848,19 @@ class BulkTeachingAssignmentView(NoCacheAPIView):
                     assignment.full_clean()
                     assignment.save()
                     assignments.append(assignment)
+                record_audit_event(
+                    actor=request.user,
+                    event_type="teaching_assignments.bulk_created",
+                    object_type="teaching_assignments",
+                    object_id="bulk",
+                    summary="A lecturer was assigned across multiple course offerings.",
+                    metadata={
+                        "lecturer_profile_id": lecturer.pk,
+                        "offering_ids": [item.offering_id for item in assignments],
+                        "created_count": len(assignments),
+                        "already_assigned_count": len(existing_ids),
+                    },
+                )
         except ValidationError as exc:
             return Response(
                 {"detail": "One or more teaching assignments are invalid.", "errors": {"__all__": exc.messages}},
@@ -922,6 +951,14 @@ class WorkspaceCollectionView(NoCacheAPIView):
                     profile.must_change_password = True
                     profile.created_by = request.user
                     profile.save()
+                    record_audit_event(
+                        actor=request.user,
+                        event_type="account.created",
+                        object_type="user",
+                        object_id=user.pk,
+                        summary="An administrator created a user account.",
+                        metadata={"role": profile.role},
+                    )
             except IntegrityError:
                 return Response({"detail": "The account could not be created because a unique value is already in use."}, status=400)
             return Response({"item": _user_data(user), "temporary_password": temporary_password}, status=201)
@@ -933,7 +970,15 @@ class WorkspaceCollectionView(NoCacheAPIView):
             if not form.is_valid():
                 return _invalid_form(form)
             try:
-                item = form.save()
+                with transaction.atomic():
+                    item = form.save()
+                    record_audit_event(
+                        actor=request.user,
+                        event_type=f"academic.{resource}_created",
+                        object_type=resource,
+                        object_id=item.pk,
+                        summary=f"An administrator created a {ACADEMIC_RESOURCE_LABELS[resource]} record.",
+                    )
             except IntegrityError:
                 return Response({"detail": "A record with the same unique values already exists."}, status=400)
             return Response({"item": _academic_data(resource, item)}, status=201)
@@ -944,7 +989,16 @@ class WorkspaceCollectionView(NoCacheAPIView):
             if not form.is_valid():
                 return _invalid_form(form)
             try:
-                item = form.save()
+                with transaction.atomic():
+                    item = form.save()
+                    record_audit_event(
+                        actor=request.user,
+                        event_type="course.created",
+                        object_type="course",
+                        object_id=item.pk,
+                        summary="An administrator created a course.",
+                        metadata={"course_code": item.code},
+                    )
             except IntegrityError:
                 return Response({"detail": "That course code is already used in the selected department."}, status=400)
             return Response({"item": _course_data(item)}, status=201)
@@ -955,7 +1009,16 @@ class WorkspaceCollectionView(NoCacheAPIView):
             if not form.is_valid():
                 return _invalid_form(form)
             try:
-                item = form.save()
+                with transaction.atomic():
+                    item = form.save()
+                    record_audit_event(
+                        actor=request.user,
+                        event_type="course_offering.created",
+                        object_type="course_offering",
+                        object_id=item.pk,
+                        summary="An administrator created a course offering.",
+                        metadata={"course_id": item.course_id, "programme_id": item.programme_id},
+                    )
             except IntegrityError:
                 return Response({"detail": "This course is already offered to that programme, semester and level."}, status=400)
             return Response({"item": _offering_data(item)}, status=201)
@@ -971,8 +1034,17 @@ class WorkspaceCollectionView(NoCacheAPIView):
                 assigned_by=request.user,
             )
             try:
-                assignment.full_clean()
-                assignment.save()
+                with transaction.atomic():
+                    assignment.full_clean()
+                    assignment.save()
+                    record_audit_event(
+                        actor=request.user,
+                        event_type="teaching_assignment.created",
+                        object_type="teaching_assignment",
+                        object_id=assignment.pk,
+                        summary="An administrator assigned a lecturer to a course offering.",
+                        metadata={"offering_id": assignment.offering_id, "lecturer_profile_id": assignment.lecturer_id},
+                    )
             except ValidationError as exc:
                 return Response({"detail": "The teaching assignment is invalid.", "errors": {"__all__": exc.messages}}, status=400)
             except IntegrityError:
@@ -1055,6 +1127,14 @@ class WorkspaceDetailView(NoCacheAPIView):
                 elif profile.role == UserProfile.ROLE_LECTURER:
                     profile.department = form.cleaned_data.get("department")
                 profile.save()
+                record_audit_event(
+                    actor=request.user,
+                    event_type="account.updated",
+                    object_type="user",
+                    object_id=item.pk,
+                    summary="An administrator updated a user account.",
+                    metadata={"role": profile.role},
+                )
             return Response({"item": _user_data(item)})
 
         if resource in ACADEMIC_FORMS:
@@ -1066,7 +1146,15 @@ class WorkspaceDetailView(NoCacheAPIView):
             if not form.is_valid():
                 return _invalid_form(form)
             try:
-                item = form.save()
+                with transaction.atomic():
+                    item = form.save()
+                    record_audit_event(
+                        actor=request.user,
+                        event_type=f"academic.{resource}_updated",
+                        object_type=resource,
+                        object_id=item.pk,
+                        summary=f"An administrator updated a {ACADEMIC_RESOURCE_LABELS[resource]} record.",
+                    )
             except IntegrityError:
                 return Response({"detail": "A record with the same unique values already exists."}, status=400)
             return Response({"item": _academic_data(resource, item)})
@@ -1079,7 +1167,16 @@ class WorkspaceDetailView(NoCacheAPIView):
             if not form.is_valid():
                 return _invalid_form(form)
             try:
-                item = form.save()
+                with transaction.atomic():
+                    item = form.save()
+                    record_audit_event(
+                        actor=request.user,
+                        event_type="course.updated",
+                        object_type="course",
+                        object_id=item.pk,
+                        summary="An administrator updated a course.",
+                        metadata={"course_code": item.code},
+                    )
             except IntegrityError:
                 return Response({"detail": "That course code is already used in the selected department."}, status=400)
             return Response({"item": _course_data(item)})
@@ -1092,7 +1189,16 @@ class WorkspaceDetailView(NoCacheAPIView):
             if not form.is_valid():
                 return _invalid_form(form)
             try:
-                item = form.save()
+                with transaction.atomic():
+                    item = form.save()
+                    record_audit_event(
+                        actor=request.user,
+                        event_type="course_offering.updated",
+                        object_type="course_offering",
+                        object_id=item.pk,
+                        summary="An administrator updated a course offering.",
+                        metadata={"course_id": item.course_id, "programme_id": item.programme_id},
+                    )
             except IntegrityError:
                 return Response({"detail": "This course is already offered to that programme, semester and level."}, status=400)
             return Response({"item": _offering_data(item)})
@@ -1121,8 +1227,17 @@ class WorkspaceActionView(NoCacheAPIView):
                 assigned_by=request.user,
             )
             try:
-                assignment.full_clean()
-                assignment.save()
+                with transaction.atomic():
+                    assignment.full_clean()
+                    assignment.save()
+                    record_audit_event(
+                        actor=request.user,
+                        event_type="teaching_assignment.created",
+                        object_type="teaching_assignment",
+                        object_id=assignment.pk,
+                        summary="An administrator assigned a lecturer to a course offering.",
+                        metadata={"offering_id": assignment.offering_id, "lecturer_profile_id": assignment.lecturer_id},
+                    )
             except ValidationError as exc:
                 return Response({"detail": "The teaching assignment is invalid.", "errors": {"__all__": exc.messages}}, status=400)
             except IntegrityError:
@@ -1132,11 +1247,20 @@ class WorkspaceActionView(NoCacheAPIView):
             _require_roles(request, UserProfile.ROLE_ADMIN)
             if not item.is_active:
                 return Response({"detail": "This assignment has already been revoked."}, status=400)
-            item.is_active = False
-            item.removed_at = timezone.now()
-            item.removed_by = request.user
-            item.removal_note = str(request.data.get("removal_note", "")).strip()[:240]
-            item.save(update_fields=["is_active", "removed_at", "removed_by", "removal_note"])
+            with transaction.atomic():
+                item.is_active = False
+                item.removed_at = timezone.now()
+                item.removed_by = request.user
+                item.removal_note = str(request.data.get("removal_note", "")).strip()[:240]
+                item.save(update_fields=["is_active", "removed_at", "removed_by", "removal_note"])
+                record_audit_event(
+                    actor=request.user,
+                    event_type="teaching_assignment.revoked",
+                    object_type="teaching_assignment",
+                    object_id=item.pk,
+                    summary="An administrator revoked a lecturer assignment.",
+                    metadata={"offering_id": item.offering_id, "lecturer_profile_id": item.lecturer_id},
+                )
             return Response({"item": _assignment_data(item)})
         if action in {"activate", "close", "cancel"} and resource == "attendance-sessions":
             _require_roles(request, UserProfile.ROLE_LECTURER)
@@ -1175,6 +1299,14 @@ class WorkspaceActionView(NoCacheAPIView):
                         removed_by=request.user,
                         removal_note="Lecturer account deactivated by administrator",
                     )
+                record_audit_event(
+                    actor=request.user,
+                    event_type="account.activated" if item.is_active else "account.deactivated",
+                    object_type="user",
+                    object_id=item.pk,
+                    summary="An administrator changed a user account's active status.",
+                    metadata={"is_active": item.is_active},
+                )
             return Response({"item": _user_data(item)})
         if resource in ACADEMIC_FORMS:
             if isinstance(item, Department) and not item.is_active and not item.faculty.is_active:
@@ -1222,6 +1354,14 @@ class WorkspaceActionView(NoCacheAPIView):
                     CourseOffering.objects.filter(programme=item, is_active=True).update(
                         is_active=False, registration_open=False, updated_at=timezone.now()
                     )
+                record_audit_event(
+                    actor=request.user,
+                    event_type=f"academic.{resource}_status_changed",
+                    object_type=resource,
+                    object_id=item.pk,
+                    summary=f"An administrator changed the active status of a {ACADEMIC_RESOURCE_LABELS[resource]} record.",
+                    metadata={"is_active": item.is_active},
+                )
             return Response({"item": _academic_data(resource, item)})
         if resource == "courses":
             if not item.is_active and (not item.department.is_active or not item.department.faculty.is_active):
@@ -1233,6 +1373,14 @@ class WorkspaceActionView(NoCacheAPIView):
                     CourseOffering.objects.filter(course=item, is_active=True).update(
                         is_active=False, registration_open=False
                     )
+                record_audit_event(
+                    actor=request.user,
+                    event_type="course.status_changed",
+                    object_type="course",
+                    object_id=item.pk,
+                    summary="An administrator changed a course's active status.",
+                    metadata={"is_active": item.is_active},
+                )
             return Response({"item": _course_data(item)})
         if resource == "offerings":
             if not item.is_active and (
@@ -1246,10 +1394,19 @@ class WorkspaceActionView(NoCacheAPIView):
                 or not item.semester.session.is_active
             ):
                 return Response({"detail": "Reactivate the course, programme, department, faculty and academic period before reactivating this offering."}, status=400)
-            item.is_active = not item.is_active
-            if not item.is_active:
-                item.registration_open = False
-            item.save(update_fields=["is_active", "registration_open", "updated_at"])
+            with transaction.atomic():
+                item.is_active = not item.is_active
+                if not item.is_active:
+                    item.registration_open = False
+                item.save(update_fields=["is_active", "registration_open", "updated_at"])
+                record_audit_event(
+                    actor=request.user,
+                    event_type="course_offering.status_changed",
+                    object_type="course_offering",
+                    object_id=item.pk,
+                    summary="An administrator changed a course offering's active status.",
+                    metadata={"is_active": item.is_active, "registration_open": item.registration_open},
+                )
             return Response({"item": _offering_data(item)})
         return Response({"detail": "This record cannot be activated or deactivated here."}, status=405)
 
@@ -1265,6 +1422,13 @@ class WorkspaceActionView(NoCacheAPIView):
                 item.is_active = True
                 item.is_current = True
                 item.save(update_fields=["is_active", "is_current", "updated_at"])
+                record_audit_event(
+                    actor=request.user,
+                    event_type="academic.session_set_current",
+                    object_type="academic_session",
+                    object_id=item.pk,
+                    summary="An administrator set the current academic session.",
+                )
             elif resource == "semesters" and isinstance(item, Semester):
                 if not item.session.is_current or not item.session.is_active:
                     return Response({"detail": "Set this semester's academic session as current before activating the semester."}, status=400)
@@ -1274,6 +1438,13 @@ class WorkspaceActionView(NoCacheAPIView):
                 item.is_active = True
                 item.is_current = True
                 item.save(update_fields=["is_active", "is_current", "updated_at"])
+                record_audit_event(
+                    actor=request.user,
+                    event_type="academic.semester_set_current",
+                    object_type="semester",
+                    object_id=item.pk,
+                    summary="An administrator set the current semester.",
+                )
             else:
                 return Response({"detail": "Only academic sessions and semesters can be set as current."}, status=400)
         return Response({"item": _academic_data(resource, item)})
@@ -1312,11 +1483,27 @@ class WorkspaceActionView(NoCacheAPIView):
                     registration = CourseRegistration(offering=locked_offering, student=profile)
                     registration.full_clean()
                     registration.save()
+                record_audit_event(
+                    actor=request.user,
+                    event_type="course_registration.registered",
+                    object_type="course_registration",
+                    object_id=registration.pk,
+                    summary="A student registered for a course offering.",
+                    metadata={"offering_id": locked_offering.pk, "student_profile_id": profile.pk},
+                )
             else:
                 if not registration or registration.status != CourseRegistration.STATUS_REGISTERED:
                     return Response({"detail": "You are not currently registered for this course."}, status=400)
                 registration.status = CourseRegistration.STATUS_WITHDRAWN
                 registration.save(update_fields=["status", "updated_at"])
+                record_audit_event(
+                    actor=request.user,
+                    event_type="course_registration.withdrawn",
+                    object_type="course_registration",
+                    object_id=registration.pk,
+                    summary="A student withdrew from a course offering.",
+                    metadata={"offering_id": locked_offering.pk, "student_profile_id": profile.pk},
+                )
         return Response({"item": _registration_data(registration)})
 
 
@@ -1344,12 +1531,20 @@ class ProfileView(NoCacheAPIView):
             return Response({"detail": "Enter a valid email address."}, status=400)
         if User.objects.filter(email__iexact=email).exclude(pk=user.pk).exists():
             return Response({"detail": "This email address is already associated with another account."}, status=400)
-        user.first_name = first_name
-        user.last_name = last_name
-        user.email = email
-        user.save(update_fields=["first_name", "last_name", "email"])
-        user.profile.phone_number = phone_number
-        user.profile.save(update_fields=["phone_number", "updated_at"])
+        with transaction.atomic():
+            user.first_name = first_name
+            user.last_name = last_name
+            user.email = email
+            user.save(update_fields=["first_name", "last_name", "email"])
+            user.profile.phone_number = phone_number
+            user.profile.save(update_fields=["phone_number", "updated_at"])
+            record_audit_event(
+                actor=request.user,
+                event_type="account.profile_updated",
+                object_type="user",
+                object_id=user.pk,
+                summary="A user updated their own profile details.",
+            )
         return Response({"item": _user_data(user)})
 
 
