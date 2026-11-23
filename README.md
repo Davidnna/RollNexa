@@ -1,8 +1,8 @@
-# RollNexa 1.1.4
+# RollNexa 1.1.5
 
 **Academic management and dual-verification attendance.**
 
-Version 1.1.4 improves CI reliability and test isolation: it collects the WhiteNoise static manifest before template tests, corrects the API test setup for expired QR tokens, explicitly rejects JSON-only face-verification attempts with a validation response, tests biometric key validation using a structurally valid enrolment request, and closes per-thread PostgreSQL connections after concurrency tests. It also orders lecturer attendance sessions deterministically and upgrades GitHub Actions to Node.js 24-compatible releases. Version 1.1.2 adds hosted GitHub Actions workflows for continuous integration, production smoke checks and a manually approved PostgreSQL backup/restore drill. Version 1.1.1 introduced the validation tooling for the 1.1.0 system-hardening release. It adds PostgreSQL concurrency tests, a guarded backup-and-restore verification script, and a management command that checks encrypted facial-template recovery without exposing biometric feature data. It also adds the documented local environment example and strengthens the k6 QR concurrency harness. Version 1.1.3 adds the non-destructive `academics.0008` migration to align Django migration state with the current course metadata and lecturer-assignment ordering. It does not change stored course values or table structure. The CI PostgreSQL service explicitly disables SSL because its local service container does not offer TLS; production continues to require SSL by default whenever `DEBUG=False`, unless an administrator deliberately overrides `DATABASE_SSL_REQUIRE`.
+Version 1.1.5 fixes course CSV import transaction handling and corrects the student programme validation test. Version 1.1.4 improved CI reliability and test isolation: it collects the WhiteNoise static manifest before template tests, corrects the API test setup for expired QR tokens, explicitly rejects JSON-only face-verification attempts with a validation response, tests biometric key validation using a structurally valid enrolment request, and closes per-thread PostgreSQL connections after concurrency tests. It also orders lecturer attendance sessions deterministically and upgrades GitHub Actions to Node.js 24-compatible releases. Version 1.1.2 adds hosted GitHub Actions workflows for continuous integration, production smoke checks and a manually approved PostgreSQL backup/restore drill. Version 1.1.1 introduced the validation tooling for the 1.1.0 system-hardening release. It adds PostgreSQL concurrency tests, a guarded backup-and-restore verification script, and a management command that checks encrypted facial-template recovery without exposing biometric feature data. It also adds the documented local environment example and strengthens the k6 QR concurrency harness. Version 1.1.3 adds the non-destructive `academics.0008` migration to align Django migration state with the current course metadata and lecturer-assignment ordering. It does not change stored course values or table structure. The CI PostgreSQL service explicitly disables SSL because its local service container does not offer TLS; production continues to require SSL by default whenever `DEBUG=False`, unless an administrator deliberately overrides `DATABASE_SSL_REQUIRE`.
 
 RollNexa is a web-based academic administration and smart attendance platform. It manages institutional structure, user accounts, academic sessions, courses, course offerings, lecturer assignments and student registrations. Its automated attendance workflow combines a rotating QR Code with server-side facial recognition. An automated present record is created only when both verification stages succeed.
 
@@ -395,7 +395,7 @@ The Dockerfile builds the React application, installs Python dependencies, downl
 Build locally:
 
 ```bash
-docker build -t rollnexa:1.1.4 .
+docker build -t rollnexa:1.1.5 .
 ```
 
 Before deploying to Render:
@@ -435,7 +435,7 @@ npm --prefix frontend run typecheck
 npm --prefix frontend run build
 ```
 
-Build the container with `docker build -t rollnexa:1.1.4 .`. The repository currently pins direct frontend dependencies in `frontend/package.json` but does not include a generated `package-lock.json`; generate and commit one through the hosted CI artifact or a network-enabled dependency-resolution environment to make transitive frontend dependency resolution reproducible.
+Build the container with `docker build -t rollnexa:1.1.5 .`. The repository currently pins direct frontend dependencies in `frontend/package.json` but does not include a generated `package-lock.json`; generate and commit one through the hosted CI artifact or a network-enabled dependency-resolution environment to make transitive frontend dependency resolution reproducible.
 
 - Keep the production database and biometric encryption key backed up under separate access controls.
 - Production defaults enforce HTTPS redirects and one-year HSTS. `/healthz` and `/readyz` are exempt from Django's redirect so Render health probes can reach them; the application routes are not exempt.
@@ -498,7 +498,7 @@ The `python manage.py verify_biometric_restore` command can also be run independ
 ## 12. Hardening status and residual validation
 
 
-### Hosted validation workflows (version 1.1.2–1.1.4)
+### Hosted validation workflows (version 1.1.2–1.1.5)
 
 The repository includes three GitHub Actions workflows under `.github/workflows/`:
 
@@ -532,7 +532,7 @@ These workflows are included as source configuration only. Their presence does n
 - `academics.0008_alter_courselecturerassignment_options_and_more` records the current lecturer-assignment ordering and the current `Course.credit_units` and `Course.stress_code` help text in migration state. These are metadata/state changes only; no data rewrite or destructive schema operation is performed.
 - `DATABASE_SSL_REQUIRE` optionally overrides the database TLS requirement. If omitted, the default remains `not DEBUG`, so production (`DEBUG=False`) requires SSL. The GitHub Actions PostgreSQL service explicitly sets it to `false` because the service container is local and does not support TLS. Never copy this CI override into the production Render environment.
 
-### CI and test reliability (version 1.1.4)
+### CI and test reliability (versions 1.1.4–1.1.5)
 
 - The CI workflow runs `python manage.py collectstatic --noinput` before the Django test suite. This creates the WhiteNoise manifest used by `{% static %}` in templates and mirrors the production Docker build, which already collects static assets.
 - The expired-QR API test now uses DRF's `APIClient.force_authenticate` so it tests the expired-token response rather than failing first on SessionAuthentication's CSRF requirement. The separate API security tests continue to exercise CSRF enforcement.
@@ -579,3 +579,12 @@ Every RollNexa update must:
 - Preserve existing functionality and database records.
 - Include migrations for model changes and avoid destructive database resets.
 - Be checked before production deployment.
+
+
+### Version 1.1.5 — CSV import and test assertion fixes
+
+The 1.1.4 hosted test run executed all 192 Django tests and identified four errors in course CSV import tests. The common root cause was that `apply_course_import_plan()` used `transaction.atomic()` without importing `transaction` from `django.db`. Version 1.1.5 adds that import; the four course-import errors share this single root cause.
+
+The same run identified one failing account-creation test. The rendered page already displayed the correct programme validation error, but the test searched the raw HTML for an apostrophe that Django correctly HTML-escaped as `&#x27;`. Version 1.1.5 changes the assertion to `assertFormError()` so it checks the actual form-field error rather than the HTML serialization. No application validation behaviour or user-facing wording was changed.
+
+No database migration is required. These changes must be confirmed by a new hosted run of `python manage.py test --verbosity=2`.

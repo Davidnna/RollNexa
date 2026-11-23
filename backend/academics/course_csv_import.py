@@ -4,6 +4,7 @@ import re
 
 from django.core.exceptions import ValidationError
 from django.core.validators import URLValidator
+from django.db import transaction
 
 from .models import AcademicSession, Course, CourseOffering, Department, Programme, Semester
 

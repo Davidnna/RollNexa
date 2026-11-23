@@ -86,7 +86,9 @@ class RollNexaAccountTests(TestCase):
             },
         )
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Select the student's programme.")
+        self.assertFormError(
+            response, "form", "programme", "Select the student's programme."
+        )
 
     def test_admin_can_assign_existing_student_to_programme(self):
         faculty = Faculty.objects.create(code="SCI", name="Faculty of Science")
