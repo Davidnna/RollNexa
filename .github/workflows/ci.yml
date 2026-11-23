@@ -40,6 +40,7 @@ jobs:
                 working-directory: backend
         env:
             DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/rollnexa
+            DATABASE_SSL_REQUIRE: "false"
             DEBUG: "false"
             SECRET_KEY: rollnexa-ci-only-secret-key-not-used-outside-tests-2026
             ALLOWED_HOSTS: localhost,127.0.0.1,testserver

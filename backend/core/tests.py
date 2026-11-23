@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.http import HttpResponse
-from django.test import RequestFactory, TestCase, override_settings
+from django.core.exceptions import ImproperlyConfigured
+from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 
 from .audit import record_audit_event
 from .middleware import BiometricRequestSizeLimitMiddleware, RollNexaSecurityHeadersMiddleware
@@ -111,3 +112,31 @@ class ReadinessEndpointTests(TestCase):
         self.assertEqual(http_response.status_code, 200)
         https_response = client.get("/healthz", secure=True)
         self.assertIn("max-age=31536000", https_response["Strict-Transport-Security"])
+
+
+class DatabaseSSLConfigurationTests(SimpleTestCase):
+    def test_production_requires_ssl_by_default(self):
+        from config.settings import resolve_database_ssl_requirement
+
+        self.assertTrue(resolve_database_ssl_requirement(False))
+
+    def test_debug_mode_does_not_require_ssl_by_default(self):
+        from config.settings import resolve_database_ssl_requirement
+
+        self.assertFalse(resolve_database_ssl_requirement(True))
+
+    def test_explicit_ci_override_can_disable_ssl(self):
+        from config.settings import resolve_database_ssl_requirement
+
+        self.assertFalse(resolve_database_ssl_requirement(False, "false"))
+
+    def test_explicit_override_can_require_ssl(self):
+        from config.settings import resolve_database_ssl_requirement
+
+        self.assertTrue(resolve_database_ssl_requirement(True, "true"))
+
+    def test_invalid_ssl_override_is_rejected(self):
+        from config.settings import resolve_database_ssl_requirement
+
+        with self.assertRaises(ImproperlyConfigured):
+            resolve_database_ssl_requirement(False, "sometimes")

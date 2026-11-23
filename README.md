@@ -1,8 +1,8 @@
-# RollNexa 1.1.1
+# RollNexa 1.1.3
 
 **Academic management and dual-verification attendance.**
 
-Version 1.1.2 adds hosted GitHub Actions workflows for continuous integration, production smoke checks and a manually approved PostgreSQL backup/restore drill. Version 1.1.1 introduced the validation tooling for the 1.1.0 system-hardening release. It adds PostgreSQL concurrency tests, a guarded backup-and-restore verification script, and a management command that checks encrypted facial-template recovery without exposing biometric feature data. It also adds the documented local environment example and strengthens the k6 QR concurrency harness. The application workflow and database schema are unchanged from 1.1.0; no new database migration is required.
+Version 1.1.2 adds hosted GitHub Actions workflows for continuous integration, production smoke checks and a manually approved PostgreSQL backup/restore drill. Version 1.1.1 introduced the validation tooling for the 1.1.0 system-hardening release. It adds PostgreSQL concurrency tests, a guarded backup-and-restore verification script, and a management command that checks encrypted facial-template recovery without exposing biometric feature data. It also adds the documented local environment example and strengthens the k6 QR concurrency harness. Version 1.1.3 adds the non-destructive `academics.0008` migration to align Django migration state with the current course metadata and lecturer-assignment ordering. It does not change stored course values or table structure. The CI PostgreSQL service explicitly disables SSL because its local service container does not offer TLS; production continues to require SSL by default whenever `DEBUG=False`, unless an administrator deliberately overrides `DATABASE_SSL_REQUIRE`.
 
 RollNexa is a web-based academic administration and smart attendance platform. It manages institutional structure, user accounts, academic sessions, courses, course offerings, lecturer assignments and student registrations. Its automated attendance workflow combines a rotating QR Code with server-side facial recognition. An automated present record is created only when both verification stages succeed.
 
@@ -330,7 +330,7 @@ Run Django management commands from the `backend/` directory:
 )
 ```
 
-Apply the existing biometric and attendance migrations and the new `core.0001_initial` migration, which creates the audit-event ledger. The attendance migrations distinguish automated dual verification from lecturer-approved manual exceptions. Existing automated attendance rows are migrated as `dual_verified`; the database is not reset.
+Apply all pending migrations, including `academics.0008_alter_courselecturerassignment_options_and_more` and `core.0001_initial`. The academic migration aligns model metadata without rewriting course records or changing table structure; the core migration creates the audit-event ledger. The attendance migrations distinguish automated dual verification from lecturer-approved manual exceptions. Existing automated attendance rows are migrated as `dual_verified`; the database is not reset.
 
 Create a local administrator if the database does not already have one:
 
@@ -395,7 +395,7 @@ The Dockerfile builds the React application, installs Python dependencies, downl
 Build locally:
 
 ```bash
-docker build -t rollnexa:1.1.1 .
+docker build -t rollnexa:1.1.3 .
 ```
 
 Before deploying to Render:
@@ -404,7 +404,7 @@ Before deploying to Render:
 2. Ensure `DATABASE_URL`, `DIRECT_DATABASE_URL` where required, `SECRET_KEY` and other existing production settings are configured.
 3. Set `BIOMETRIC_ENCRYPTION_KEY` in Render. The Blueprint uses `generateValue: true`, which asks Render to create a Base64-encoded 256-bit secret compatible with Fernet. Render generates this value only when the variable does not already exist; syncing the Blueprint does not replace an existing value. If the application reports an invalid key and no facial templates have ever been successfully enrolled, replace the existing value using Render's **Generate Random Value** option and redeploy. If any templates have been enrolled, do not replace the key; use a controlled key migration. For local development, generate a Fernet key with the command in section 9.2. Do not commit the value.
 4. Set `BIOMETRIC_ENCRYPTION_KEY_VERSION=v1`, `BIOMETRIC_CONSENT_POLICY_VERSION=1.1`, `BIOMETRIC_FACE_MATCH_THRESHOLD=0.363` and `BIOMETRIC_FACE_DETECTION_THRESHOLD=0.75`.
-5. Confirm the Blueprint applies `SECURE_SSL_REDIRECT=true` and `SECURE_HSTS_SECONDS=31536000`. The readiness endpoint is exempt from redirects so Render can probe it over the service network.
+5. Confirm the Blueprint applies `SECURE_SSL_REDIRECT=true` and `SECURE_HSTS_SECONDS=31536000`. Production database SSL remains required by default when `DEBUG=False`; `DATABASE_SSL_REQUIRE` exists for explicit environment-specific overrides and is set to `false` only for the ephemeral, non-TLS PostgreSQL service used by GitHub CI. The readiness endpoint is exempt from redirects so Render can probe it over the service network.
 6. If using a custom domain, add it to `ALLOWED_HOSTS` and add its HTTPS origin to `CSRF_TRUSTED_ORIGINS`.
 7. Deploy and verify `/healthz`, `/readyz`, HTTPS redirects, HSTS, authentication, database migrations and the biometric status endpoint.
 8. Complete controlled enrolment and verification tests before enabling student biometric enrolment institution-wide.
@@ -435,7 +435,7 @@ npm --prefix frontend run typecheck
 npm --prefix frontend run build
 ```
 
-Build the container with `docker build -t rollnexa:1.1.1 .`. The repository currently pins direct frontend dependencies in `frontend/package.json` but does not include a generated `package-lock.json`; generate and commit one with `npm --prefix frontend install` in a network-enabled development environment to make transitive frontend dependency resolution reproducible.
+Build the container with `docker build -t rollnexa:1.1.3 .`. The repository currently pins direct frontend dependencies in `frontend/package.json` but does not include a generated `package-lock.json`; generate and commit one through the hosted CI artifact or a network-enabled dependency-resolution environment to make transitive frontend dependency resolution reproducible.
 
 - Keep the production database and biometric encryption key backed up under separate access controls.
 - Production defaults enforce HTTPS redirects and one-year HSTS. `/healthz` and `/readyz` are exempt from Django's redirect so Render health probes can reach them; the application routes are not exempt.
@@ -498,11 +498,11 @@ The `python manage.py verify_biometric_restore` command can also be run independ
 ## 12. Hardening status and residual validation
 
 
-### Hosted validation workflows (version 1.1.2)
+### Hosted validation workflows (version 1.1.2 and 1.1.3)
 
 The repository includes three GitHub Actions workflows under `.github/workflows/`:
 
-- `ci.yml` runs Django checks and the full test suite against an ephemeral PostgreSQL 16 service, checks migrations, builds the React application and builds the production Docker image without publishing it. The frontend job resolves dependencies, creates a `package-lock.json`, uploads it as a short-lived workflow artifact and uses that exact lockfile for `npm ci`. The Docker build job independently generates a lockfile in its checked-out build context so the Dockerfile can use `npm ci` during that image build. The generated lockfile must still be added to the repository to make subsequent installs reproducible.
+- `ci.yml` runs Django checks and the full test suite against an ephemeral PostgreSQL 16 service, checks migrations, builds the React application and builds the production Docker image without publishing it. The ephemeral service sets `DATABASE_SSL_REQUIRE=false`; this is isolated to CI and does not change the production SSL default. The frontend job resolves dependencies, creates a `package-lock.json`, uploads it as a short-lived workflow artifact and uses that exact lockfile for `npm ci`. The Docker build job independently generates a lockfile in its checked-out build context so the Dockerfile can use `npm ci` during that image build. The generated lockfile must still be added to the repository to make subsequent installs reproducible.
 - `production-smoke.yml` can be triggered manually to check the deployed `/healthz` and `/readyz` endpoints and verify the expected HTTPS security headers on `https://rollnexa.onrender.com`.
 - `backup-restore-drill.yml` is manually triggered from `main` and requires the exact confirmation text `RESTORE_TO_ISOLATED_STAGING`. Configure the protected GitHub Actions repository secrets `SOURCE_DATABASE_URL`, `STAGING_DATABASE_URL`, `BIOMETRIC_ENCRYPTION_KEY` and `BIOMETRIC_ENCRYPTION_KEY_VERSION` before using it. The staging database must be newly created and empty. The workflow never uploads the database dump as an artifact and deletes the temporary dump when the job finishes.
 
@@ -526,6 +526,11 @@ These workflows are included as source configuration only. Their presence does n
 - PostgreSQL-only `TransactionTestCase` tests use independent database connections to race simultaneous QR scans and simultaneous dual-verification completion.
 - The k6 script now supports both distinct-student load and same-student duplicate-scan races, and enforces exact new-versus-reused pending-verification counts.
 - `backend/.env.example` now exists and documents local-only environment settings without containing production secrets.
+
+### Migration and database SSL configuration (version 1.1.3)
+
+- `academics.0008_alter_courselecturerassignment_options_and_more` records the current lecturer-assignment ordering and the current `Course.credit_units` and `Course.stress_code` help text in migration state. These are metadata/state changes only; no data rewrite or destructive schema operation is performed.
+- `DATABASE_SSL_REQUIRE` optionally overrides the database TLS requirement. If omitted, the default remains `not DEBUG`, so production (`DEBUG=False`) requires SSL. The GitHub Actions PostgreSQL service explicitly sets it to `false` because the service container is local and does not support TLS. Never copy this CI override into the production Render environment.
 
 ### Must still be validated in the deployment environment
 

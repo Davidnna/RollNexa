@@ -91,12 +91,30 @@ database_url = os.environ.get("DATABASE_URL")
 if not database_url:
     raise ImproperlyConfigured("The DATABASE_URL environment variable must be configured.")
 
+def resolve_database_ssl_requirement(debug, configured_value=None):
+    """Use secure production TLS by default with an explicit CI override."""
+    if configured_value is None:
+        return not debug
+
+    normalized_value = configured_value.strip().lower()
+    if normalized_value not in {"1", "true", "yes", "on", "0", "false", "no", "off"}:
+        raise ImproperlyConfigured(
+            "DATABASE_SSL_REQUIRE must be a boolean value when configured."
+        )
+    return normalized_value in {"1", "true", "yes", "on"}
+
+
+database_ssl_require = resolve_database_ssl_requirement(
+    DEBUG,
+    os.environ.get("DATABASE_SSL_REQUIRE"),
+)
+
 DATABASES = {
     "default": dj_database_url.parse(
         database_url,
         conn_max_age=60,
         conn_health_checks=True,
-        ssl_require=not DEBUG,
+        ssl_require=database_ssl_require,
     )
 }
 
