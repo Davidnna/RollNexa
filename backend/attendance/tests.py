@@ -1,11 +1,14 @@
 import json
+from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
+from threading import Barrier
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core import signing
 from django.core.exceptions import ValidationError
-from django.test import TestCase
+from django.db import close_old_connections
+from django.test import TestCase, TransactionTestCase, skipUnlessDBFeature
 from django.urls import reverse
 from django.utils import timezone
 
@@ -736,3 +739,175 @@ class AttendanceManagementTests(TestCase):
         )
         self.assertEqual(response.status_code, 403)
         self.assertEqual(AttendanceRecord.objects.count(), 0)
+
+
+class AttendanceConcurrencyTests(TransactionTestCase):
+    """Exercise row-lock and uniqueness behaviour using independent DB connections."""
+
+    reset_sequences = True
+
+    def setUp(self):
+        self.now = timezone.now().replace(second=0, microsecond=0)
+        self.admin = User.objects.create_superuser(
+            username="concurrency_admin",
+            email="concurrency_admin@example.test",
+            password="StrongTestPassword!2026",
+        )
+        faculty = Faculty.objects.create(code="TST", name="Faculty of Testing")
+        department = Department.objects.create(
+            faculty=faculty,
+            code="CST",
+            name="Computer Science Testing",
+        )
+        self.programme = Programme.objects.create(
+            department=department,
+            code="BSC-TST",
+            name="Computer Science Testing",
+        )
+        academic_session = AcademicSession.objects.create(
+            name="2026/2027",
+            is_current=True,
+        )
+        semester = Semester.objects.create(
+            session=academic_session,
+            name=Semester.FIRST,
+            is_current=True,
+        )
+        course = Course.objects.create(
+            department=department,
+            code="TST401",
+            title="Concurrency Testing",
+            credit_units=3,
+        )
+        offering = CourseOffering.objects.create(
+            course=course,
+            programme=self.programme,
+            semester=semester,
+            level="400",
+            registration_open=True,
+        )
+
+        lecturer_user = User.objects.create_user(
+            username="concurrency_lecturer",
+            email="concurrency_lecturer@example.test",
+            password="StrongTestPassword!2026",
+        )
+        lecturer = lecturer_user.profile
+        lecturer.role = UserProfile.ROLE_LECTURER
+        lecturer.department = department
+        lecturer.save()
+        CourseLecturerAssignment.objects.create(
+            offering=offering,
+            lecturer=lecturer,
+            assigned_by=self.admin,
+        )
+
+        student_user = User.objects.create_user(
+            username="concurrency_student",
+            email="concurrency_student@example.test",
+            password="StrongTestPassword!2026",
+        )
+        self.student = student_user.profile
+        self.student.programme = self.programme
+        self.student.current_level = "400"
+        self.student.save()
+        CourseRegistration.objects.create(
+            offering=offering,
+            student=self.student,
+            status=CourseRegistration.STATUS_REGISTERED,
+        )
+
+        self.session = create_attendance_session(
+            offering_id=offering.pk,
+            created_by=lecturer_user,
+            title="Concurrency test session",
+            starts_at=self.now - timedelta(minutes=5),
+            ends_at=self.now + timedelta(minutes=45),
+        )
+        activate_attendance_session(
+            session_id=self.session.pk,
+            lecturer_profile=lecturer,
+            at=self.now,
+        )
+        issued = issue_attendance_qr_token(
+            session_id=self.session.pk,
+            lecturer_profile=lecturer,
+        )
+        self.qr_token = issued["token"]
+
+    def _run_concurrently(self, callback, workers):
+        barrier = Barrier(workers)
+
+        def run_one():
+            close_old_connections()
+            try:
+                barrier.wait(timeout=10)
+                return callback()
+            finally:
+                close_old_connections()
+
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            futures = [executor.submit(run_one) for _ in range(workers)]
+            return [future.result(timeout=30) for future in futures]
+
+    @skipUnlessDBFeature("has_select_for_update")
+    def test_simultaneous_qr_scans_reuse_one_pending_verification(self):
+        def verify():
+            verification, already_verified = verify_attendance_qr(
+                token=self.qr_token,
+                student_profile=self.student.pk,
+            )
+            return str(verification.pk), already_verified
+
+        results = self._run_concurrently(verify, workers=4)
+
+        verification_ids = {verification_id for verification_id, _ in results}
+        newly_created = sum(not already_verified for _, already_verified in results)
+        self.assertEqual(len(verification_ids), 1)
+        self.assertEqual(newly_created, 1)
+        self.assertEqual(
+            AttendanceVerification.objects.filter(
+                session=self.session,
+                student=self.student,
+                status=AttendanceVerification.STATUS_QR_VERIFIED,
+            ).count(),
+            1,
+        )
+        self.assertEqual(
+            AuditEvent.objects.filter(event_type="attendance.qr_verified").count(),
+            1,
+        )
+
+    @skipUnlessDBFeature("has_select_for_update")
+    def test_simultaneous_face_completion_creates_only_one_attendance_record(self):
+        verification, _ = verify_attendance_qr(
+            token=self.qr_token,
+            student_profile=self.student,
+        )
+
+        def complete():
+            try:
+                record = complete_attendance_verification(
+                    verification_id=verification.pk,
+                )
+                return ("completed", record.pk)
+            except ValidationError:
+                return ("rejected", None)
+
+        results = self._run_concurrently(complete, workers=2)
+
+        self.assertEqual(sum(result == "completed" for result, _ in results), 1)
+        self.assertEqual(sum(result == "rejected" for result, _ in results), 1)
+        self.assertEqual(
+            AttendanceRecord.objects.filter(
+                session=self.session,
+                student=self.student,
+            ).count(),
+            1,
+        )
+        verification.refresh_from_db()
+        self.assertEqual(verification.status, AttendanceVerification.STATUS_COMPLETED)
+        self.assertEqual(
+            AuditEvent.objects.filter(event_type="attendance.recorded_dual_verified").count(),
+            1,
+        )

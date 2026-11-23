@@ -1,10 +1,8 @@
-# RollNexa 1.1.0
+# RollNexa 1.1.1
 
 **Academic management and dual-verification attendance.**
 
-Version 1.1.0 is the system-hardening release. It adds an append-only operational audit ledger, database-backed readiness checks, production HTTPS/HSTS defaults, a restrictive policy for the React application, biometric request-size and file-count limits, JPEG dimension checks before image decoding, and concurrency protection for facial challenge issuance. It retains the 1.0.7 user experience and automatic attendance workflow. One additive database migration creates the audit-event table; existing academic, account, biometric and attendance records are not rewritten or deleted.
-
-Version 1.0.6 refines the public website and authenticated workspaces, improves layouts across mobile screen sizes, simplifies user-facing language, and makes face enrolment and attendance verification more automatic. After a student scans a class code, RollNexa opens the face check automatically, guides the student through the required movement, captures the necessary frames and submits the verification without manual capture buttons. No database schema changes or migrations are introduced.
+Version 1.1.1 is a validation-tooling patch for the 1.1.0 system-hardening release. It adds PostgreSQL concurrency tests, a guarded backup-and-restore verification script, and a management command that checks encrypted facial-template recovery without exposing biometric feature data. It also adds the documented local environment example and strengthens the k6 QR concurrency harness. The application workflow and database schema are unchanged from 1.1.0; no new database migration is required.
 
 RollNexa is a web-based academic administration and smart attendance platform. It manages institutional structure, user accounts, academic sessions, courses, course offerings, lecturer assignments and student registrations. Its automated attendance workflow combines a rotating QR Code with server-side facial recognition. An automated present record is created only when both verification stages succeed.
 
@@ -172,6 +170,7 @@ rollnexa/
         api/                       Versioned REST API, workspace endpoints and API tests
         attendance/                Attendance sessions, records, QR and manual exception services
         biometrics/                Consent, enrolment, face processing and verification
+            management/             Biometric restore-verification command
             migrations/            Biometric database migrations
             model_assets/           Downloaded ONNX models and licence notices (not committed)
         config/                    Django settings, ASGI, WSGI and URL configuration
@@ -194,7 +193,7 @@ rollnexa/
     Dockerfile                     Multi-stage React and Django image build
     render.yaml                    Render Blueprint configuration
     build.sh                       Local build helper
-    scripts/                       k6 concurrent QR check-in test harness
+    scripts/                       k6 load test and guarded PostgreSQL restore drill
     .dockerignore                  Docker build exclusions
     .gitignore                     Git exclusions
     .editorconfig                  Four-space editor and whitespace conventions
@@ -396,7 +395,7 @@ The Dockerfile builds the React application, installs Python dependencies, downl
 Build locally:
 
 ```bash
-docker build -t rollnexa:1.1.0 .
+docker build -t rollnexa:1.1.1 .
 ```
 
 Before deploying to Render:
@@ -436,7 +435,7 @@ npm --prefix frontend run typecheck
 npm --prefix frontend run build
 ```
 
-Build the container with `docker build -t rollnexa:1.1.0 .`. The repository currently pins direct frontend dependencies in `frontend/package.json` but does not include a generated `package-lock.json`; generate and commit one with `npm --prefix frontend install` in a network-enabled development environment to make transitive frontend dependency resolution reproducible.
+Build the container with `docker build -t rollnexa:1.1.1 .`. The repository currently pins direct frontend dependencies in `frontend/package.json` but does not include a generated `package-lock.json`; generate and commit one with `npm --prefix frontend install` in a network-enabled development environment to make transitive frontend dependency resolution reproducible.
 
 - Keep the production database and biometric encryption key backed up under separate access controls.
 - Production defaults enforce HTTPS redirects and one-year HSTS. `/healthz` and `/readyz` are exempt from Django's redirect so Render health probes can reach them; the application routes are not exempt.
@@ -457,20 +456,27 @@ Build the container with `docker build -t rollnexa:1.1.0 .`. The repository curr
 
 ### Concurrent QR check-in test
 
-A k6 script is included at `scripts/k6_qr_checkin.js`. It performs a one-time concurrent QR check-in using up to eight distinct test-student accounts. Each account must be active, registered for the session's course offering and not already marked present. Create a temporary JSON file at `scripts/students.test.json` containing an array of `{ "username": "...", "password": "..." }` test accounts, and save a freshly issued QR token to `scripts/qr-token.txt`. These paths are excluded from Git. Restrict their local permissions and never use real student credentials.
+A k6 script is included at `scripts/k6_qr_checkin.js`. It supports two controlled modes, each limited to eight virtual users to stay within the current login and QR API throttles:
 
-Run the test immediately after the lecturer activates the test session and issues a fresh QR token; the QR token has a short validity window:
+- `MODE=distinct`: use one clean test-student account per virtual user. Each student must be active, registered for the session's course offering and not already marked present or holding a pending verification. The expected result is one new pending verification per student.
+- `MODE=same-student`: use one clean test-student account across all virtual users. The expected result is exactly one new pending verification and all other simultaneous requests reusing that same pending attempt. This exercises the QR check-in idempotency and session-row serialization.
+
+Create a temporary JSON file at `scripts/students.test.json` containing an array of `{ "username": "...", "password": "..." }` test accounts, and save a freshly issued QR token to `scripts/qr-token.txt`. In `same-student` mode the JSON array must contain exactly one account; in `distinct` mode it must contain exactly as many accounts as the requested concurrency. These paths are excluded from Git. Restrict their local permissions and never use real student credentials.
+
+Run only against an isolated staging deployment with test students and a test attendance session. The QR token has a short validity window, so run immediately after the lecturer activates the session and issues a fresh token:
 
 ```bash
 chmod 600 scripts/students.test.json scripts/qr-token.txt
-export BASE_URL="https://your-rollnexa-domain"
+export BASE_URL="https://your-staging-rollnexa-domain"
 export STUDENTS_JSON="$(cat scripts/students.test.json)"
 export QR_TOKEN="$(cat scripts/qr-token.txt)"
+export MODE="same-student"
+export CONCURRENCY="8"
 k6 run scripts/k6_qr_checkin.js
 unset STUDENTS_JSON QR_TOKEN
 ```
 
-The script verifies that all test students can authenticate and create or reuse a pending QR verification, and reports QR check-in latency. It deliberately stops at `qr_verified`; it does not simulate face verification or create attendance records. Use a staging deployment for load tests. The eight-VU limit respects the current conservative login and QR API throttles. This script is a test harness, not evidence that a load test has already been executed.
+For `distinct` mode, set `MODE=distinct` and provide eight distinct accounts. The script enforces successful checks, zero failed HTTP requests, a five-second p95 QR response target, and the expected counts of newly created versus reused pending verifications. It deliberately stops at `qr_verified`; it does not simulate facial verification or create attendance records. PostgreSQL `TransactionTestCase` coverage separately exercises simultaneous QR scans and simultaneous completion of the server-side dual-verification service. Neither the k6 test nor the Django concurrency tests should be described as executed until their actual results have been captured.
 
 ### Backup and restore drill
 
@@ -481,30 +487,38 @@ pg_dump --format=custom --no-owner --no-acl "$DIRECT_DATABASE_URL" --file="rolln
 pg_restore --list "rollnexa-backup.dump"
 ```
 
-Restore only into an isolated staging database, never over production as part of a routine test:
+Restore only into an isolated staging database, never over production. Do not use `pg_restore --clean` or `--if-exists` for a recovery drill because those options can drop existing objects in the target. Use the guarded script below, which requires a newly created empty staging database and refuses to target the source database.
 
-```bash
-pg_restore --no-owner --no-acl --clean --if-exists --dbname="$STAGING_DATABASE_URL" "rollnexa-backup.dump"
-```
+After restoring, run Django checks and verify account, course, registration and attendance counts against the backup manifest. If biometric templates exist, configure the matching backed-up `BIOMETRIC_ENCRYPTION_KEY` and key version in the isolated staging service, then verify that every stored template can be decrypted without displaying or exporting feature vectors. Database backups and the biometric encryption key must be recoverable together; a database-only restore cannot recover facial matching if the key has been lost. Record the date and outcome of each restore drill.
 
-After restoring, run Django checks and verify account, course, registration and attendance counts against the backup manifest. If biometric templates exist, configure the matching backed-up `BIOMETRIC_ENCRYPTION_KEY` and key version in the isolated staging service, then verify that a controlled template can be decrypted without displaying or exporting the resulting feature vector. Database backups and the biometric encryption key must be recoverable together; a database-only restore cannot recover facial matching if the key has been lost. Record the date and outcome of each restore drill.
+For a repeatable drill, `scripts/verify_postgres_restore.sh` automates the archive, empty-target, row-count, migration-state and biometric-template checks. It requires `SOURCE_DATABASE_URL` to point to the direct source database and `STAGING_DATABASE_URL` to point to a separate, newly created empty database. Set `SOURCE_DATABASE_URL` from the protected `DIRECT_DATABASE_URL` setting without printing or committing either value. The script deliberately refuses to restore into a non-empty target or the same database identity. Run it only from a secured operations environment with PostgreSQL client tools and the backend Python dependencies installed. Perform the comparison during a controlled maintenance window so concurrent production writes do not change row counts during the drill. The original biometric key and key version must be present in that environment; never put them in source files or logs.
+
+The `python manage.py verify_biometric_restore` command can also be run independently against a restored database. It decrypts templates in memory and reports only aggregate success/failure counts.
 
 ## 12. Hardening status and residual validation
 
-### Implemented in version 1.1.0
+### Application hardening introduced in version 1.1.0
 
 - HTTPS redirects and one-year HSTS are enabled by the Render Blueprint; health probes use separate liveness and readiness endpoints.
 - The React application receives a restrictive Content Security Policy and a same-origin camera Permissions Policy. Session and CSRF cookies are secure, HttpOnly and SameSite=Lax in production.
 - User, academic, attendance and biometric records are read-only in Django Administration. Application changes use role-protected workflows and write append-only audit events.
 - Biometric multipart request size, file count and per-image size are bounded. JPEG dimensions are checked before OpenCV image decoding.
 - Facial challenge issuance locks the session and verification in a consistent order. Attendance recording remains transactional and requires the server-side QR and face verification states.
-- A k6 script is provided for a controlled concurrent QR check-in test.
+- The k6 harness supports distinct-student and same-student QR check-in races, with strict result-count and request-success thresholds. PostgreSQL-specific `TransactionTestCase` tests exercise simultaneous QR scans and simultaneous final attendance completion.
+
+### Validation tooling added in version 1.1.1
+
+- `backend/biometrics/management/commands/verify_biometric_restore.py` checks that the configured key version matches and decrypts every stored facial template. It reports aggregate counts only; it never prints, serializes or exports feature vectors.
+- `scripts/verify_postgres_restore.sh` creates a custom-format backup, verifies archive readability, refuses to restore into a non-empty or identical source database, restores into an isolated empty staging database, compares public-table row counts, checks migration state and invokes the biometric-template recovery command.
+- PostgreSQL-only `TransactionTestCase` tests use independent database connections to race simultaneous QR scans and simultaneous dual-verification completion.
+- The k6 script now supports both distinct-student load and same-student duplicate-scan races, and enforces exact new-versus-reused pending-verification counts.
+- `backend/.env.example` now exists and documents local-only environment settings without containing production secrets.
 
 ### Must still be validated in the deployment environment
 
 - Execute `python manage.py check --deploy`, `python manage.py makemigrations --check --dry-run` and the complete Django test suite against the release. The current build environment used for preparing this package does not contain Django or PostgreSQL, so runtime tests and migration execution have not been performed here.
 - Run the Vite production build and Docker image build. The frontend registry was unavailable during package preparation, so a `package-lock.json` could not be generated. Direct frontend dependencies are exact-version pinned in `package.json`, but transitive dependency resolution is not yet lockfile-reproducible. Generate and commit the lockfile from a network-enabled environment before treating the frontend supply chain as fully reproducible.
-- Run the included k6 test against a staging deployment, perform a restore drill from a real database backup, and verify that encrypted facial templates can be decrypted in staging using the separately backed-up key.
+- Execute the PostgreSQL-specific concurrency tests and run both k6 modes against a staging deployment. Perform the restore drill using `scripts/verify_postgres_restore.sh` with a real direct production connection and a newly provisioned, empty staging database. The staging environment must receive the original `BIOMETRIC_ENCRYPTION_KEY` and matching key version through secure environment configuration before the restore verification command can validate templates.
 - Measure false-accept and false-reject rates using a representative, consented evaluation set. The SFace threshold `0.363` is a published benchmark reference, not a RollNexa-specific calibrated threshold.
 - The randomised head-turn challenge is a heuristic liveness check, not a certified presentation-attack detection system. It must not be represented as proof that sophisticated photo, screen or video replay attacks are impossible. Retain the lecturer-approved manual alternative and evaluate a dedicated PAD model before high-stakes deployment.
 - The DRF throttles use Django's process-local cache. Configure shared cache and edge rate limiting before scaling beyond the current single-worker/single-instance configuration. Django Administration does not have built-in MFA in this release; protect administrator access with the institution's identity and network controls.

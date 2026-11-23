@@ -1,9 +1,12 @@
 from datetime import timedelta
+from io import StringIO
 
 import numpy as np
 from cryptography.fernet import Fernet
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -164,6 +167,55 @@ class BiometricWorkflowTests(TestCase):
             student_profile=self.student,
         )
         return verification
+
+    def test_restore_command_verifies_encrypted_templates_without_outputting_embeddings(self):
+        self.grant_consent()
+        enrollment = FaceEnrollment(
+            student=self.student,
+            encrypted_template=encrypt_template(np.ones(128, dtype=np.float32)),
+            encryption_key_version="test-v1",
+            model_version="test-model",
+            sample_count=3,
+        )
+        enrollment.full_clean()
+        enrollment.save()
+
+        output = StringIO()
+        call_command("verify_biometric_restore", stdout=output)
+
+        self.assertIn("1 stored template(s) decrypted successfully", output.getvalue())
+        self.assertNotIn("embedding", output.getvalue().lower())
+
+    def test_restore_command_rejects_a_different_encryption_key(self):
+        self.grant_consent()
+        enrollment = FaceEnrollment(
+            student=self.student,
+            encrypted_template=encrypt_template(np.ones(128, dtype=np.float32)),
+            encryption_key_version="test-v1",
+            model_version="test-model",
+            sample_count=3,
+        )
+        enrollment.full_clean()
+        enrollment.save()
+
+        with override_settings(BIOMETRIC_ENCRYPTION_KEY=Fernet.generate_key().decode("ascii")):
+            with self.assertRaises(CommandError):
+                call_command("verify_biometric_restore", stdout=StringIO())
+
+    def test_restore_command_rejects_an_unavailable_key_version(self):
+        self.grant_consent()
+        enrollment = FaceEnrollment(
+            student=self.student,
+            encrypted_template=encrypt_template(np.ones(128, dtype=np.float32)),
+            encryption_key_version="old-key-version",
+            model_version="test-model",
+            sample_count=3,
+        )
+        enrollment.full_clean()
+        enrollment.save()
+
+        with self.assertRaises(CommandError):
+            call_command("verify_biometric_restore", stdout=StringIO())
 
     def test_student_can_grant_biometric_consent_and_event_is_audited(self):
         consent = self.grant_consent()
