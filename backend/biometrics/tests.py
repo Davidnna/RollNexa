@@ -341,11 +341,18 @@ class BiometricWorkflowTests(TestCase):
     def test_enrolment_api_rejects_invalid_key_before_face_processing(self):
         self.grant_consent()
         self.client.force_authenticate(user=self.student_user)
-        frame = SimpleUploadedFile("frame.jpg", b"placeholder", content_type="image/jpeg")
+        frames = [
+            SimpleUploadedFile(
+                f"frame-{index}.jpg",
+                b"placeholder",
+                content_type="image/jpeg",
+            )
+            for index in range(1, 4)
+        ]
         with patch("biometrics.views.create_or_replace_face_enrollment") as create_enrollment:
             response = self.client.post(
                 reverse("api_biometrics_enrolment"),
-                {"frames": [frame]},
+                {"frames": frames},
                 format="multipart",
             )
         self.assertEqual(response.status_code, 503)

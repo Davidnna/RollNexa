@@ -49,10 +49,10 @@ jobs:
             BIOMETRIC_CONSENT_POLICY_VERSION: "1.1"
         steps:
             - name: Check out source
-              uses: actions/checkout@v4
+              uses: actions/checkout@v7
 
             - name: Set up Python
-              uses: actions/setup-python@v5
+              uses: actions/setup-python@v7
               with:
                   python-version: "3.12"
                   cache: pip
@@ -87,6 +87,9 @@ jobs:
             - name: Verify migration state
               run: python manage.py migrate --check
 
+            - name: Collect static assets for manifest-backed template tests
+              run: python manage.py collectstatic --noinput
+
             - name: Run the complete Django test suite
               run: python manage.py test --verbosity=2
 
@@ -99,10 +102,10 @@ jobs:
                 working-directory: frontend
         steps:
             - name: Check out source
-              uses: actions/checkout@v4
+              uses: actions/checkout@v7
 
             - name: Set up Node.js
-              uses: actions/setup-node@v4
+              uses: actions/setup-node@v7
               with:
                   node-version: "22"
 
@@ -110,7 +113,7 @@ jobs:
               run: npm install --package-lock-only --no-audit --no-fund
 
             - name: Upload generated lockfile for repository adoption
-              uses: actions/upload-artifact@v4
+              uses: actions/upload-artifact@v6
               with:
                   name: rollnexa-frontend-package-lock
                   path: frontend/package-lock.json
@@ -132,10 +135,10 @@ jobs:
             - frontend-build
         steps:
             - name: Check out source
-              uses: actions/checkout@v4
+              uses: actions/checkout@v7
 
             - name: Set up Node.js for lockfile generation
-              uses: actions/setup-node@v4
+              uses: actions/setup-node@v7
               with:
                   node-version: "22"
 
@@ -144,10 +147,10 @@ jobs:
               run: npm install --package-lock-only --no-audit --no-fund
 
             - name: Set up Docker Buildx
-              uses: docker/setup-buildx-action@v3
+              uses: docker/setup-buildx-action@v4
 
             - name: Build production image without publishing
-              uses: docker/build-push-action@v6
+              uses: docker/build-push-action@v7
               with:
                   context: .
                   file: ./Dockerfile

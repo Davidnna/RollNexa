@@ -7,10 +7,11 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.core import signing
 from django.core.exceptions import ValidationError
-from django.db import close_old_connections
+from django.db import connections
 from django.test import TestCase, TransactionTestCase, skipUnlessDBFeature
 from django.urls import reverse
 from django.utils import timezone
+from rest_framework.test import APIClient
 
 from accounts.models import UserProfile
 from academics.models import (
@@ -631,15 +632,16 @@ class AttendanceManagementTests(TestCase):
     def test_signed_qr_token_expires_after_its_validity_window(self):
         session = self._active_session()
         issued = self._issued_qr(session)
-        self.client.force_login(self.student_user)
+        api_client = APIClient()
+        api_client.force_authenticate(user=self.student_user)
         with patch(
             "attendance.services.signing.loads",
             side_effect=signing.SignatureExpired("expired"),
         ):
-            response = self.client.post(
+            response = api_client.post(
                 reverse("api_attendance_verify_qr"),
-                data=json.dumps({"token": issued["token"]}),
-                content_type="application/json",
+                {"token": issued["token"]},
+                format="json",
             )
         self.assertEqual(response.status_code, 400)
         self.assertEqual(AttendanceVerification.objects.count(), 0)
@@ -839,12 +841,12 @@ class AttendanceConcurrencyTests(TransactionTestCase):
         barrier = Barrier(workers)
 
         def run_one():
-            close_old_connections()
+            connections.close_all()
             try:
                 barrier.wait(timeout=10)
                 return callback()
             finally:
-                close_old_connections()
+                connections.close_all()
 
         with ThreadPoolExecutor(max_workers=workers) as executor:
             futures = [executor.submit(run_one) for _ in range(workers)]

@@ -54,7 +54,7 @@ def _manageable_sessions(profile):
             distinct=True,
         ),
         attendance_count=Count("records", distinct=True),
-    ).distinct()
+    ).distinct().order_by("-starts_at", "-pk")
 
 
 def _get_manageable_session(profile, pk):

@@ -29,7 +29,7 @@ jobs:
             BACKUP_FILE: ${{ runner.temp }}/rollnexa-restore-drill.dump
         steps:
             - name: Check out source
-              uses: actions/checkout@v4
+              uses: actions/checkout@v7
 
             - name: Validate required protected secrets
               shell: bash
@@ -44,7 +44,7 @@ jobs:
                   done
 
             - name: Set up Python
-              uses: actions/setup-python@v5
+              uses: actions/setup-python@v7
               with:
                   python-version: "3.12"
                   cache: pip

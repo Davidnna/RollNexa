@@ -1,8 +1,8 @@
-# RollNexa 1.1.3
+# RollNexa 1.1.4
 
 **Academic management and dual-verification attendance.**
 
-Version 1.1.2 adds hosted GitHub Actions workflows for continuous integration, production smoke checks and a manually approved PostgreSQL backup/restore drill. Version 1.1.1 introduced the validation tooling for the 1.1.0 system-hardening release. It adds PostgreSQL concurrency tests, a guarded backup-and-restore verification script, and a management command that checks encrypted facial-template recovery without exposing biometric feature data. It also adds the documented local environment example and strengthens the k6 QR concurrency harness. Version 1.1.3 adds the non-destructive `academics.0008` migration to align Django migration state with the current course metadata and lecturer-assignment ordering. It does not change stored course values or table structure. The CI PostgreSQL service explicitly disables SSL because its local service container does not offer TLS; production continues to require SSL by default whenever `DEBUG=False`, unless an administrator deliberately overrides `DATABASE_SSL_REQUIRE`.
+Version 1.1.4 improves CI reliability and test isolation: it collects the WhiteNoise static manifest before template tests, corrects the API test setup for expired QR tokens, explicitly rejects JSON-only face-verification attempts with a validation response, tests biometric key validation using a structurally valid enrolment request, and closes per-thread PostgreSQL connections after concurrency tests. It also orders lecturer attendance sessions deterministically and upgrades GitHub Actions to Node.js 24-compatible releases. Version 1.1.2 adds hosted GitHub Actions workflows for continuous integration, production smoke checks and a manually approved PostgreSQL backup/restore drill. Version 1.1.1 introduced the validation tooling for the 1.1.0 system-hardening release. It adds PostgreSQL concurrency tests, a guarded backup-and-restore verification script, and a management command that checks encrypted facial-template recovery without exposing biometric feature data. It also adds the documented local environment example and strengthens the k6 QR concurrency harness. Version 1.1.3 adds the non-destructive `academics.0008` migration to align Django migration state with the current course metadata and lecturer-assignment ordering. It does not change stored course values or table structure. The CI PostgreSQL service explicitly disables SSL because its local service container does not offer TLS; production continues to require SSL by default whenever `DEBUG=False`, unless an administrator deliberately overrides `DATABASE_SSL_REQUIRE`.
 
 RollNexa is a web-based academic administration and smart attendance platform. It manages institutional structure, user accounts, academic sessions, courses, course offerings, lecturer assignments and student registrations. Its automated attendance workflow combines a rotating QR Code with server-side facial recognition. An automated present record is created only when both verification stages succeed.
 
@@ -395,7 +395,7 @@ The Dockerfile builds the React application, installs Python dependencies, downl
 Build locally:
 
 ```bash
-docker build -t rollnexa:1.1.3 .
+docker build -t rollnexa:1.1.4 .
 ```
 
 Before deploying to Render:
@@ -435,7 +435,7 @@ npm --prefix frontend run typecheck
 npm --prefix frontend run build
 ```
 
-Build the container with `docker build -t rollnexa:1.1.3 .`. The repository currently pins direct frontend dependencies in `frontend/package.json` but does not include a generated `package-lock.json`; generate and commit one through the hosted CI artifact or a network-enabled dependency-resolution environment to make transitive frontend dependency resolution reproducible.
+Build the container with `docker build -t rollnexa:1.1.4 .`. The repository currently pins direct frontend dependencies in `frontend/package.json` but does not include a generated `package-lock.json`; generate and commit one through the hosted CI artifact or a network-enabled dependency-resolution environment to make transitive frontend dependency resolution reproducible.
 
 - Keep the production database and biometric encryption key backed up under separate access controls.
 - Production defaults enforce HTTPS redirects and one-year HSTS. `/healthz` and `/readyz` are exempt from Django's redirect so Render health probes can reach them; the application routes are not exempt.
@@ -498,7 +498,7 @@ The `python manage.py verify_biometric_restore` command can also be run independ
 ## 12. Hardening status and residual validation
 
 
-### Hosted validation workflows (version 1.1.2 and 1.1.3)
+### Hosted validation workflows (version 1.1.2–1.1.4)
 
 The repository includes three GitHub Actions workflows under `.github/workflows/`:
 
@@ -532,10 +532,22 @@ These workflows are included as source configuration only. Their presence does n
 - `academics.0008_alter_courselecturerassignment_options_and_more` records the current lecturer-assignment ordering and the current `Course.credit_units` and `Course.stress_code` help text in migration state. These are metadata/state changes only; no data rewrite or destructive schema operation is performed.
 - `DATABASE_SSL_REQUIRE` optionally overrides the database TLS requirement. If omitted, the default remains `not DEBUG`, so production (`DEBUG=False`) requires SSL. The GitHub Actions PostgreSQL service explicitly sets it to `false` because the service container is local and does not support TLS. Never copy this CI override into the production Render environment.
 
+### CI and test reliability (version 1.1.4)
+
+- The CI workflow runs `python manage.py collectstatic --noinput` before the Django test suite. This creates the WhiteNoise manifest used by `{% static %}` in templates and mirrors the production Docker build, which already collects static assets.
+- The expired-QR API test now uses DRF's `APIClient.force_authenticate` so it tests the expired-token response rather than failing first on SessionAuthentication's CSRF requirement. The separate API security tests continue to exercise CSRF enforcement.
+- The face-verification endpoint also parses JSON so a JSON-only request (including a client-supplied `faceVerified` boolean) receives an explicit HTTP 400 validation response. Actual verification still requires the server challenge and two uploaded frames.
+- The invalid-encryption-key enrolment test submits exactly three frames so request-shape validation passes and the test reaches the intended fail-closed key-configuration check before any face processing.
+- Concurrency-test worker threads now close all of their own Django database connections. This prevents healthy persistent connections from remaining attached to worker threads and blocking PostgreSQL test-database deletion.
+- Lecturer attendance-session pagination now has a stable `starts_at`/primary-key ordering.
+- GitHub Actions dependencies have been updated to Node.js 24-compatible major releases.
+
+The last available hosted run (`45115749357`) passed migration checks and the React production build. Its Django run executed 192 tests but was blocked by 52 template errors caused by the uncollected static manifest, three independent test failures, and four lingering PostgreSQL connections during test-database teardown. Version 1.1.4 addresses those findings. A new hosted run is still required to confirm that the corrections pass together; this package has not been represented as having a successful post-fix CI run.
+
 ### Must still be validated in the deployment environment
 
-- Execute `python manage.py check --deploy`, `python manage.py makemigrations --check --dry-run` and the complete Django test suite against the release. The current build environment used for preparing this package does not contain Django or PostgreSQL, so runtime tests and migration execution have not been performed here.
-- Run the Vite production build and Docker image build. The frontend registry was unavailable during package preparation, so a `package-lock.json` could not be generated. Direct frontend dependencies are exact-version pinned in `package.json`, but transitive dependency resolution is not yet lockfile-reproducible. Generate and commit the lockfile from a network-enabled environment before treating the frontend supply chain as fully reproducible.
+- Re-run the complete hosted PostgreSQL CI workflow against this release. The preparation environment does not contain Django or PostgreSQL, so post-fix runtime tests and migration execution have not been performed locally. The previous hosted run is diagnostic evidence only and does not validate this revision.
+- The previous hosted run completed the Vite production build and generated a short-lived `package-lock.json` artifact. The Docker image job was skipped because the backend job failed. Commit a reviewed `frontend/package-lock.json` when the hosted artifact is adopted so transitive dependency resolution is reproducible.
 - Execute the PostgreSQL-specific concurrency tests and run both k6 modes against a staging deployment. Perform the restore drill using `scripts/verify_postgres_restore.sh` with a real direct production connection and a newly provisioned, empty staging database. The staging environment must receive the original `BIOMETRIC_ENCRYPTION_KEY` and matching key version through secure environment configuration before the restore verification command can validate templates.
 - Measure false-accept and false-reject rates using a representative, consented evaluation set. The SFace threshold `0.363` is a published benchmark reference, not a RollNexa-specific calibrated threshold.
 - The randomised head-turn challenge is a heuristic liveness check, not a certified presentation-attack detection system. It must not be represented as proof that sophisticated photo, screen or video replay attacks are impossible. Retain the lecturer-approved manual alternative and evaluate a dedicated PAD model before high-stakes deployment.
