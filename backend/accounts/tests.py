@@ -87,7 +87,9 @@ class RollNexaAccountTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertFormError(
-            response, "form", "programme", "Select the student's programme."
+            response.context["form"],
+            "programme",
+            "Select the student's programme.",
         )
 
     def test_admin_can_assign_existing_student_to_programme(self):
