@@ -6,14 +6,19 @@ on:
 permissions:
     contents: read
 
+concurrency:
+    group: rollnexa-production-smoke
+    cancel-in-progress: false
+
 jobs:
     smoke-check:
-        name: Check deployed application health and security headers
+        name: Check production health, HTTPS and browser security headers
         runs-on: ubuntu-latest
         timeout-minutes: 10
         steps:
             - name: Check production liveness
               run: |
+                  set -euo pipefail
                   response=$(curl --retry 6 --retry-delay 10 --retry-connrefused \
                       --connect-timeout 15 --max-time 30 --fail --silent --show-error \
                       https://rollnexa.onrender.com/healthz)
@@ -21,20 +26,63 @@ jobs:
 
             - name: Check production readiness
               run: |
+                  set -euo pipefail
                   response=$(curl --retry 6 --retry-delay 10 --retry-connrefused \
                       --connect-timeout 15 --max-time 30 --fail --silent --show-error \
                       https://rollnexa.onrender.com/readyz)
                   test "$response" = "ready"
 
-            - name: Verify HTTPS security headers
+            - name: Verify HTTP redirects to HTTPS
               run: |
+                  set -euo pipefail
+                  status=$(curl --silent --show-error --output /dev/null \
+                      --dump-header "$RUNNER_TEMP/rollnexa-http-headers.txt" \
+                      --write-out '%{http_code}' --connect-timeout 15 --max-time 30 \
+                      http://rollnexa.onrender.com/)
+                  case "$status" in
+                      301|302|307|308) ;;
+                      *) echo "Expected an HTTP-to-HTTPS redirect; received HTTP $status." >&2; exit 1 ;;
+                  esac
+                  grep -Eiq '^location: https://rollnexa\.onrender\.com/' \
+                      "$RUNNER_TEMP/rollnexa-http-headers.txt"
+
+            - name: Verify production browser security headers
+              run: |
+                  set -euo pipefail
                   curl --retry 6 --retry-delay 10 --retry-connrefused \
                       --connect-timeout 15 --max-time 30 --fail --silent --show-error \
                       --dump-header "$RUNNER_TEMP/rollnexa-headers.txt" \
                       --output /dev/null https://rollnexa.onrender.com/
-                  grep -Eiq '^strict-transport-security:.*max-age=31536000' \
-                      "$RUNNER_TEMP/rollnexa-headers.txt"
-                  grep -Eiq '^x-content-type-options:.*nosniff' \
-                      "$RUNNER_TEMP/rollnexa-headers.txt"
-                  grep -Eiq '^permissions-policy:.*camera=\(self\)' \
-                      "$RUNNER_TEMP/rollnexa-headers.txt"
+                  headers="$RUNNER_TEMP/rollnexa-headers.txt"
+                  grep -Eiq '^strict-transport-security:.*max-age=31536000' "$headers"
+                  grep -Eiq '^x-content-type-options:.*nosniff' "$headers"
+                  grep -Eiq '^x-frame-options:.*DENY' "$headers"
+                  grep -Eiq '^referrer-policy:.*strict-origin-when-cross-origin' "$headers"
+                  grep -Eiq '^permissions-policy:.*camera=\(self\)' "$headers"
+                  grep -Eiq '^permissions-policy:.*microphone=\(\)' "$headers"
+                  grep -Eiq '^content-security-policy:.*default-src .self.' "$headers"
+                  grep -Eiq '^content-security-policy:.*frame-ancestors .none.' "$headers"
+
+            - name: Verify CSRF bootstrap endpoint and secure cookie flags
+              run: |
+                  set -euo pipefail
+                  curl --retry 4 --retry-delay 5 --retry-connrefused \
+                      --connect-timeout 15 --max-time 30 --fail --silent --show-error \
+                      --cookie-jar "$RUNNER_TEMP/rollnexa-cookies.txt" \
+                      --dump-header "$RUNNER_TEMP/rollnexa-csrf-headers.txt" \
+                      --output "$RUNNER_TEMP/rollnexa-csrf.json" \
+                      https://rollnexa.onrender.com/api/v1/csrf/
+                  python - "$RUNNER_TEMP/rollnexa-csrf.json" <<'PY'
+                  import json
+                  import sys
+
+                  with open(sys.argv[1], encoding="utf-8") as source:
+                      payload = json.load(source)
+                  if not isinstance(payload.get("csrfToken"), str) or not payload["csrfToken"]:
+                      raise SystemExit("CSRF bootstrap did not return a token.")
+                  PY
+                  cookie_header=$(grep -i '^set-cookie: csrftoken=' \
+                      "$RUNNER_TEMP/rollnexa-csrf-headers.txt" | tail -n 1)
+                  printf '%s' "$cookie_header" | grep -Eiq 'secure'
+                  printf '%s' "$cookie_header" | grep -Eiq 'httponly'
+                  printf '%s' "$cookie_header" | grep -Eiq 'samesite=lax'

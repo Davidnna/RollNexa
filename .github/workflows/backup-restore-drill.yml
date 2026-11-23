@@ -21,6 +21,7 @@ jobs:
         if: github.ref == 'refs/heads/main' && inputs.confirmation == 'RESTORE_TO_ISOLATED_STAGING'
         runs-on: ubuntu-latest
         timeout-minutes: 45
+        environment: rollnexa-recovery
         env:
             SOURCE_DATABASE_URL: ${{ secrets.SOURCE_DATABASE_URL }}
             STAGING_DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}

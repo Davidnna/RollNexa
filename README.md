@@ -1,4 +1,4 @@
-# RollNexa 1.1.6
+# RollNexa 1.1.7
 
 **Academic management and dual-verification attendance.**
 
@@ -395,7 +395,7 @@ The Dockerfile builds the React application, installs Python dependencies, downl
 Build locally:
 
 ```bash
-docker build -t rollnexa:1.1.5 .
+docker build -t rollnexa:1.1.7 .
 ```
 
 Before deploying to Render:
@@ -435,7 +435,7 @@ npm --prefix frontend run typecheck
 npm --prefix frontend run build
 ```
 
-Build the container with `docker build -t rollnexa:1.1.5 .`. The repository currently pins direct frontend dependencies in `frontend/package.json` but does not include a generated `package-lock.json`; generate and commit one through the hosted CI artifact or a network-enabled dependency-resolution environment to make transitive frontend dependency resolution reproducible.
+Build the container with `docker build -t rollnexa:1.1.7 .`. The repository currently pins direct frontend dependencies in `frontend/package.json` but does not include a generated `package-lock.json`; generate and commit one through the hosted CI artifact or a network-enabled dependency-resolution environment to make transitive frontend dependency resolution reproducible.
 
 - Keep the production database and biometric encryption key backed up under separate access controls.
 - Production defaults enforce HTTPS redirects and one-year HSTS. `/healthz` and `/readyz` are exempt from Django's redirect so Render health probes can reach them; the application routes are not exempt.
@@ -497,64 +497,72 @@ The `python manage.py verify_biometric_restore` command can also be run independ
 
 ## 12. Hardening status and residual validation
 
+### Hosted validation workflows
 
-### Hosted validation workflows (version 1.1.2–1.1.5)
+The repository contains the following manually controlled GitHub Actions workflows:
 
-The repository includes three GitHub Actions workflows under `.github/workflows/`:
+- `ci.yml` runs Django production checks, migration consistency checks, migrations against an ephemeral PostgreSQL 16 service, static collection, the full Django test suite, the React production build and a non-publishing Docker build. The CI database explicitly disables TLS only for its local PostgreSQL service; production database SSL remains required by default.
+- `production-smoke.yml` checks the live production liveness and readiness endpoints, HTTP-to-HTTPS redirection, HSTS, content-type protection, frame protection, referrer policy, camera permissions, Content Security Policy and secure CSRF-cookie flags. It performs read-only HTTP requests.
+- `backup-restore-drill.yml` creates a custom-format backup from the direct production database connection and restores it into a newly created, empty staging database. It checks database identity, TLS, target emptiness, PostgreSQL client compatibility, archive readability, table row counts, migration state and biometric template decryption. The workflow uses the protected GitHub environment `rollnexa-recovery`; configure required reviewers for that environment before enabling the drill.
+- `staging-concurrency.yml` obtains a fresh QR token through the staging lecturer API and runs the bounded eight-user k6 test against an isolated staging service. It refuses the known production hostname and requires `staging` in the hostname. The workflow uses the protected GitHub environment `rollnexa-staging`; configure required reviewers before running it.
 
-- `ci.yml` runs Django checks and the full test suite against an ephemeral PostgreSQL 16 service, checks migrations, builds the React application and builds the production Docker image without publishing it. The ephemeral service sets `DATABASE_SSL_REQUIRE=false`; this is isolated to CI and does not change the production SSL default. The frontend job resolves dependencies, creates a `package-lock.json`, uploads it as a short-lived workflow artifact and uses that exact lockfile for `npm ci`. The Docker build job independently generates a lockfile in its checked-out build context so the Dockerfile can use `npm ci` during that image build. The generated lockfile must still be added to the repository to make subsequent installs reproducible.
-- `production-smoke.yml` can be triggered manually to check the deployed `/healthz` and `/readyz` endpoints and verify the expected HTTPS security headers on `https://rollnexa.onrender.com`.
-- `backup-restore-drill.yml` is manually triggered from `main` and requires the exact confirmation text `RESTORE_TO_ISOLATED_STAGING`. Configure the protected GitHub Actions repository secrets `SOURCE_DATABASE_URL`, `STAGING_DATABASE_URL`, `BIOMETRIC_ENCRYPTION_KEY` and `BIOMETRIC_ENCRYPTION_KEY_VERSION` before using it. The staging database must be newly created and empty. The workflow never uploads the database dump as an artifact and deletes the temporary dump when the job finishes.
+### Required GitHub environment configuration
 
-The backup/restore workflow is intentionally manual because it reads production data and writes to a staging database. Run it during a controlled maintenance window, keep the source and staging databases separate, and ensure the original biometric encryption key is available through protected secrets. Do not enable automatic execution for this workflow.
+Configure the `rollnexa-recovery` environment with required reviewers and these environment secrets:
 
-These workflows are included as source configuration only. Their presence does not mean they have executed. A successful GitHub Actions run is required before reporting CI, production smoke checks, backup restoration or hosted concurrency tests as passed.
+- `SOURCE_DATABASE_URL`: direct production PostgreSQL connection URL. Use the direct connection, not a transaction-pool URL, and preserve the provider's TLS parameters.
+- `STAGING_DATABASE_URL`: direct connection URL to a newly created, empty staging database on an isolated staging environment. It must not point to production.
+- `BIOMETRIC_ENCRYPTION_KEY`: the exact existing production Fernet key. Do not rotate it as part of a restore drill.
+- `BIOMETRIC_ENCRYPTION_KEY_VERSION`: the matching production key version.
 
-### Application hardening introduced in version 1.1.0
+The restore workflow requires the exact manual confirmation `RESTORE_TO_ISOLATED_STAGING`. It never restores into production, never uses `pg_restore --clean`, never uploads the database dump as an artifact and removes the temporary dump when the job completes. The database dump is temporary test material, not a retained backup service. Configure and verify the database provider's own scheduled backup and point-in-time recovery separately; the application workflow does not create long-term backup retention.
 
-- HTTPS redirects and one-year HSTS are enabled by the Render Blueprint; health probes use separate liveness and readiness endpoints.
-- The React application receives a restrictive Content Security Policy and a same-origin camera Permissions Policy. Session and CSRF cookies are secure, HttpOnly and SameSite=Lax in production.
-- User, academic, attendance and biometric records are read-only in Django Administration. Application changes use role-protected workflows and write append-only audit events.
-- Biometric multipart request size, file count and per-image size are bounded. JPEG dimensions are checked before OpenCV image decoding.
-- Facial challenge issuance locks the session and verification in a consistent order. Attendance recording remains transactional and requires the server-side QR and face verification states.
-- The k6 harness supports distinct-student and same-student QR check-in races, with strict result-count and request-success thresholds. PostgreSQL-specific `TransactionTestCase` tests exercise simultaneous QR scans and simultaneous final attendance completion.
+Configure the `rollnexa-staging` environment with required reviewers and these environment secrets:
 
-### Validation tooling added in version 1.1.1
+- `STAGING_BASE_URL`: HTTPS origin of the isolated staging web service. Its hostname must contain `staging` and must not be the production hostname.
+- `STAGING_LECTURER_USERNAME` and `STAGING_LECTURER_PASSWORD`: a dedicated staging lecturer account assigned to the test attendance session.
+- `STAGING_STUDENTS_JSON`: JSON array of dedicated staging test-student credentials. `same-student` mode requires exactly one student; `distinct` mode requires exactly eight unique students.
 
-- `backend/biometrics/management/commands/verify_biometric_restore.py` checks that the configured key version matches and decrypts every stored facial template. It reports aggregate counts only; it never prints, serializes or exports feature vectors.
-- `scripts/verify_postgres_restore.sh` creates a custom-format backup, verifies archive readability, refuses to restore into a non-empty or identical source database, restores into an isolated empty staging database, compares public-table row counts, checks migration state and invokes the biometric-template recovery command.
-- PostgreSQL-only `TransactionTestCase` tests use independent database connections to race simultaneous QR scans and simultaneous dual-verification completion.
-- The k6 script now supports both distinct-student load and same-student duplicate-scan races, and enforces exact new-versus-reused pending-verification counts.
-- `backend/.env.example` now exists and documents local-only environment settings without containing production secrets.
+The staging concurrency workflow requires the manual confirmation `RUN_STAGING_CONCURRENCY` and an active staging attendance-session ID. Run each mode with a fresh active test session and fresh QR token. The test creates pending QR verifications in staging; it does not submit facial images or create attendance records. Never use production student accounts, production session IDs or the production URL for this workflow.
 
-### Migration and database SSL configuration (version 1.1.3)
+### Version 1.1.6 — CI test correction
 
-- `academics.0008_alter_courselecturerassignment_options_and_more` records the current lecturer-assignment ordering and the current `Course.credit_units` and `Course.stress_code` help text in migration state. These are metadata/state changes only; no data rewrite or destructive schema operation is performed.
-- `DATABASE_SSL_REQUIRE` optionally overrides the database TLS requirement. If omitted, the default remains `not DEBUG`, so production (`DEBUG=False`) requires SSL. The GitHub Actions PostgreSQL service explicitly sets it to `false` because the service container is local and does not support TLS. Never copy this CI override into the production Render environment.
+Version 1.1.6 corrected the programme-validation test to pass the bound form from `response.context` to Django's `assertFormError()` API. The change affects test assertion handling only; it does not change student account validation or production data. The user confirmed that the deployment gate passed and the 1.1.6 release deployed successfully. The CI workflow's backend, frontend and Docker jobs are required before the deployment proceeds.
 
-### CI and test reliability (versions 1.1.4–1.1.5)
+### Version 1.1.7 — Operational hardening
 
-- The CI workflow runs `python manage.py collectstatic --noinput` before the Django test suite. This creates the WhiteNoise manifest used by `{% static %}` in templates and mirrors the production Docker build, which already collects static assets.
-- The expired-QR API test now uses DRF's `APIClient.force_authenticate` so it tests the expired-token response rather than failing first on SessionAuthentication's CSRF requirement. The separate API security tests continue to exercise CSRF enforcement.
-- The face-verification endpoint also parses JSON so a JSON-only request (including a client-supplied `faceVerified` boolean) receives an explicit HTTP 400 validation response. Actual verification still requires the server challenge and two uploaded frames.
-- The invalid-encryption-key enrolment test submits exactly three frames so request-shape validation passes and the test reaches the intended fail-closed key-configuration check before any face processing.
-- Concurrency-test worker threads now close all of their own Django database connections. This prevents healthy persistent connections from remaining attached to worker threads and blocking PostgreSQL test-database deletion.
-- Lecturer attendance-session pagination now has a stable `starts_at`/primary-key ordering.
-- GitHub Actions dependencies have been updated to Node.js 24-compatible major releases.
+- The PostgreSQL restore drill now requires TLS for both database connections and verifies that TLS is active on each connection.
+- Source and staging identity checks include the database OID and connected server address/port, helping detect the same database reached through different URLs.
+- The restore drill rejects PostgreSQL system databases and checks for existing relations and non-default schemas, rather than checking only public tables.
+- The restore script verifies that the PostgreSQL client major version is compatible with the source server before creating a dump.
+- Restore runs in a single transaction so a failed restore does not leave a partially restored target database.
+- Row-count comparisons include tables in all non-system schemas. Database identities and row-count manifests are not printed to workflow logs.
+- The recovery workflow is gated by the protected `rollnexa-recovery` GitHub environment.
+- The production smoke workflow checks HTTPS redirection, browser security headers and the CSRF bootstrap cookie in addition to liveness and readiness.
+- A staging-only k6 workflow issues its own short-lived QR token through the lecturer API, masks the token in workflow logs and runs bounded same-student or distinct-student concurrency tests.
 
-The last available hosted run (`45115749357`) passed migration checks and the React production build. Its Django run executed 192 tests but was blocked by 52 template errors caused by the uncollected static manifest, three independent test failures, and four lingering PostgreSQL connections during test-database teardown. Version 1.1.4 addresses those findings. A new hosted run is still required to confirm that the corrections pass together; this package has not been represented as having a successful post-fix CI run.
+### Validation status
 
-### Must still be validated in the deployment environment
+The deployed 1.1.6 release passed the repository's deployment gate, as confirmed by the project owner. That gate includes the configured Django/PostgreSQL tests, frontend production build and Docker image build. This 1.1.7 archive is a candidate release; the deployed service remains on 1.1.6 until this revision passes GitHub CI and is deployed. The 1.1.7 operational workflows and restore-script safeguards have not been executed against hosted production or staging infrastructure from the source-preparation environment.
 
-- Re-run the complete hosted PostgreSQL CI workflow against this release. The preparation environment does not contain Django or PostgreSQL, so post-fix runtime tests and migration execution have not been performed locally. The previous hosted run is diagnostic evidence only and does not validate this revision.
-- The previous hosted run completed the Vite production build and generated a short-lived `package-lock.json` artifact. The Docker image job was skipped because the backend job failed. Commit a reviewed `frontend/package-lock.json` when the hosted artifact is adopted so transitive dependency resolution is reproducible.
-- Execute the PostgreSQL-specific concurrency tests and run both k6 modes against a staging deployment. Perform the restore drill using `scripts/verify_postgres_restore.sh` with a real direct production connection and a newly provisioned, empty staging database. The staging environment must receive the original `BIOMETRIC_ENCRYPTION_KEY` and matching key version through secure environment configuration before the restore verification command can validate templates.
-- Measure false-accept and false-reject rates using a representative, consented evaluation set. The SFace threshold `0.363` is a published benchmark reference, not a RollNexa-specific calibrated threshold.
-- The randomised head-turn challenge is a heuristic liveness check, not a certified presentation-attack detection system. It must not be represented as proof that sophisticated photo, screen or video replay attacks are impossible. Retain the lecturer-approved manual alternative and evaluate a dedicated PAD model before high-stakes deployment.
-- The DRF throttles use Django's process-local cache. Configure shared cache and edge rate limiting before scaling beyond the current single-worker/single-instance configuration. Django Administration does not have built-in MFA in this release; protect administrator access with the institution's identity and network controls.
+The following operations remain environment-dependent and must only be reported as passed after their workflow results are captured:
+
+- Production `/healthz` and `/readyz` plus HTTPS/security-header smoke checks.
+- A real production backup restored into an isolated staging database, followed by row-count, migration and biometric-template recovery checks.
+- Both same-student and distinct-student k6 concurrency modes against staging.
+- Verification of the database provider's scheduled backup retention and point-in-time recovery configuration. The restore-drill workflow creates and removes a temporary dump; it is not a persistent backup system.
+
+### Additional security and privacy controls
+
+- The DRF throttles currently use Django's process-local cache. The Render Blueprint configures one Gunicorn worker, but rate limits are not globally coordinated across multiple workers or service instances. Configure a shared cache and edge-level rate limiting before scaling horizontally.
+- Django Administration does not have application-level multi-factor authentication in this release. Protect administrator access through the institution's identity provider, network controls and strong unique credentials.
+- The face challenge is a heuristic liveness check, not certified presentation-attack detection. It must not be represented as proof that photo, screen or video replay attacks are impossible. Retain the lecturer-approved manual alternative and evaluate a dedicated PAD model before high-stakes use.
+- The SFace threshold `0.363` is a benchmark reference, not a RollNexa-specific calibrated threshold. Measure false-accept and false-reject rates using representative, consented evaluation data before operational use.
 - The institution must approve the privacy notice, lawful basis, DPIA, biometric retention schedule, audit retention schedule and incident-response process before collecting real student biometric data.
+- Audit events are append-only through application workflows, but the application does not automatically purge audit, consent or verification history. The institution must define and implement retention and deletion controls.
+- The `frontend/package-lock.json` is generated in CI for that run and uploaded as a short-lived artifact; it is not yet committed to the repository. Commit a reviewed lockfile to make transitive frontend dependency resolution reproducible across builds.
 
-A successful container build and application smoke test are necessary but do not replace the accuracy, security, privacy, backup/restore and load evaluations listed above.
+A successful CI run, container build and production smoke test do not replace the biometric accuracy, privacy, database recovery and load evaluations listed above.
 
 ## 13. Third-party model attribution
 
@@ -588,3 +596,12 @@ The 1.1.4 hosted test run executed all 192 Django tests and identified four erro
 The same run identified one failing account-creation test. The rendered page already displayed the correct programme validation error, but the test searched the raw HTML for an apostrophe that Django correctly HTML-escaped as `&#x27;`. Version 1.1.5 changes the assertion to `assertFormError()` so it checks the actual form-field error rather than the HTML serialization. No application validation behaviour or user-facing wording was changed.
 
 No database migration is required. These changes must be confirmed by a new hosted run of `python manage.py test --verbosity=2`.
+
+
+### Version 1.1.6 — final CI validation
+
+The project owner confirmed that the deployment gate passed and the 1.1.6 release deployed. The deployment gate is configured to prevent deployment when the required GitHub Actions workflow fails.
+
+### Version 1.1.7 — operational hardening
+
+This release strengthens the manual PostgreSQL recovery drill, adds protected GitHub environment gates for recovery and staging load tests, and expands production smoke checks. It does not change application models or require a database migration. The new hosted workflows must still be run against the actual isolated staging and production services before their operational checks can be marked complete.
