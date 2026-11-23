@@ -1,4 +1,4 @@
-# RollNexa 1.1.7
+# RollNexa 1.1.8
 
 **Academic management and dual-verification attendance.**
 
@@ -395,7 +395,7 @@ The Dockerfile builds the React application, installs Python dependencies, downl
 Build locally:
 
 ```bash
-docker build -t rollnexa:1.1.7 .
+docker build -t rollnexa:1.1.8 .
 ```
 
 Before deploying to Render:
@@ -435,7 +435,7 @@ npm --prefix frontend run typecheck
 npm --prefix frontend run build
 ```
 
-Build the container with `docker build -t rollnexa:1.1.7 .`. The repository currently pins direct frontend dependencies in `frontend/package.json` but does not include a generated `package-lock.json`; generate and commit one through the hosted CI artifact or a network-enabled dependency-resolution environment to make transitive frontend dependency resolution reproducible.
+Build the container with `docker build -t rollnexa:1.1.8 .`. The repository currently pins direct frontend dependencies in `frontend/package.json` but does not include a generated `package-lock.json`; generate and commit one through the hosted CI artifact or a network-enabled dependency-resolution environment to make transitive frontend dependency resolution reproducible.
 
 - Keep the production database and biometric encryption key backed up under separate access controls.
 - Production defaults enforce HTTPS redirects and one-year HSTS. `/healthz` and `/readyz` are exempt from Django's redirect so Render health probes can reach them; the application routes are not exempt.
@@ -529,6 +529,12 @@ The staging concurrency workflow requires the manual confirmation `RUN_STAGING_C
 
 Version 1.1.6 corrected the programme-validation test to pass the bound form from `response.context` to Django's `assertFormError()` API. The change affects test assertion handling only; it does not change student account validation or production data. The user confirmed that the deployment gate passed and the 1.1.6 release deployed successfully. The CI workflow's backend, frontend and Docker jobs are required before the deployment proceeds.
 
+### Version 1.1.8 — Render Docker port alignment
+
+The 1.1.7 deployment built successfully and Gunicorn logged that it was listening on `0.0.0.0:10000`, but Render's port scan timed out without detecting an open port. Inspection found that the Dockerfile still declared `EXPOSE 8000` and defaulted `PORT` to `8000`, while the Render runtime injected `PORT=10000`. Version 1.1.8 aligns the Docker image's `PORT` default, `EXPOSE` declaration, entrypoint fallback and Render Blueprint setting on port `10000`. A CI regression check now verifies that these four settings remain aligned. No application code, database schema, stored records or biometric encryption settings are changed; no database migration is required.
+
+The source-level checks confirm that the configuration is internally consistent. A successful hosted deployment must still be confirmed by Render detecting port `10000`, completing the `/readyz` health check and reporting the service live.
+
 ### Version 1.1.7 — Operational hardening
 
 - The PostgreSQL restore drill now requires TLS for both database connections and verifies that TLS is active on each connection.
@@ -543,7 +549,7 @@ Version 1.1.6 corrected the programme-validation test to pass the bound form fro
 
 ### Validation status
 
-The deployed 1.1.6 release passed the repository's deployment gate, as confirmed by the project owner. That gate includes the configured Django/PostgreSQL tests, frontend production build and Docker image build. This 1.1.7 archive is a candidate release; the deployed service remains on 1.1.6 until this revision passes GitHub CI and is deployed. The 1.1.7 operational workflows and restore-script safeguards have not been executed against hosted production or staging infrastructure from the source-preparation environment.
+The deployed 1.1.6 release passed the repository's deployment gate, as confirmed by the project owner. The 1.1.7 candidate built its image and started Gunicorn but failed Render's port scan; the runtime listened on port 10000 while the Dockerfile exposed port 8000. Version 1.1.8 aligns those settings and adds a CI regression check. The deployed service remains on 1.1.6 until 1.1.8 passes GitHub CI and Render deployment. The 1.1.7 operational workflows and restore-script safeguards have not been executed against hosted production or staging infrastructure from the source-preparation environment.
 
 The following operations remain environment-dependent and must only be reported as passed after their workflow results are captured:
 

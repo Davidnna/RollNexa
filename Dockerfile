@@ -12,7 +12,7 @@ FROM python:3.12-slim AS application
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PORT=8000
+    PORT=10000
 
 WORKDIR /app/backend
 
@@ -34,6 +34,6 @@ RUN python biometrics/download_models.py \
 
 USER rollnexa
 
-EXPOSE 8000
+EXPOSE 10000
 
 CMD ["sh", "docker-entrypoint.sh"]
