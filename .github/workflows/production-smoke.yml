@@ -1,0 +1,40 @@
+name: RollNexa Production Smoke Check
+
+on:
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+jobs:
+    smoke-check:
+        name: Check deployed application health and security headers
+        runs-on: ubuntu-latest
+        timeout-minutes: 10
+        steps:
+            - name: Check production liveness
+              run: |
+                  response=$(curl --retry 6 --retry-delay 10 --retry-connrefused \
+                      --connect-timeout 15 --max-time 30 --fail --silent --show-error \
+                      https://rollnexa.onrender.com/healthz)
+                  test "$response" = "ok"
+
+            - name: Check production readiness
+              run: |
+                  response=$(curl --retry 6 --retry-delay 10 --retry-connrefused \
+                      --connect-timeout 15 --max-time 30 --fail --silent --show-error \
+                      https://rollnexa.onrender.com/readyz)
+                  test "$response" = "ready"
+
+            - name: Verify HTTPS security headers
+              run: |
+                  curl --retry 6 --retry-delay 10 --retry-connrefused \
+                      --connect-timeout 15 --max-time 30 --fail --silent --show-error \
+                      --dump-header "$RUNNER_TEMP/rollnexa-headers.txt" \
+                      --output /dev/null https://rollnexa.onrender.com/
+                  grep -Eiq '^strict-transport-security:.*max-age=31536000' \
+                      "$RUNNER_TEMP/rollnexa-headers.txt"
+                  grep -Eiq '^x-content-type-options:.*nosniff' \
+                      "$RUNNER_TEMP/rollnexa-headers.txt"
+                  grep -Eiq '^permissions-policy:.*camera=\(self\)' \
+                      "$RUNNER_TEMP/rollnexa-headers.txt"

@@ -1,0 +1,65 @@
+name: RollNexa PostgreSQL Backup and Restore Drill
+
+on:
+    workflow_dispatch:
+        inputs:
+            confirmation:
+                description: "Type RESTORE_TO_ISOLATED_STAGING to confirm this recovery drill."
+                required: true
+                type: string
+
+permissions:
+    contents: read
+
+concurrency:
+    group: rollnexa-production-restore-drill
+    cancel-in-progress: false
+
+jobs:
+    restore-drill:
+        name: Back up production and restore into isolated staging
+        if: github.ref == 'refs/heads/main' && inputs.confirmation == 'RESTORE_TO_ISOLATED_STAGING'
+        runs-on: ubuntu-latest
+        timeout-minutes: 45
+        env:
+            SOURCE_DATABASE_URL: ${{ secrets.SOURCE_DATABASE_URL }}
+            STAGING_DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+            BIOMETRIC_ENCRYPTION_KEY: ${{ secrets.BIOMETRIC_ENCRYPTION_KEY }}
+            BIOMETRIC_ENCRYPTION_KEY_VERSION: ${{ secrets.BIOMETRIC_ENCRYPTION_KEY_VERSION }}
+            BACKUP_FILE: ${{ runner.temp }}/rollnexa-restore-drill.dump
+        steps:
+            - name: Check out source
+              uses: actions/checkout@v4
+
+            - name: Validate required protected secrets
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  for name in SOURCE_DATABASE_URL STAGING_DATABASE_URL \
+                      BIOMETRIC_ENCRYPTION_KEY BIOMETRIC_ENCRYPTION_KEY_VERSION; do
+                      if [[ -z "${!name:-}" ]]; then
+                          echo "Required GitHub Actions secret is missing: $name" >&2
+                          exit 1
+                      fi
+                  done
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.12"
+                  cache: pip
+                  cache-dependency-path: backend/requirements.txt
+
+            - name: Install PostgreSQL client and backend dependencies
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install --yes postgresql-client
+                  python -m pip install --upgrade pip
+                  python -m pip install -r backend/requirements.txt
+
+            - name: Execute guarded backup and isolated restore drill
+              run: sh scripts/verify_postgres_restore.sh
+
+            - name: Remove temporary database backup
+              if: always()
+              run: rm -f "$BACKUP_FILE"

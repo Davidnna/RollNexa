@@ -2,7 +2,7 @@
 
 **Academic management and dual-verification attendance.**
 
-Version 1.1.1 is a validation-tooling patch for the 1.1.0 system-hardening release. It adds PostgreSQL concurrency tests, a guarded backup-and-restore verification script, and a management command that checks encrypted facial-template recovery without exposing biometric feature data. It also adds the documented local environment example and strengthens the k6 QR concurrency harness. The application workflow and database schema are unchanged from 1.1.0; no new database migration is required.
+Version 1.1.2 adds hosted GitHub Actions workflows for continuous integration, production smoke checks and a manually approved PostgreSQL backup/restore drill. Version 1.1.1 introduced the validation tooling for the 1.1.0 system-hardening release. It adds PostgreSQL concurrency tests, a guarded backup-and-restore verification script, and a management command that checks encrypted facial-template recovery without exposing biometric feature data. It also adds the documented local environment example and strengthens the k6 QR concurrency harness. The application workflow and database schema are unchanged from 1.1.0; no new database migration is required.
 
 RollNexa is a web-based academic administration and smart attendance platform. It manages institutional structure, user accounts, academic sessions, courses, course offerings, lecturer assignments and student registrations. Its automated attendance workflow combines a rotating QR Code with server-side facial recognition. An automated present record is created only when both verification stages succeed.
 
@@ -496,6 +496,19 @@ For a repeatable drill, `scripts/verify_postgres_restore.sh` automates the archi
 The `python manage.py verify_biometric_restore` command can also be run independently against a restored database. It decrypts templates in memory and reports only aggregate success/failure counts.
 
 ## 12. Hardening status and residual validation
+
+
+### Hosted validation workflows (version 1.1.2)
+
+The repository includes three GitHub Actions workflows under `.github/workflows/`:
+
+- `ci.yml` runs Django checks and the full test suite against an ephemeral PostgreSQL 16 service, checks migrations, builds the React application and builds the production Docker image without publishing it. The frontend job resolves dependencies, creates a `package-lock.json`, uploads it as a short-lived workflow artifact and uses that exact lockfile for `npm ci`. The Docker build job independently generates a lockfile in its checked-out build context so the Dockerfile can use `npm ci` during that image build. The generated lockfile must still be added to the repository to make subsequent installs reproducible.
+- `production-smoke.yml` can be triggered manually to check the deployed `/healthz` and `/readyz` endpoints and verify the expected HTTPS security headers on `https://rollnexa.onrender.com`.
+- `backup-restore-drill.yml` is manually triggered from `main` and requires the exact confirmation text `RESTORE_TO_ISOLATED_STAGING`. Configure the protected GitHub Actions repository secrets `SOURCE_DATABASE_URL`, `STAGING_DATABASE_URL`, `BIOMETRIC_ENCRYPTION_KEY` and `BIOMETRIC_ENCRYPTION_KEY_VERSION` before using it. The staging database must be newly created and empty. The workflow never uploads the database dump as an artifact and deletes the temporary dump when the job finishes.
+
+The backup/restore workflow is intentionally manual because it reads production data and writes to a staging database. Run it during a controlled maintenance window, keep the source and staging databases separate, and ensure the original biometric encryption key is available through protected secrets. Do not enable automatic execution for this workflow.
+
+These workflows are included as source configuration only. Their presence does not mean they have executed. A successful GitHub Actions run is required before reporting CI, production smoke checks, backup restoration or hosted concurrency tests as passed.
 
 ### Application hardening introduced in version 1.1.0
 
