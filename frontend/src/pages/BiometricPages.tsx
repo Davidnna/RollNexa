@@ -67,6 +67,7 @@ function useCamera(enabled: boolean) {
     const streamRef = useRef<MediaStream | null>(null);
     const [cameraError, setCameraError] = useState("");
     const [cameraReady, setCameraReady] = useState(false);
+    const [cameraAspect, setCameraAspect] = useState<number | null>(null);
 
     useEffect(() => {
         if (!enabled) return;
@@ -97,6 +98,9 @@ function useCamera(enabled: boolean) {
                 if (videoRef.current) {
                     videoRef.current.srcObject = stream;
                     await videoRef.current.play();
+                    if (videoRef.current.videoWidth && videoRef.current.videoHeight) {
+                        setCameraAspect(videoRef.current.videoWidth / videoRef.current.videoHeight);
+                    }
                     setCameraReady(true);
                 }
             } catch (error) {
@@ -112,6 +116,7 @@ function useCamera(enabled: boolean) {
             streamRef.current?.getTracks().forEach((track) => track.stop());
             streamRef.current = null;
             setCameraReady(false);
+            setCameraAspect(null);
         };
     }, [enabled]);
 
@@ -121,25 +126,13 @@ function useCamera(enabled: boolean) {
             throw new Error("The camera is not ready. Wait for the video preview and try again.");
         }
 
-        const displayRect = video.getBoundingClientRect();
-        const targetAspect = displayRect.width > 0 && displayRect.height > 0
-            ? displayRect.width / displayRect.height
-            : video.videoWidth / video.videoHeight;
-        const sourceAspect = video.videoWidth / video.videoHeight;
-        let sourceX = 0;
-        let sourceY = 0;
-        let sourceWidth = video.videoWidth;
-        let sourceHeight = video.videoHeight;
-
-        // Crop the source to the exact visible camera viewport. This keeps the
-        // image sent to Django consistent with what the student sees on mobile.
-        if (sourceAspect > targetAspect) {
-            sourceWidth = video.videoHeight * targetAspect;
-            sourceX = (video.videoWidth - sourceWidth) / 2;
-        } else if (sourceAspect < targetAspect) {
-            sourceHeight = video.videoWidth / targetAspect;
-            sourceY = (video.videoHeight - sourceHeight) / 2;
-        }
+        // Preserve the complete camera frame. Cropping to the CSS viewport can
+        // magnify faces on phones when the browser returns a different sensor
+        // aspect ratio from the requested portrait stream.
+        const sourceX = 0;
+        const sourceY = 0;
+        const sourceWidth = video.videoWidth;
+        const sourceHeight = video.videoHeight;
 
         const scale = Math.min(1, maxWidth / sourceWidth);
         const canvas = document.createElement("canvas");
@@ -172,6 +165,7 @@ function useCamera(enabled: boolean) {
         videoRef,
         cameraError,
         cameraReady,
+        cameraAspect,
         captureFrame: () => captureFrame(1280, 0.88),
         capturePreviewFrame: () => captureFrame(640, 0.72),
     };
@@ -470,7 +464,7 @@ export function BiometricSettingsPage() {
                             )}
                             {cameraEnabled && (
                                 <div className="biometric-capture-layout biometric-live-capture">
-                                    <div className="biometric-camera-frame">
+                                    <div className="biometric-camera-frame" style={camera.cameraAspect ? { aspectRatio: String(camera.cameraAspect), width: `min(100%, calc(min(54svh, 420px) * ${camera.cameraAspect}))`, marginInline: "auto" } : undefined}>
                                         <video ref={camera.videoRef} autoPlay playsInline muted />
                                         <div className="biometric-face-guide" aria-hidden="true" />
                                         {livePreview.boundingBox && (
@@ -851,7 +845,7 @@ export function AttendanceFaceCheckPage() {
                         <p>{verificationStage === "aligning" ? "Keep your face inside the guide." : verificationStage === "turning" ? "Move gently, then hold still." : "This will only take a moment."}</p>
                     </div>
                     <div className="biometric-capture-layout biometric-live-capture biometric-verification-capture">
-                        <div className="biometric-camera-frame">
+                        <div className="biometric-camera-frame" style={camera.cameraAspect ? { aspectRatio: String(camera.cameraAspect), width: `min(100%, calc(min(54svh, 420px) * ${camera.cameraAspect}))`, marginInline: "auto" } : undefined}>
                             <video ref={camera.videoRef} autoPlay playsInline muted />
                             <div className="biometric-face-guide" aria-hidden="true" />
                             {livePreview.boundingBox && (

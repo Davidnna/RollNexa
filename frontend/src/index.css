@@ -4242,7 +4242,7 @@ button:disabled {
     width: 100%;
     min-height: 260px;
     max-height: 420px;
-    object-fit: cover;
+    object-fit: contain;
     transform: scaleX(-1);
 }
 
@@ -4378,15 +4378,15 @@ button:disabled {
     height: 100%;
     min-height: 260px;
     max-height: 420px;
-    object-fit: cover;
+    object-fit: contain;
 }
 
 .biometric-face-guide {
     position: absolute;
     top: 50%;
     left: 50%;
-    width: 42%;
-    height: 76%;
+    width: 64%;
+    height: 82%;
     border: 2px dashed rgba(255, 255, 255, 0.88);
     border-radius: 48% 48% 44% 44%;
     box-shadow: 0 0 0 999px rgba(8, 17, 32, 0.18);
@@ -4533,7 +4533,7 @@ button:disabled {
         height: 100%;
         min-height: 0;
         max-height: none;
-        object-fit: cover;
+        object-fit: contain;
     }
 
     .biometric-live-capture .biometric-camera-frame {
@@ -4549,7 +4549,7 @@ button:disabled {
         height: 100%;
         min-height: 0;
         max-height: none;
-        object-fit: cover;
+        object-fit: contain;
     }
 
     .biometric-face-guide {
@@ -4672,12 +4672,12 @@ button:disabled {
     height: 100%;
     min-height: 0;
     max-height: none;
-    object-fit: cover;
+    object-fit: contain;
 }
 
 .biometric-verification-capture .biometric-face-guide {
-    width: 58%;
-    height: 72%;
+    width: 64%;
+    height: 82%;
 }
 
 .biometric-verification-capture .biometric-capture-controls {
@@ -4925,7 +4925,7 @@ button:disabled {
         height: 100%;
         min-height: 0;
         max-height: none;
-        object-fit: cover;
+        object-fit: contain;
     }
 
     .biometric-capture-controls {
@@ -5143,8 +5143,8 @@ button:disabled {
     }
 
     .biometric-face-guide {
-        width: 62%;
-        height: 73%;
+        width: 72%;
+        height: 84%;
     }
 
     .biometric-stage-label {
@@ -5224,3 +5224,16 @@ button:disabled {
         width: 145px;
     }
 }
+
+/* Preserve the complete sensor frame during biometric capture. */
+.biometric-capture-layout.biometric-live-capture .biometric-camera-frame {
+    min-height: 0;
+    max-height: min(54svh, 420px);
+}
+
+.biometric-capture-layout.biometric-live-capture .biometric-camera-frame video {
+    min-height: 0;
+    max-height: none;
+    object-fit: contain;
+}
+

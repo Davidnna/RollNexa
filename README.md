@@ -1,4 +1,6 @@
-# RollNexa 1.1.8
+# RollNexa 1.1.9
+
+**Version 1.1.9 improves mobile biometric camera framing. The preview and uploaded verification frames preserve the full camera sensor image instead of cropping it to the display viewport. The camera preview frame follows the actual stream aspect ratio, reducing apparent magnification and unnecessary distance from the phone.**
 
 **Academic management and dual-verification attendance.**
 
@@ -95,7 +97,7 @@ The model assets are downloaded during the Docker image build by `backend/biomet
 
 - The student must review the current biometric notice and explicitly grant consent before enrolment. This release increments the consent policy to version `1.1` because it introduces repeated live-preview frame processing; students with version `1.0` consent must review and accept the updated notice before continuing.
 - During enrolment, the browser sends a compressed camera preview frame to the same-origin Django API approximately every 900 milliseconds. The server runs YuNet detection and returns a face count, positioning box, and transient pose ratio for live guidance.
-- The guide reports when no face is visible, multiple faces are present, the face is too small or large, the face is off-centre, or the requested head position has been reached.
+- The guide reports when no face is visible, multiple faces are present, the face is too small or large, the face is off-centre, or the requested head position has been reached. The preview follows the camera stream aspect ratio and preserves the complete sensor frame; it does not crop the image to fill a portrait display box.
 - The interface automatically captures three stable frames in order: neutral, slight left turn and slight right turn. Each preview frame is processed in memory and is not stored. The final enrolment request rechecks the three frames, verifies pose changes and identity consistency, then creates the encrypted feature template.
 - The server creates a normalised facial feature vector and encrypts it before storage.
 - The application stores the encrypted feature template, model/version metadata and enrolment timestamps. It does not persist the captured enrolment images.
@@ -395,7 +397,7 @@ The Dockerfile builds the React application, installs Python dependencies, downl
 Build locally:
 
 ```bash
-docker build -t rollnexa:1.1.8 .
+docker build -t rollnexa:1.1.9 .
 ```
 
 Before deploying to Render:
@@ -435,7 +437,7 @@ npm --prefix frontend run typecheck
 npm --prefix frontend run build
 ```
 
-Build the container with `docker build -t rollnexa:1.1.8 .`. The repository currently pins direct frontend dependencies in `frontend/package.json` but does not include a generated `package-lock.json`; generate and commit one through the hosted CI artifact or a network-enabled dependency-resolution environment to make transitive frontend dependency resolution reproducible.
+Build the container with `docker build -t rollnexa:1.1.9 .`. The repository currently pins direct frontend dependencies in `frontend/package.json` but does not include a generated `package-lock.json`; generate and commit one through the hosted CI artifact or a network-enabled dependency-resolution environment to make transitive frontend dependency resolution reproducible.
 
 - Keep the production database and biometric encryption key backed up under separate access controls.
 - Production defaults enforce HTTPS redirects and one-year HSTS. `/healthz` and `/readyz` are exempt from Django's redirect so Render health probes can reach them; the application routes are not exempt.
@@ -535,6 +537,10 @@ The 1.1.7 deployment built successfully and Gunicorn logged that it was listenin
 
 The source-level checks confirm that the configuration is internally consistent. A successful hosted deployment must still be confirmed by Render detecting port `10000`, completing the `/readyz` health check and reporting the service live.
 
+### Version 1.1.9 — Mobile biometric camera framing
+
+Version 1.1.9 corrects camera framing during facial enrolment and attendance verification. The browser now sizes the preview frame to the actual camera stream aspect ratio, preserves the complete sensor image in the preview, and sends the complete camera frame to Django rather than cropping it to the CSS viewport. This avoids apparent magnification and loss of face context when a mobile browser supplies a camera stream whose aspect ratio differs from the requested portrait ratio. The face guide has also been adjusted to better represent the server's accepted face-size range. The server-side face-size and similarity checks remain unchanged. No database migration, stored-record change or biometric encryption-key change is required.
+
 ### Version 1.1.7 — Operational hardening
 
 - The PostgreSQL restore drill now requires TLS for both database connections and verifies that TLS is active on each connection.
@@ -549,7 +555,7 @@ The source-level checks confirm that the configuration is internally consistent.
 
 ### Validation status
 
-The deployed 1.1.6 release passed the repository's deployment gate, as confirmed by the project owner. The 1.1.7 candidate built its image and started Gunicorn but failed Render's port scan; the runtime listened on port 10000 while the Dockerfile exposed port 8000. Version 1.1.8 aligns those settings and adds a CI regression check. The deployed service remains on 1.1.6 until 1.1.8 passes GitHub CI and Render deployment. The 1.1.7 operational workflows and restore-script safeguards have not been executed against hosted production or staging infrastructure from the source-preparation environment.
+The project owner confirmed that RollNexa 1.1.8 passed the deployment gate and deployed successfully. Version 1.1.9 is a source update for mobile biometric camera framing and must pass the repository's GitHub Actions checks and Render deployment before it is considered the deployed release. The 1.1.7 operational workflows and restore-script safeguards require actual execution against hosted production and isolated staging infrastructure; source-level validation alone does not establish that those exercises passed.
 
 The following operations remain environment-dependent and must only be reported as passed after their workflow results are captured:
 
